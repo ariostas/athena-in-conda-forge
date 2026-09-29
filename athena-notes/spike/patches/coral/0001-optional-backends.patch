@@ -1,0 +1,40 @@
+--- a/CMakeLists.txt	2026-09-29 15:27:19.654210014 +0000
++++ b/CMakeLists.txt	2026-09-29 15:27:19.828210014 +0000
+@@ -146,16 +146,32 @@
+             XMLAuthenticationService XMLLookupService
+             EnvironmentAuthenticationService
+             ConnectionService RelationalService
+-            SQLiteAccess MySQLAccess OracleAccess
+-            PyCoral
+-            Tests)
++            SQLiteAccess
++            PyCoral)
+
+-if(NOT WIN32)
++# Optional backends, so that CORAL can be built without externals that are not
++# available or not redistributable (e.g. the Oracle Instant Client).
++option(CORAL_BUILD_MYSQL "Build the MySQL backend" ON)
++option(CORAL_BUILD_ORACLE "Build the Oracle backend" ON)
++option(CORAL_BUILD_FRONTIER "Build the Frontier backend" ON)
++option(CORAL_BUILD_TESTS "Build the tests" ON)
++option(CORAL_BUILD_SERVER "Build the CORAL server" ON)
++if(CORAL_BUILD_MYSQL)
++  list(APPEND subdirs MySQLAccess)
++endif()
++if(CORAL_BUILD_ORACLE)
++  list(APPEND subdirs OracleAccess)
++endif()
++if(CORAL_BUILD_TESTS)
++  list(APPEND subdirs Tests)
++endif()
++
++if(NOT WIN32 AND CORAL_BUILD_FRONTIER)
+   set(subdirs ${subdirs} FrontierAccess)
+ endif()
+
+ # CORAL SERVER subdirectories
+-IF(NOT CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin") # CORALCOOL-2822
++IF(NOT CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin" AND CORAL_BUILD_SERVER) # CORALCOOL-2822
+   set(CORAL_SERVER_subdirs CoralMonitor CoralServerBase
+                            CoralStubs CoralSockets CoralAccess
+                            CoralServer CoralServerProxy)

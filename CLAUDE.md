@@ -27,6 +27,21 @@ learned. The sister project is `../cmssw-in-conda-forge` (same approach for CMSS
   and its externals at `.../25.0/AthenaExternals/25.0.73/`. Reads are slow; keep scans targeted.
 - Externals versions: atlasexternals 2.1.91, LCG_110_ATLAS_5, ROOT 6.40.02 (C++23), gcc 15.2.
 
+## Building locally
+
+The host is an arm64 Mac, so builds happen in Docker. `athena-dev` is `condaforge/miniforge3`
+(native **linux-aarch64**) with the repo at `/repo`, `/cvmfs` read-only, and the volume
+`athena-work` at `/work`: rattler-build and friends in `/work/tools/bin`, the conda-forge
+pinning in `/work/conda_build_config.yaml`, an athena checkout of `release/25.0.73` in
+`/work/athena`. The M1 spike environments (`/work/spike-env`, `/work/spike-build`) are
+described in `athena-notes/spike/README.md`. Leave the `cmssw-dev*` containers alone.
+
+- The image is Ubuntu-based: `/bin/sh` is dash, and CMake installs shared libraries without
+  the execute bit unless `CMAKE_INSTALL_SO_NO_EXE=0`. conda-forge's CI is AlmaLinux.
+- Scripts that `source` conda activation must do so with `set +eu` (bash errors out inside
+  conda's `activate` function otherwise) and without redirecting the `source`.
+- Do not edit a bash script while it is running.
+
 ## Conventions
 
 - Run `prek -a --quiet` before committing. Revert its changes to pre-existing upstream files

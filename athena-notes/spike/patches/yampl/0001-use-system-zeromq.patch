@@ -1,0 +1,42 @@
+Link against an installed ZeroMQ instead of building the bundled copy (whose nested
+configure does not get the cross-compilation settings, and which duplicates libzmq).
+--- a/Makefile.in
++++ b/Makefile.in
+@@ -1,6 +1,6 @@
+ CXX = @CXX@
+ CC=@CC@
+-CXXFLAGS = -O2 -g -Wall -Iinclude -fPIC -Izeromq/include @CXXFLAGS@
++CXXFLAGS = -O2 -g -Wall -Iinclude -fPIC @CXXFLAGS@
+ LDFLAGS = -shared -lpthread -lrt -luuid @LDFLAGS@
+
+ SOURCES = $(wildcard src/pipe/*.cpp) \
+@@ -11,26 +11,23 @@
+ OBJECTS = $(SOURCES:.cpp=.o)
+ DEPS = $(SOURCES:.cpp=.d)
+ LIBYAMPL = libyampl.so
+-LIBZMQ = ./zeromq/src/.libs/libzmq.a
++LIBZMQ = -lzmq
+ EXAMPLES = examples
+ TESTS = tests
+ PREFIX = @prefix@
+ TAGS = tags
+
+-all: $(LIBZMQ) $(LIBYAMPL)
++all: $(LIBYAMPL)
+
+ $(TAGS):
+ 	ctags -R ./
+
+-$(LIBZMQ):
+-	+cd zeromq && CXX="${CXX}" CC="${CC}" ./configure --with-pic && make
+-
+ -include $(DEPS)
+
+ %.o: %.cpp
+ 	$(CXX) $(CXXFLAGS) -MT $@ -MMD -c $< -o $@
+
+-$(LIBYAMPL): $(OBJECTS) $(LIBZMQ)
++$(LIBYAMPL): $(OBJECTS)
+ 	$(CXX) $(LDFLAGS) $(OBJECTS) $(LIBZMQ) -o $(LIBYAMPL)
+
+ .PHONY: $(EXAMPLES)

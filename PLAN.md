@@ -382,6 +382,11 @@ akraszna, clemenci and Buncic.
   the first vehicle for osx-arm64 since it needs no Gaudi.
 - **D4:** build Gaudi ourselves (ATLAS fork v40r4.002) to start, since a patched CLHEP and
   osx-arm64 are needed anyway. Revisit contributing to the conda-forge gaudi feedstock later.
+  **Confirmed by the M1 spike:** Gaudi must be built with the same GCC major as Athena
+  (`std::format` ABI), and conda-forge's 40.4 is a gcc 14 build.
+- **D2 install layout:** (A), one install area per layer under
+  `$PREFIX/opt/athena/<Project>/<version>/InstallArea/<platform>` (M1 spike).
+- **Linux sysroot:** `c_stdlib_version` 2.34 (M1 spike).
 - Contact cburr, clemenci, akraszna and Buncic early (done by the user, not from this repo);
   the licence and POOL-payload questions need ATLAS.
 - Next: M0 and M1 (the stacking spike and cost measurement on linux-aarch64).
@@ -395,3 +400,73 @@ akraszna, clemenci and Buncic.
 Five research reports (listed at the top) on the build system, the externals, the package
 graph, prior art, and runtime data and platforms. ATLAS CVMFS (`atlas.cern.ch`,
 `atlas-condb.cern.ch`, `atlas-nightlies.cern.ch`, `sft.cern.ch`) is mounted on this machine.
+
+### 2026-09-29: the M1 spike: Athena projects stack in a conda prefix
+
+Scripts in `athena-notes/spike/` (see its README), run natively on linux-aarch64 in the
+`athena-dev` container, outside rattler-build but with the same host/build prefix split.
+
+**Stacking works.** atlasexternals' own `AthenaExternals` project, configured with LCG 0 and
+no bundled externals, gives the base that Athena's project files expect. On it, three Athena
+layers, each its own ATLAS project built only against the installed ones below it, the top one
+named `Athena`: four levels, one more than ATLAS itself uses. Everything is installed under
+`$PREFIX/opt/athena/<Project>/25.0.73/InstallArea/<platform>` (install layout (A) of D2), and
+in that shape ATLAS's own `setup.sh` of the top layer sets up the whole chain (PATH, libraries,
+python, job options, data, CMake prefixes). The 17-package link closure of `AthExHelloWorld`
+plus the 32 packages `athena.py` needs to start builds that way, including AthenaServices,
+AthenaMP, PerfMon and genconf/CLID DB/dictionary generation in every layer.
+
+**What it took:**
+- AtlasCMake: cburr's 5 patches apply unchanged to atlasexternals 2.1.91.
+- AtlasLCG: `find_package(LCG 0 EXACT)` has to succeed (patch 0001), and `lcg_generate_env`
+  must tolerate a Gaudi found through its own CMake configuration (0002). Both upstreamable.
+- Find modules: AtlasLCG's `FindTBB` clashes with TBB's own CMake configuration (conda-forge's
+  TBB also exports `tbbbind`), so the shim has its own. ATLAS's `FindGaudi.cmake` wrapper (it
+  creates the plain `GaudiKernel` target) and the `External/*/cmake/Find*.cmake` modules are
+  only installed by AthenaExternals when it builds those externals, so the shim installs them.
+- `link_libraries(Threads::Threads)` in the externals' PostConfig (cburr needed it too).
+- **The Linux recipes need `c_stdlib_version` 2.34** (EL9's glibc, what ATLAS targets):
+  PerfMonComps uses `mallinfo2` (glibc 2.33), and 2.17 is behind cburr's `_dlfcn_hook` patch.
+  `root_base` pins its *host* prefix to the 2.17 sysroot, but the compiler lives in the build
+  prefix, so this works in rattler-build.
+- The compilers must be given by absolute path: an installed layer's `setup.sh` puts the host
+  prefix's `bin/` first, where `root_base`'s own compiler (with the 2.17 sysroot) lives. Same
+  for Python (`-DPython_EXECUTABLE`).
+- `-DCMAKE_INSTALL_SO_NO_EXE=0`: on a Debian-like build host CMake installs libraries without
+  the execute bit, and `athena_preload.sh` finds `libexcabort.so` with `which`.
+- Layer projects must live in `athena/Projects/<name>/`: PyUtils finds the source tree as
+  `${CMAKE_SOURCE_DIR}/../../`.
+- Build-time tool dependencies the link graph does not show: every component needs
+  `Control/CLIDComps` (genCLIDDB) in the same or a lower layer, and PyUtils needs
+  `pygraphviz` in the build environment. `layers.py` has to learn about the first.
+
+**Gaudi has to be built with Athena's compiler.** conda-forge's gaudi 40.4 is a gcc 14 build
+and exports libstdc++'s `std::format` internals; Athena code built with gcc 15 binds to them
+and `genconf` segfaults in `Gaudi::Utils::toStream(double)` for every component with a
+`double` property. **The build does not fail**: the component is just missing from the
+`.confdb2`, and the job fails much later (`GaudiConfig2.Configurables has no attribute
+AthSequencer`). Recipe tests must check that every component made it into the databases.
+ATLAS's fork v40r4.002 built with gcc 15 fixes it, which settles D4. (conda-forge's gaudi also
+exports `GaudiKernel` with an absolute path to `librt.so` in its feedstock's build sysroot:
+worth reporting to the feedstock.)
+
+**New externals, all built in the spike:** CORAL 3_3_20 (upstream lcgcoral, with a patch
+making MySQL/Oracle/Frontier/tests/server optional); boost-mpi3 v0.81 with ATLAS's patch
+(needs openmpi); yampl 1.2 (a patch to use conda-forge's zeromq + cppzmq instead of its
+bundled copy). AthenaServices also needs valgrind's headers (conda-forge has them on Linux
+only). CORAL and yampl have no licence file.
+
+**Cost.** ninja's timings at `-j8` on the lowest layers (light Control packages): about
+**6 CPU-s per non-test translation unit** including dictionaries and generated code, 7–9 s
+per dictionary; compiled tests roughly double the total. Heavier xAOD/Eigen code is still to
+be measured, and so is memory.
+
+**`athena.py` runs but HelloWorld does not yet:** `initConfigFlags()` imports `IOVDbSvc`,
+which needs **COOL, CrestApi and chai**. So the whole conditions client stack is needed from
+the first layer, as the package graph said for the core layer. Also found: `athena.py` is a
+`#!/bin/sh` script with bash arrays, which fails where `/bin/sh` is dash (Debian/Ubuntu); an
+upstream fix is `#!/bin/bash`.
+
+**Next:** COOL, CrestApi and chai in the spike until HelloWorld runs; then the first real
+recipes (`atlascmake` shim, `atlas-gaudi`, `lcg-coral`/`lcg-cool`, the small externals) and
+the first layer through rattler-build.
