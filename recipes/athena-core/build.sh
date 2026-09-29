@@ -38,7 +38,9 @@ echo "- .*" >> package_filters.txt
 mkdir -p Projects/CondaLayer
 cp "${RECIPE_DIR}/CMakeLists.txt" Projects/CondaLayer/
 # CMAKE_INSTALL_SO_NO_EXE: CMake's default on Debian-based hosts is to install shared libraries
-# without the execute bit, and athena.py looks some of them up with "which".
+# without the execute bit, and athena.py looks some of them up with "which". ATLAS_EXTERNAL:
+# see the authentication.xml check below. ATLAS_ALWAYS_BUILD_TESTS: the packages' compiled
+# unit tests are neither run nor installed here, and are about a third of the compile jobs.
 
 cmake -S Projects/CondaLayer -B build -G Ninja ${CMAKE_ARGS} \
   -DCMAKE_BUILD_TYPE=Release \
@@ -50,9 +52,18 @@ cmake -S Projects/CondaLayer -B build -G Ninja ${CMAKE_ARGS} \
   -DATHENA_SOURCE_DIR="${SRC_DIR}" \
   -DATLAS_PACKAGE_FILTER_FILE="${PWD}/package_filters.txt" \
   -DPython_EXECUTABLE="${PYTHON}" \
-  -DCMAKE_INSTALL_SO_NO_EXE=0
+  -DCMAKE_INSTALL_SO_NO_EXE=0 \
+  -DATLAS_EXTERNAL="${SRC_DIR}/no-atlas-external" \
+  -DATLAS_ALWAYS_BUILD_TESTS=OFF
 cmake --build build --parallel "${CPU_COUNT}"
 cmake --install build
+
+# ATLAS's authentication.xml holds database passwords: AtlasAuthentication installs it when it
+# finds it in ${ATLAS_EXTERNAL} (on AFS by default), which is pointed nowhere above.
+if find "${INSTALL}" -name authentication.xml | grep .; then
+  echo "authentication.xml must not be packaged"
+  exit 1
+fi
 
 # Activation: the layer's own setup.sh, as on CVMFS (see activate.sh).
 mkdir -p "${PREFIX}/etc/conda/activate.d" "${PREFIX}/etc/conda/deactivate.d"

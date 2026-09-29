@@ -362,8 +362,8 @@ akraszna, clemenci and Buncic.
    may force `-j2` on 7 GB runners.
 5. **Deep project chaining** is untested beyond three levels; configure time with thousands of
    copied imported targets per level.
-6. **tdaq-common**'s build system is LCG-centric and has never been built outside EL9/gcc. It is
-   needed from the core layer (ByteStream) unless ByteStream moves up.
+6. ~~**tdaq-common**'s build system is LCG-centric and has never been built outside EL9/gcc.~~
+   Retired: its packages build on a small shim of the tdaq CMake functions (progress log).
 7. **ACTS and GeoModel pins** tie our recipes to atlasexternals' versions; the conda-forge
    feedstocks move on their own schedule.
 8. **Tests**: ATLAS tests are often full athena jobs needing data; running them in CI may cost
@@ -542,3 +542,84 @@ Decisions and findings:
 the POOL/RNTuple I/O and ByteStream packages; `layers.py` must learn the CLIDComps build
 dependency), measure memory per compile on it, and the M3 deliverables (write/read a POOL file,
 conditions from SQLite).
+
+### 2026-09-29: the full core layer (M3)
+
+`athena-core` is now the whole `core` layer of `layers.py` (177 packages) plus
+GeneratorConfig and McEventSelector, which job configurations import. It builds with
+`rattler-build` on linux-aarch64 and passes four tests:
+- HelloWorld, serial and multi-threaded;
+- **conditions from SQLite through POOL**: ATLAS's IOVDbTestAlg write and read jobs. The write
+  job puts conditions payloads in a POOL file and registers them in a COOL SQLite database; the
+  read job reads them back through IOVDbSvc. The output matches ATLAS's reference logs except
+  for three framework debug lines;
+- **raw data**: an EventStorage file of random events written with tdaq-common's eformat,
+  then listed and copied with Athena's `AtlListBSEvents` and `AtlCopyBSEvent`;
+- the component check: 486 components, and every one has its configurable or matches a
+  documented exception.
+
+New and changed recipes:
+- **`tdaq-common` 14.0.0**:
+  - the packages Athena uses outside the online and DQ code: ers, compression, eformat,
+    EventStorage, CTPfragment, hltinterface, MuCalDecode and circ;
+  - sources are the public `atlas-tdaq-software` repositories, at the submodule commits of
+    `tdaq-common-cmake`'s `tdaq-common-14-00-00` branch. They are identical to CVMFS;
+  - licence Apache-2.0 (one LICENSE file, identical in every package);
+  - the packages' own CMakeLists.txt files, unmodified, build on a ~200-line shim of the
+    `tdaq_*` functions (`cmake/TDAQShim.cmake`) instead of the LCG-centric cmake_tdaq;
+  - conda layout: the Boost.Python modules (`libpyeformat`, `liberspy`, ...) go in
+    site-packages, because python imports them by those names;
+  - tests: events written with the python bindings, read back in python and in C++;
+  - `athena-externals` ships a `Findtdaq-common.cmake` for this layout, without the TDAQ
+    environment (`TDAQ_RELEASE_BASE`, `TDAQ_PYTHON_HOME`);
+  - left out for now:
+    - the ROOT-dependent packages (dqm_core, dqm_algorithm_helper, HistogramStyles, webdaq),
+      needed by DQ and trigger;
+    - df_ef_interface, which has no licence file.
+
+  This retires risk 6: tdaq-common's build system was not an obstacle.
+- **`athena-externals`** also builds dSFMT (`+ External/dSFMT`). It is a static library whose
+  sources are in atlasexternals (BSD-3-Clause, licence added), used by
+  AtlasCLHEP_RandomGenerators.
+- **`athena-core`**:
+  - adds tdaq-common, HepMC3, XRootD, Davix, libprotobuf, gperftools and a Fortran
+    compiler (the layer project now enables Fortran, like `Projects/Athena`);
+  - `ATLAS_ALWAYS_BUILD_TESTS=OFF`. Compiled unit tests are about a quarter of the build
+    time, and four of them need later layers (xAODJet, xAODEgamma);
+  - `ATLAS_EXTERNAL` points nowhere, and the build fails if an `authentication.xml` is ever
+    installed. AtlasAuthentication installs one when it finds it on AFS.
+- **`layers.py`** knows that every package with components needs `Control/CLIDComps` at build
+  time (in `graph.py`). This changes no layer assignment today.
+
+Two Athena patches, both small and upstreamable:
+1. **CLHEP.** AtlasCLHEP_RandomGenerators derives from `CLHEP::RandBinomial`, whose members
+   are private upstream and protected in ATLAS's CLHEP fork (`CLHEP_2_4_7_1_atl01`). The
+   patch reads them as protected with a scoped `#define`, which is ABI-neutral. The fork's
+   other change, to RandGaussZiggurat and RandExpZiggurat (no `thread_local`, a rounding fix),
+   changes random sequences. That matters for simulation and digitization reproducibility, not
+   for core: raise it with the clhep feedstock and ATLAS before the sim layer (D5).
+2. **GeoModel flags.** `GeoModelConfigFlags` imports `DumpGeo` (DetectorDescription), and
+   every IOVDb job reads a GeoModel flag (`IOVDb.UseCREST` depends on `GeoModel.Run`). The
+   patch guards the import with `moduleExists`, as AllConfigFlags does for other optional
+   categories. Also, `GeoModel.Run` is deduced from the geometry tag through AtlasGeoModel and
+   the geometry database, so **core-only conditions jobs must set `GeoModel.Run`** (or
+   `IOVDb.UseCREST`) explicitly. The link graph shows neither dependency; python imports
+   inside flag generators are the next thing to scan for when drawing layer boundaries.
+
+**Cost** (`compile_cost.py`: the ninja log, plus 164 compiles re-run for peak memory):
+- the layer builds in **12 to 15 minutes at `-j10`** on the Mac's linux-aarch64 VM without the
+  unit tests (the whole recipe, tests included, in 13 minutes; the package is 34 MB): about 8 CPU-s per translation unit, dictionaries and genconf included. That is
+  roughly 1.5–2.5 h on a 2-core conda-forge runner;
+- peak RSS per compile: median 350 MB, p90 0.7 GB, max 2.2 GB (the xAODTrigger reflex
+  dictionary, whose genreflex step alone takes 6 minutes). **`-j4` fits in 7 GB**; heavier
+  (Eigen) layers still need measuring the same way.
+
+Also: the `authentication.xml` guard; `KEEP_BUILD=1` in `build-local.sh`; tdaq-common in the
+default build order.
+
+**Next:**
+- M4: externals for `detdescr` (GeoModel 6.29.0, ACTS 47.7.0, vecmem), then the layer itself;
+- scan python imports in flag and config generators for layer-crossing dependencies;
+- the runtime python dependencies of core (psutil, matplotlib, pandas, sqlalchemy for
+  PerfMon's scripts; boto3 and stomp.py for EventIndex), deciding which become run
+  requirements.

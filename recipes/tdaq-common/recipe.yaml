@@ -1,0 +1,128 @@
+context:
+  version: "14.0.0"
+  tag: tdaq-common-14-00-00
+
+package:
+  name: tdaq-common
+  version: ${{ version }}
+
+# tdaq-common is a superproject (atlas-tdaq-software/tdaq-common-cmake) with one git submodule
+# per package. These are the commits its ${{ tag }} branch points to, and the subset of the
+# packages that the ATLAS offline software (Athena) uses outside the online and DQ code.
+source:
+  - url: https://gitlab.cern.ch/atlas-tdaq-software/ers/-/archive/82d5bc686d5bc797f5b4c5823610cbfe0e1297ba/ers-82d5bc686d5bc797f5b4c5823610cbfe0e1297ba.tar.gz
+    sha256: 8ac046637bce262ea24dea02c88093a40b824073856029a6e37c54de63209fce
+    target_directory: ers
+  - url: https://gitlab.cern.ch/atlas-tdaq-software/compression/-/archive/398f711d6a6b0cf29286a11352d9c848882ef710/compression-398f711d6a6b0cf29286a11352d9c848882ef710.tar.gz
+    sha256: 07f6c999e506bf65795467c461c43bc5918cb83467c7e1ab1ada3176f4c93229
+    target_directory: compression
+  - url: https://gitlab.cern.ch/atlas-tdaq-software/eformat/-/archive/e8be71d06d944a2ac1838182f0097123a03bccc9/eformat-e8be71d06d944a2ac1838182f0097123a03bccc9.tar.gz
+    sha256: 8496c97493c8bdb3b803205d219908f5faa8b9a5a3c3b46d15b6f994ffcac3d1
+    target_directory: eformat
+  - url: https://gitlab.cern.ch/atlas-tdaq-software/EventStorage/-/archive/895d4a9c58cd20927ebdea6c3fd68829e996cf43/EventStorage-895d4a9c58cd20927ebdea6c3fd68829e996cf43.tar.gz
+    sha256: 13476b19c84186e29f006dc968273275d21cfa1a0d11dc5c36af713721044797
+    target_directory: EventStorage
+  - url: https://gitlab.cern.ch/atlas-tdaq-software/CTPfragment/-/archive/5788cecb053653014720a15e2dbfb39046648065/CTPfragment-5788cecb053653014720a15e2dbfb39046648065.tar.gz
+    sha256: 25658ad66d185c28c7ea8d5e2b4437ff92382d14c7ae568f9697e888fda8619d
+    target_directory: CTPfragment
+  - url: https://gitlab.cern.ch/atlas-tdaq-software/hltinterface/-/archive/ed98b7ad3c18d208c2e04bb55dbd3e2e39dc24cb/hltinterface-ed98b7ad3c18d208c2e04bb55dbd3e2e39dc24cb.tar.gz
+    sha256: b38c343f57bcfd5bfae3a7b8bc69f7d7d8bf2f21a65fe40e05bd337516ffb0f1
+    target_directory: hltinterface
+  - url: https://gitlab.cern.ch/atlas-tdaq-software/MuCalDecode/-/archive/632544ca2baf73e123f4492e7b56eea9cfd17eeb/MuCalDecode-632544ca2baf73e123f4492e7b56eea9cfd17eeb.tar.gz
+    sha256: 114c20c6afe6d1643b63a05a04b3f93bfcea868d8fefbcd31c17c0470095ab9e
+    target_directory: MuCalDecode
+  - url: https://gitlab.cern.ch/atlas-tdaq-software/circ/-/archive/a9792232bd13ad4ef941976075c80b51f2e7d77c/circ-a9792232bd13ad4ef941976075c80b51f2e7d77c.tar.gz
+    sha256: e8581567db81e99c96c0e28119496c2ca13ea58711b26ffe1c82a99d3d64aa7a
+    target_directory: circ
+
+build:
+  number: 0
+  skip:
+    - not linux
+  script:
+    # The packages' own CMakeLists.txt, on a replacement for the tdaq build system (cmake_tdaq,
+    # built around LCG releases): see cmake/TDAQShim.cmake.
+    - cp ${RECIPE_DIR}/cmake/CMakeLists.txt ${RECIPE_DIR}/cmake/TDAQShim.cmake .
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DPython_EXECUTABLE=${PYTHON} -DTDAQ_PYTHON_DIR=${SP_DIR}
+    - cmake --build build --parallel ${CPU_COUNT}
+    - cmake --install build
+
+requirements:
+  # the libraries have no soname version
+  run_exports:
+    - ${{ pin_subpackage('tdaq-common', upper_bound='x.x') }}
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+  host:
+    - python
+    - libboost-devel
+    - libboost-python-devel
+    - libuuid
+    - zlib
+  run:
+    - python
+    # ers's public headers use Boost.Preprocessor
+    - libboost-headers
+
+tests:
+  - package_contents:
+      lib:
+        - ers
+        - ErsBaseStreams
+        - compression
+        - eformat
+        - eformat_write
+        - eformat_old
+        - RawFileName
+        - DataReader
+        - DataWriter
+        - fReadPlain
+        - CTPfragment
+        - hltinterface
+        - MuCalDecode
+        - circ_proc
+      include:
+        - eformat/eformat.h
+        - EventStorage/DataReader.h
+        - ers/ers.h
+        - CTPfragment/CTPdataformatVersion.h
+  - python:
+      imports:
+        - ers
+        - eformat
+        - CTPfragment
+      pip_check: false
+  - script:
+      # random events written to an EventStorage file with the python bindings, read back in
+      # python and in C++
+      - python test/write_read.py test.data
+      - ${CXX} -std=c++23 test/read.cxx -I${PREFIX}/include -L${PREFIX}/lib -Wl,-rpath,${PREFIX}/lib -lDataReader -leformat -lers -o read
+      - ./read test.data 5
+    files:
+      recipe:
+        - test/
+    requirements:
+      run:
+        - ${{ compiler('cxx') }}
+        - ${{ stdlib('c') }}
+
+about:
+  homepage: https://gitlab.cern.ch/atlas-tdaq-software
+  summary: The ATLAS TDAQ common libraries (event format, event storage, error reporting)
+  description: |
+    tdaq-common is the part of the ATLAS Trigger and Data Acquisition software that the
+    offline software shares: the raw event format (eformat), the raw data file reader and
+    writer (EventStorage), the error reporting system (ers), and the level-1 central trigger,
+    HLT interface and muon calibration data formats. This package holds that subset, without
+    the online and data quality monitoring packages.
+  license: Apache-2.0
+  license_file: LICENSE
+  repository: https://gitlab.cern.ch/atlas-tdaq-software/tdaq-common-cmake
+
+extra:
+  recipe-maintainers:
+    - ariostas

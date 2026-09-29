@@ -1,0 +1,16 @@
+--- a/Control/AthenaConfiguration/python/GeoModelConfigFlags.py	2026-09-29 16:02:18
++++ b/Control/AthenaConfiguration/python/GeoModelConfigFlags.py	2026-09-29 16:02:18
+@@ -97,8 +97,10 @@
+ 
+     gcf.addFlag('GeoModel.IgnoreTagDifference',False, help='Ignore geometry tag difference between the configured value and the value read from the input file metadata')
+ 
+-    # Add the DumpGeo config flags
+-    from DumpGeo.DumpGeoConfigFlags import createDumpGeoConfigFlags
+-    gcf = createDumpGeoConfigFlags(gcf)
++    # Add the DumpGeo config flags (DetectorDescription/GeoModel/DumpGeo, if it is available)
++    from PyUtils.moduleExists import moduleExists
++    if moduleExists("DumpGeo"):
++        from DumpGeo.DumpGeoConfigFlags import createDumpGeoConfigFlags
++        gcf = createDumpGeoConfigFlags(gcf)
+ 
+     return gcf

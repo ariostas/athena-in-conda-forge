@@ -8,6 +8,12 @@ package:
 source:
   url: https://gitlab.cern.ch/atlas/athena/-/archive/release/${{ version }}/athena-release-${{ version }}.tar.gz
   sha256: e2df75b2fd966f97973e9ed89984222e4070be0d60ace0a4f3975e80e9ec1eba
+  patches:
+    # AtlasCLHEP_RandomGenerators with conda-forge's (upstream) CLHEP instead of ATLAS's fork
+    - 0001-AtlasCLHEP_RandomGenerators-upstream-CLHEP.patch
+    # the GeoModel configuration flags without DetectorDescription/GeoModel/DumpGeo (a later
+    # layer), as AthenaConfiguration does for other optional flag categories
+    - 0002-AthenaConfiguration-DumpGeo-flags-only-if-available.patch
 
 build:
   number: 0
@@ -22,6 +28,8 @@ requirements:
   build:
     - ${{ compiler('c') }}
     - ${{ compiler('cxx') }}
+    # AthExFortranAlgorithm
+    - ${{ compiler('fortran') }}
     - ${{ stdlib('c') }}
     - cmake
     - ninja
@@ -32,6 +40,7 @@ requirements:
     - lcg-cool
     - crestapi
     - chai
+    - tdaq-common
     - yampl
     - boost-mpi3
     - openmpi
@@ -59,6 +68,14 @@ requirements:
     - heppdt
     - zeromq
     - cppzmq
+    - hepmc3
+    # ByteStream input from remote storage
+    - xrootd
+    - davix
+    # EventIndexProducer
+    - libprotobuf
+    # PerfMonGPerfTools
+    - gperftools
     # headers only (AthenaServices)
     - valgrind
     - libcurl
@@ -78,6 +95,11 @@ tests:
       # the ATLAS HelloWorld example, serial and multi-threaded
       - bash test/run_hello.sh
       - bash test/run_hello.sh --threads=2
+      # conditions: payloads written to a POOL file and registered in a COOL SQLite
+      # database, read back through IOVDbSvc
+      - bash test/run_conditions.sh
+      # raw data: an EventStorage file listed and copied with the ByteStream tools
+      - bash test/run_bytestream.sh
       # every component of the layer has its configurable
       - python test/check_confdb.py "${AthenaCore_DIR}/lib/AthenaCore.components"
     files:
@@ -91,8 +113,8 @@ about:
     Athena is the offline software of the ATLAS experiment at CERN, built on the Gaudi
     framework. This package is the first of the layers Athena is split into for conda-forge:
     the framework itself (athena.py, StoreGate, the component configuration, AthenaMP,
-    performance monitoring, conditions access). For now it carries the subset of packages
-    needed to run the HelloWorld example.
+    performance monitoring, POOL and RNTuple I/O, raw data (ByteStream) I/O, conditions
+    access through IOVDb, COOL and CREST, the core of the xAOD event data model).
   license: Apache-2.0
   license_file: LICENSE
   repository: https://gitlab.cern.ch/atlas/athena

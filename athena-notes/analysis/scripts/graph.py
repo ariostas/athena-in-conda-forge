@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from scan import WORK  # noqa: E402
 
 LIB_KINDS = {"library", "tpcnv", "cmake_library"}
+CLIDCOMPS = "Control/CLIDComps"
 BUILD_KINDS = LIB_KINDS | {
     "component",
     "dictionary",
@@ -185,6 +186,11 @@ def build(pkgs, target_pkg):
             "kinds": dict(kinds),
             "python": d["python"],
         }
+    # Build-time tools that the link graph does not show: genCLIDDB, from Control/CLIDComps,
+    # runs on every component library (found in the M1 spike).
+    for p, d in g.items():
+        if "component" in d["kinds"] and p != CLIDCOMPS:
+            d["deps"] = sorted(set(d["deps"]) | {CLIDCOMPS})
     return g
 
 

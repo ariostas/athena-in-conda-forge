@@ -2,8 +2,8 @@
 set -euxo pipefail
 
 # The base project of the Athena layers: atlasexternals' AthenaExternals project with no LCG
-# release (LCG 0) and none of its bundled externals (they come from conda-forge and from the
-# recipes next to this one). What it installs is the project configuration, the Pre- and
+# release (LCG 0) and almost none of its bundled externals (they come from conda-forge and from
+# the recipes next to this one). What it installs is the project configuration, the Pre- and
 # PostConfig files, AtlasCMake and AtlasLCG, and the setup scripts, in the CVMFS layout that
 # the Athena layers expect for their base projects:
 #   ${PREFIX}/opt/athena/AthenaExternals/<version>/InstallArea/<platform>
@@ -16,7 +16,9 @@ esac
 PLATFORM=${ARCH}-cf-gcc$(${CXX} -dumpversion | cut -d. -f1)-opt
 INSTALL=${PREFIX}/opt/athena/AthenaExternals/${PKG_VERSION}/InstallArea/${PLATFORM}
 
-printf -- '- .*\n' > package_filters.txt
+# Of the externals, only dSFMT: a small library that ATLAS keeps in atlasexternals (its sources
+# are there), static, for AtlasCLHEP_RandomGenerators.
+printf -- '+ External/dSFMT\n- .*\n' > package_filters.txt
 cmake -S Projects/AthenaExternals -B build -G Ninja ${CMAKE_ARGS} \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="${INSTALL}" \

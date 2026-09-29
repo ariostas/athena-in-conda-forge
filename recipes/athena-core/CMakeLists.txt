@@ -8,7 +8,8 @@
 #   -DATLAS_PACKAGE_FILTER_FILE=<file>        (the packages of this layer)
 cmake_minimum_required( VERSION 3.25 )
 set( ATHENA_LAYER_VERSION "25.0.73" CACHE STRING "Athena version" )
-project( ${ATHENA_LAYER_NAME} VERSION ${ATHENA_LAYER_VERSION} LANGUAGES C CXX )
+# Fortran as in Projects/Athena (AthExFortranAlgorithm and a few generator interfaces).
+project( ${ATHENA_LAYER_NAME} VERSION ${ATHENA_LAYER_VERSION} LANGUAGES C CXX Fortran )
 
 # No flake8_atlas, cppcheck or CUDA in these builds.
 set( ATLAS_FLAKE8 "" CACHE STRING "Default flake8 command" )

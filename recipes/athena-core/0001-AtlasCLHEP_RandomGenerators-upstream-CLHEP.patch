@@ -1,0 +1,18 @@
+--- a/Simulation/Tools/AtlasCLHEP_RandomGenerators/AtlasCLHEP_RandomGenerators/RandBinomialFixedP.h	2026-09-29 15:23:01
++++ b/Simulation/Tools/AtlasCLHEP_RandomGenerators/AtlasCLHEP_RandomGenerators/RandBinomialFixedP.h	2026-09-29 15:23:01
+@@ -7,7 +7,15 @@
+ 
+ #include <vector>
+ 
++// RandBinomialFixedP needs RandBinomial's members, which are private in upstream CLHEP and
++// protected in ATLAS's fork (CLHEP_2_4_7_1_atl01). Access control does not change the ABI, so
++// with upstream CLHEP (conda-forge) read them as protected: RandBinomial.h's own includes
++// first, so that the redefinition applies to it alone.
++#include "CLHEP/Random/Random.h"
++#include "CLHEP/Utility/memory.h"
++#define private protected
+ #include "CLHEP/Random/RandBinomial.h"
++#undef private
+ 
+ namespace CLHEP {
+ 

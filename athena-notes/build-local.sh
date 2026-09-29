@@ -1,11 +1,12 @@
 #!/bin/bash
 # Build the Athena recipes locally, inside a conda-forge style container.
 #
-# usage: [WORK=<dir>] build-local.sh <ci-config> [recipe ...]
+# usage: [WORK=<dir>] [KEEP_BUILD=1] build-local.sh <ci-config> [recipe ...]
 #   e.g. build-local.sh linux_aarch64   (in the athena-dev container, repo mounted at /repo)
 # ci-config is one of the files in .ci_support (without .yaml). WORK (default /work) must contain
 # conda_build_config.yaml (the conda-forge global pinning). Packages are written to $WORK/output,
-# which is also used as a channel, so recipes must be given in dependency order.
+# which is also used as a channel, so recipes must be given in dependency order. KEEP_BUILD=1
+# keeps the build directories (in $WORK/output/bld), e.g. to look at the ninja log.
 # Adapted from ../cmssw-in-conda-forge/cmssw-notes/build-local.sh.
 set -euo pipefail
 
@@ -13,7 +14,7 @@ CONFIG=$1
 shift
 RECIPES=("$@")
 if [ ${#RECIPES[@]} -eq 0 ]; then
-  RECIPES=(recipes/boost-mpi3 recipes/yampl recipes/frontier-client recipes/lcg-coral recipes/lcg-cool
+  RECIPES=(recipes/boost-mpi3 recipes/yampl recipes/tdaq-common recipes/frontier-client recipes/lcg-coral recipes/lcg-cool
            recipes/crestapi recipes/chai recipes/atlas-gaudi recipes/athena-externals)
 fi
 
@@ -47,7 +48,9 @@ for recipe in "${RECIPES[@]}"; do
   # explicit -m disables the auto-discovery of the recipe's variants.yaml, add it last so it wins
   recipe_variants=()
   [ -f "${recipe}/variants.yaml" ] && recipe_variants+=(-m "${recipe}/variants.yaml")
-  if rattler-build build --recipe "${recipe}" --output-dir "${OUT}" \
+  keep=()
+  [ "${KEEP_BUILD:-0}" = 1 ] && keep+=(--keep-build)
+  if rattler-build build --recipe "${recipe}" --output-dir "${OUT}" ${keep[@]+"${keep[@]}"} \
       -m "${WORK}/${CONFIG}_local.yaml" -m "${WORK}/conda_build_config.yaml" \
       -m "${WORK}/local_variants.yaml" ${recipe_variants[@]+"${recipe_variants[@]}"} \
       > "${WORK}/logs/${name}-${CONFIG}.log" 2>&1; then

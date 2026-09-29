@@ -40,8 +40,10 @@ described in `athena-notes/spike/README.md`. Leave the `cmssw-dev*` containers a
 Recipes are built with `athena-notes/build-local.sh` (adapted from the CMSSW one):
 `docker exec athena-dev bash -c 'export PATH=/work/tools/bin:$PATH; cd /repo &&
 ./athena-notes/build-local.sh linux_aarch64 [recipes/<name> ...]'`. With no recipes it builds
-all of them in dependency order. Packages go to `/work/output` (also used as a channel), logs
-to `/work/logs/<name>-linux_aarch64.log`, and only python 3.13 is built.
+all of them except the Athena layers, in dependency order. Packages go to `/work/output` (also
+used as a channel), logs to `/work/logs/<name>-linux_aarch64.log`, and only python 3.13 is
+built. `KEEP_BUILD=1` keeps the build directories in `/work/output/bld`, for
+`athena-notes/analysis/scripts/compile_cost.py` (compile time and memory of a layer).
 
 - The image is Ubuntu-based: `/bin/sh` is dash, and CMake installs shared libraries without
   the execute bit unless `CMAKE_INSTALL_SO_NO_EXE=0`. conda-forge's CI is AlmaLinux.

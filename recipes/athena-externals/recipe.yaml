@@ -30,6 +30,8 @@ requirements:
     - ${{ stdlib('c') }}
     - cmake
     - ninja
+    # dSFMT's own Makefile
+    - make
 
 tests:
   - package_contents:
@@ -39,6 +41,9 @@ tests:
         - opt/athena/AthenaExternals/${{ version }}/InstallArea/*/cmake/modules/AtlasFunctions.cmake
         - opt/athena/AthenaExternals/${{ version }}/InstallArea/*/cmake/modules/FindGaudi.cmake
         - opt/athena/AthenaExternals/${{ version }}/InstallArea/*/cmake/modules/FindCORAL.cmake
+        - opt/athena/AthenaExternals/${{ version }}/InstallArea/*/cmake/modules/FinddSFMT.cmake
+        - opt/athena/AthenaExternals/${{ version }}/InstallArea/*/include/dSFMT.h
+        - opt/athena/AthenaExternals/${{ version }}/InstallArea/*/lib/libdSFMT-std.a
   - script:
       # a trivial ATLAS project on top of AthenaExternals, as each Athena layer is
       - cmake -S test -B build -G Ninja -DCMAKE_PREFIX_PATH="$(echo ${PREFIX}/opt/athena/AthenaExternals/*/InstallArea/*)"
@@ -60,12 +65,16 @@ about:
   summary: The base project of ATLAS's Athena for conda-forge (AtlasCMake and AtlasLCG)
   description: |
     The AthenaExternals project of ATLAS's atlasexternals, configured without an LCG release
-    and without any of its bundled externals, which come from conda-forge instead. It provides
+    and without its bundled externals, which come from conda-forge instead, except for the
+    dSFMT random number generator library that ATLAS keeps in atlasexternals. It provides
     the ATLAS CMake build system (AtlasCMake and AtlasLCG, patched for conda-forge) and the
     base project that the Athena packages are built on, installed in the directory layout
     ATLAS uses on CVMFS.
-  license: Apache-2.0
-  license_file: LICENSE
+  # dSFMT: BSD-3-Clause
+  license: Apache-2.0 AND BSD-3-Clause
+  license_file:
+    - LICENSE
+    - LICENSE-dSFMT.txt
   repository: https://gitlab.cern.ch/atlas/atlasexternals
 
 extra:
