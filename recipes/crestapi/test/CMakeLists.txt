@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(crestapi_test LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+find_package(CrestApi REQUIRED)
+add_executable(tagdto tagdto.cxx)
+target_link_libraries(tagdto PRIVATE CrestApi::CrestApiLib)

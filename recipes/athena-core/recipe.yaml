@@ -1,0 +1,102 @@
+context:
+  version: "25.0.73"
+
+package:
+  name: athena-core
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/atlas/athena/-/archive/release/${{ version }}/athena-release-${{ version }}.tar.gz
+  sha256: e2df75b2fd966f97973e9ed89984222e4070be0d60ace0a4f3975e80e9ec1eba
+
+build:
+  number: 0
+  skip:
+    - not linux
+    # the confdb2 files of Gaudi need dbm.sqlite3
+    - match(python, "<3.13")
+  script:
+    file: build.sh
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+  host:
+    - athena-externals ==${{ version }}
+    - atlas-gaudi
+    - lcg-coral
+    - lcg-cool
+    - crestapi
+    - chai
+    - yampl
+    - boost-mpi3
+    - openmpi
+    - python
+    - root_base
+    - root_cxx_standard
+    - libboost-devel
+    - libboost-python-devel
+    - tbb-devel
+    - eigen
+    - clhep
+    - libuuid
+    - nlohmann_json
+    - fmt
+    - range-v3
+    - ms-gsl
+    - xerces-c
+    - zlib
+    - sqlite
+    - gtest
+    - gmock
+    - cppunit
+    - expat
+    - aida
+    - heppdt
+    - zeromq
+    - cppzmq
+    # headers only (AthenaServices)
+    - valgrind
+    - libcurl
+    - vdt
+    # the build draws the python import graph of the packages (apydep)
+    - pygraphviz
+  run:
+    - athena-externals ==${{ version }}
+    - python
+    - root_base
+    - openmpi
+    - requests
+    - distro
+
+tests:
+  - script:
+      # the ATLAS HelloWorld example, serial and multi-threaded
+      - bash test/run_hello.sh
+      - bash test/run_hello.sh --threads=2
+      # every component of the layer has its configurable
+      - python test/check_confdb.py "${AthenaCore_DIR}/lib/AthenaCore.components"
+    files:
+      recipe:
+        - test/
+
+about:
+  homepage: https://gitlab.cern.ch/atlas/athena
+  summary: The core of ATLAS's Athena software (framework, StoreGate, configuration)
+  description: |
+    Athena is the offline software of the ATLAS experiment at CERN, built on the Gaudi
+    framework. This package is the first of the layers Athena is split into for conda-forge:
+    the framework itself (athena.py, StoreGate, the component configuration, AthenaMP,
+    performance monitoring, conditions access). For now it carries the subset of packages
+    needed to run the HelloWorld example.
+  license: Apache-2.0
+  license_file: LICENSE
+  repository: https://gitlab.cern.ch/atlas/athena
+
+extra:
+  recipe-maintainers:
+    - ariostas

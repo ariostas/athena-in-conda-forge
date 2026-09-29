@@ -1,0 +1,109 @@
+context:
+  version: "40.4.002"
+  tag: v40r4.002
+
+package:
+  name: atlas-gaudi
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/atlas/Gaudi/-/archive/${{ tag }}/Gaudi-${{ tag }}.tar.gz
+  sha256: f297afae2a7d0b100691c165413f0e64975315f1bbcdbfecde2dd03a2e4ae977
+  patches:
+    # from conda-forge's gaudi feedstock: look for .components files next to
+    # libGaudiPluginService when GAUDI_PLUGIN_PATH is not set
+    - patches/0001-fix-scan-default-plugin-path-in-Registry-initialize.patch
+
+build:
+  number: 0
+  skip:
+    - not linux
+    # conda-forge's python lacks gdbm, so the confdb2 files need dbm.sqlite3 (3.13+)
+    - match(python, "<3.13")
+  script:
+    # The options of conda-forge's gaudi recipe. The test suite is not built: it takes
+    # longer than Gaudi itself and conda-forge's gaudi feedstock runs it on the same sources.
+    # librt by name: GaudiKernel's exported target would otherwise carry the absolute path of
+    # the build environment's sysroot.
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_CXX_STANDARD=23 -DBUILD_SHARED_LIBS=ON -DBUILD_TESTING=OFF -DGAUDI_INSTALL_PYTHONDIR=${SP_DIR} -DGAUDI_DEFAULT_PLUGIN_PATH=${PREFIX}/lib -DPython_EXECUTABLE=${PYTHON} -DGAUDI_USE_DOXYGEN=OFF -Drt_LIBRARY=rt
+    - cmake --build build --parallel ${CPU_COUNT}
+    - cmake --install build
+
+requirements:
+  run_exports:
+    - ${{ pin_subpackage('atlas-gaudi', upper_bound='x.x.x') }}
+  build:
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+    - pkg-config
+    - git
+  host:
+    - python
+    - libboost-devel
+    - libboost-python-devel
+    - root_base
+    - root_cxx_standard
+    - tbb-devel
+    - zlib
+    - zstd
+    - libuuid
+    - range-v3
+    - nlohmann_json
+    - fmt
+    - clhep
+    - xerces-c
+    - ms-gsl
+    - aida
+    - heppdt
+    - vdt
+  run:
+    - python
+  run_constraints:
+    # the same files as conda-forge's gaudi
+    - gaudi <0a0
+
+tests:
+  - python:
+      imports:
+        - GaudiKernel
+        - GaudiConfig2
+      pip_check: false
+  - package_contents:
+      bin:
+        - Gaudi
+        - genconf
+        - listcomponents
+      lib:
+        - GaudiKernel
+        - GaudiPluginService
+  - script:
+      - Gaudi --help
+      # a job that loads the core services through the plugin service and the configurables
+      # database (genconf's output, which a compiler mismatch breaks silently)
+      - gaudirun.py test/job.py 2>&1 | tee job.log
+      - grep -q "ApplicationMgr.*INFO Application Manager Terminated successfully" job.log
+      # every component has its configurable (these few are not configurable)
+      - python test/check_confdb.py ${PREFIX}/lib/Gaudi.components Gaudi::XMLFileCatalog NTuple::Selector ServiceManager
+    files:
+      recipe:
+        - test/
+
+about:
+  homepage: https://gitlab.cern.ch/atlas/Gaudi
+  summary: The Gaudi event processing framework, as used by ATLAS
+  description: |
+    Gaudi is a software framework for building event data processing applications in
+    high-energy physics, developed at CERN by LHCb and ATLAS. This package is ATLAS's fork
+    (upstream Gaudi plus the changes of an ATLAS release), built with the same compiler as the
+    ATLAS Athena packages that depend on it: Gaudi exports C++ standard library internals
+    (std::format), so it has to be. conda-forge's gaudi package is upstream Gaudi.
+  license: Apache-2.0
+  license_file: LICENSE
+  documentation: https://gaudi-framework.readthedocs.io/
+  repository: https://gitlab.cern.ch/atlas/Gaudi
+
+extra:
+  recipe-maintainers:
+    - ariostas

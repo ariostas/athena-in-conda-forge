@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(chai_test LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+find_package(chai REQUIRED)
+add_executable(roundtrip roundtrip.cpp)
+target_link_libraries(roundtrip PRIVATE chai::chai chai::container)

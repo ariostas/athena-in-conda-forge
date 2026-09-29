@@ -1,0 +1,17 @@
+AtlasLCG: "find_package( LCG 0 EXACT )" must succeed. LCG version 0 is the supported "no LCG
+release" mode, and the installed Pre/PostConfig files of the projects ask for their LCG
+version with EXACT.
+
+--- a/Build/AtlasLCG/LCGConfig-version.cmake	2026-09-29 11:29:30
++++ b/Build/AtlasLCG/LCGConfig-version.cmake	2026-09-29 11:29:31
+@@ -39,7 +39,9 @@
+    set( PACKAGE_VERSION_NUMBER 0 )
+    set( PACKAGE_VERSION_STRING "" )
+    set( PACKAGE_VERSION_COMPATIBLE TRUE )
+-   set( PACKAGE_VERSION_EXACT FALSE )
++   # Version 0 is what was asked for, so "find_package( LCG 0 EXACT )" (which the
++   # installed PreConfig/PostConfig files of the projects use) has to succeed.
++   set( PACKAGE_VERSION_EXACT TRUE )
+ elseif( NOT PACKAGE_FIND_VERSION )
+    # If no version was requested:
+    if( NOT LCG_FIND_QUIETLY )

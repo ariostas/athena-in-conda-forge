@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+project(bmpi3_test LANGUAGES CXX)
+find_package(bmpi3 REQUIRED)
+add_executable(hello hello.cpp)
+target_link_libraries(hello PRIVATE bmpi3::bmpi3)

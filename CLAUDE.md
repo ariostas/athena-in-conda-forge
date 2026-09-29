@@ -15,6 +15,7 @@ learned. The sister project is `../cmssw-in-conda-forge` (same approach for CMSS
     prior art, runtime data and platforms).
   - `analysis/scripts/`: CMakeLists.txt parser, dependency graph, cost and layer partitioning
     (`layers.py`). python3 stdlib only; they read CVMFS and cache in `_work/`.
+- `athena-notes/build-local.sh`: builds the recipes in the container (see below).
 - `_work/` (git-ignored): clones (atlasexternals, the ATLAS Gaudi and CLHEP forks), repodata
   caches and analysis outputs.
 
@@ -36,11 +37,21 @@ pinning in `/work/conda_build_config.yaml`, an athena checkout of `release/25.0.
 `/work/athena`. The M1 spike environments (`/work/spike-env`, `/work/spike-build`) are
 described in `athena-notes/spike/README.md`. Leave the `cmssw-dev*` containers alone.
 
+Recipes are built with `athena-notes/build-local.sh` (adapted from the CMSSW one):
+`docker exec athena-dev bash -c 'export PATH=/work/tools/bin:$PATH; cd /repo &&
+./athena-notes/build-local.sh linux_aarch64 [recipes/<name> ...]'`. With no recipes it builds
+all of them in dependency order. Packages go to `/work/output` (also used as a channel), logs
+to `/work/logs/<name>-linux_aarch64.log`, and only python 3.13 is built.
+
 - The image is Ubuntu-based: `/bin/sh` is dash, and CMake installs shared libraries without
   the execute bit unless `CMAKE_INSTALL_SO_NO_EXE=0`. conda-forge's CI is AlmaLinux.
 - Scripts that `source` conda activation must do so with `set +eu` (bash errors out inside
   conda's `activate` function otherwise) and without redirecting the `source`.
 - Do not edit a bash script while it is running.
+- GitLab sometimes answers the athena archive URL with an empty 200 response. rattler-build then
+  fails the sha256 check. The fix is to seed its cache: put the tarball in
+  `/work/output/src_cache/<key>_<file>`, the unpacked tree (without the top directory) in
+  `<key>_extracted`, and a `.metadata/<key>.json` like the other entries there.
 
 ## Conventions
 

@@ -1,0 +1,31 @@
+AtlasLCG: lcg_generate_env() with a Gaudi found through its own CMake configuration (as
+conda-forge's is), which does not set GAUDI_PYTHON_PATH and friends. list( INSERT ) with no
+values is an error.
+
+--- a/Build/AtlasLCG/modules/LCGFunctions.cmake	2026-09-29 11:31:26
++++ b/Build/AtlasLCG/modules/LCGFunctions.cmake	2026-09-29 11:31:27
+@@ -681,10 +681,20 @@
+    list( FIND _packages_found "Gaudi" _gaudiPackageIndex )
+    if( NOT "${_gaudiPackageIndex}" EQUAL -1 )
+       find_package( Gaudi QUIET )
+-      list( INSERT _python_paths 0 ${GAUDI_PYTHON_PATH} )
+-      list( INSERT _binary_paths 0 ${GAUDI_BINARY_PATH} )
+-      list( INSERT _library_paths 0 ${GAUDI_LIBRARY_DIRS} )
+-      list( INSERT _include_paths 0 ${GAUDI_INCLUDE_DIRS} )
++      # A Gaudi found through its own CMake configuration (rather than ATLAS's build of
++      # it) does not set all of these.
++      if( GAUDI_PYTHON_PATH )
++         list( INSERT _python_paths 0 ${GAUDI_PYTHON_PATH} )
++      endif()
++      if( GAUDI_BINARY_PATH )
++         list( INSERT _binary_paths 0 ${GAUDI_BINARY_PATH} )
++      endif()
++      if( GAUDI_LIBRARY_DIRS )
++         list( INSERT _library_paths 0 ${GAUDI_LIBRARY_DIRS} )
++      endif()
++      if( GAUDI_INCLUDE_DIRS )
++         list( INSERT _include_paths 0 ${GAUDI_INCLUDE_DIRS} )
++      endif()
+       list( APPEND _environments ${GAUDI_ENVIRONMENT} )
+    endif()
+    unset( _gaudiPackageIndex )

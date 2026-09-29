@@ -1,0 +1,73 @@
+context:
+  version: "25.0.73"
+  # the atlasexternals tag of Athena 25.0.73
+  atlasexternals_tag: "2.1.91"
+
+package:
+  name: athena-externals
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/atlas/atlasexternals/-/archive/${{ atlasexternals_tag }}/atlasexternals-${{ atlasexternals_tag }}.tar.gz
+  sha256: 655cc0c9f438a19dc0343658fa5164e2247638556418bd1a9b3a72f17c77009d
+  patches:
+    - patches/0001-AtlasCMake-support-conda-forge-builds.patch
+    - patches/0002-AtlasLCG-accept-version-0-with-EXACT.patch
+    - patches/0003-AtlasLCG-lcg_generate_env-with-Gaudi-from-its-CMake-config.patch
+
+build:
+  number: 0
+  skip:
+    - not linux
+  script:
+    file: build.sh
+
+requirements:
+  build:
+    # the project checks the compilers; the platform name records the compiler's version
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+
+tests:
+  - package_contents:
+      files:
+        - opt/athena/AthenaExternals/${{ version }}/InstallArea/*/setup.sh
+        - opt/athena/AthenaExternals/${{ version }}/InstallArea/*/cmake/AthenaExternalsConfig.cmake
+        - opt/athena/AthenaExternals/${{ version }}/InstallArea/*/cmake/modules/AtlasFunctions.cmake
+        - opt/athena/AthenaExternals/${{ version }}/InstallArea/*/cmake/modules/FindGaudi.cmake
+        - opt/athena/AthenaExternals/${{ version }}/InstallArea/*/cmake/modules/FindCORAL.cmake
+  - script:
+      # a trivial ATLAS project on top of AthenaExternals, as each Athena layer is
+      - cmake -S test -B build -G Ninja -DCMAKE_PREFIX_PATH="$(echo ${PREFIX}/opt/athena/AthenaExternals/*/InstallArea/*)"
+      - cmake --build build
+      - ./build/*/bin/hello
+    requirements:
+      run:
+        - ${{ compiler('c') }}
+        - ${{ compiler('cxx') }}
+        - ${{ stdlib('c') }}
+        - cmake
+        - ninja
+    files:
+      recipe:
+        - test/
+
+about:
+  homepage: https://gitlab.cern.ch/atlas/atlasexternals
+  summary: The base project of ATLAS's Athena for conda-forge (AtlasCMake and AtlasLCG)
+  description: |
+    The AthenaExternals project of ATLAS's atlasexternals, configured without an LCG release
+    and without any of its bundled externals, which come from conda-forge instead. It provides
+    the ATLAS CMake build system (AtlasCMake and AtlasLCG, patched for conda-forge) and the
+    base project that the Athena packages are built on, installed in the directory layout
+    ATLAS uses on CVMFS.
+  license: Apache-2.0
+  license_file: LICENSE
+  repository: https://gitlab.cern.ch/atlas/atlasexternals
+
+extra:
+  recipe-maintainers:
+    - ariostas

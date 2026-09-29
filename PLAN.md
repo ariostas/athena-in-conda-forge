@@ -375,7 +375,8 @@ akraszna, clemenci and Buncic.
 ## 5. Decisions taken (2026-09-29)
 
 - **D1:** native AtlasCMake against conda-forge externals, through an `atlascmake` shim package
-  built from Chris Burr's POC.
+  built from Chris Burr's POC. (It became `athena-externals`, the AthenaExternals project
+  itself: see the progress log.)
 - **D2:** each layer is its own ATLAS project, built on the previous one; the top layer is
   named `Athena`. The install layout, (A) or (B), is decided by the M1 spike, trying (A) first.
 - **D3:** full Athena is the main line. AnalysisBase is a later, separate product, and possibly
@@ -488,3 +489,56 @@ of heavier code (needs a bigger layer), and running this through rattler-build.
 patches, our Find modules, the conda PostConfig, the AthenaExternals base project), Gaudi
 (`atlas-gaudi`, ATLAS's fork), `lcg-coral`, `lcg-cool`, `crestapi`, `chai`, `yampl`,
 `boost-mpi3`, then the first Athena layer through rattler-build.
+
+### 2026-09-29: the first recipes; athena-core runs HelloWorld through rattler-build
+
+`athena-notes/build-local.sh` (from the CMSSW one) builds `recipes/` in the container, in
+dependency order: `boost-mpi3`, `yampl`, `frontier-client` (the CMSSW repo's recipe,
+unchanged), `lcg-coral`, `lcg-cool`, `crestapi`, `chai`, `atlas-gaudi`, `athena-externals`,
+`athena-core`. All build on linux-aarch64 and pass their tests: an MPI hello world, a yampl
+ping-pong over ZeroMQ/pipes/shared memory, SQLite round trips through CORAL (python) and COOL
+(PyCool), a CREST tag through JSON, a chai payload through its file-system plugin, a Gaudi job,
+a trivial ATLAS project on top of `athena-externals`, and **`athena.py
+AthExHelloWorld/HelloWorldConfig.py`, serial and with `--threads=2`, from the installed
+`athena-core` package** (a fresh environment, set up by its activation script).
+
+Decisions and findings:
+- **The shim is `athena-externals` 25.0.73**, not `atlascmake`: it is AthenaExternals itself
+  (AtlasCMake + AtlasLCG, cburr's patches as one patch file plus our two, ATLAS's
+  `External/*/cmake` Find modules, our `FindTBB`/`FindCORAL`, the conda PostConfig), installed
+  in the CVMFS layout, and the layers pin it `==` like each other. The platform name is set
+  explicitly (`ATLAS_FORCE_PLATFORM`, `<arch>-cf-gcc<major>-opt`) so that recipes can compute it.
+- One `variants.yaml` for everything that links the stack: ROOT 6.40.2 cxx23, Boost 1.90,
+  CLHEP 2.4.7.1 (zipped with geant4 11.3.2 in the pinning; unpinned, Gaudi gets one build per
+  CLHEP), `c_stdlib_version` 2.34 (13.3 on macOS).
+- **The spike's Athena layer never found CORAL**: AtlasLCG's FindCORAL requires the CORAL
+  server executables, which we do not build; CoraCool linked only because COOL shares the
+  include directory. `athena-externals` has a FindCORAL without that requirement.
+- CORAL and COOL are installed the conda way: python modules (and `liblcg_PyCoral`) in
+  site-packages, no tests/examples/Oracle scripts. COOL's own FindCORAL is pointed at
+  site-packages. `lcg-coral` conflicts with the CMS fork's `coral` (same library names), which
+  is recorded as a `run_constraints`; one CORAL for both experiments is a later question.
+- `atlas-gaudi` needs the gaudi feedstock's plugin-path patch: without it Gaudi finds no
+  component factories unless `LD_LIBRARY_PATH`/`GAUDI_PLUGIN_PATH` is set (the recipe's test job
+  runs without either). `-Drt_LIBRARY=rt` keeps the build sysroot out of the exported targets.
+- chai is built without its python bindings (one Athena script uses them) so that it is not
+  python-specific; its plugins are found next to `libchai`. CrestApi's public headers use
+  Boost.Parameter, so it needs `libboost-devel` (its CMake configuration asks for Boost's).
+- `check_confdb.py` (tests of `atlas-gaudi` and every layer) fails if a component has no
+  configurable. The exceptions are rules (converters, `_PERS_`/`_TRANS_` aliases, ROOT storage
+  technologies, one factory) with which every component of ATLAS's own 25.0.73 release on
+  CVMFS has its configurable.
+- `athena-core` is, for now, the spike's 54 packages. It builds from the release tarball as
+  its own project (`Projects/CondaLayer`), sourcing the base's `setup.sh`, in 9 to 12 minutes
+  at `-j10`. Its activation script sources the layer's `setup.sh` and saves/restores what it
+  changes (provisional, D6). The InstallArea also carries the packages' sources (`src/`), as on
+  CVMFS; to be weighed against package size.
+- **GitLab's archive endpoint can return an empty 200 response for the athena tarball**
+  (58 MB; it happened repeatedly for a while, from two machines). Locally the source cache was
+  seeded by hand; in CI this would be a flaky download. A mirror (or `git` with a shallow
+  clone) may be needed.
+
+**Next:** grow `athena-core` to the full core layer (tdaq-common subset, HepMC3, XRootD/Davix,
+the POOL/RNTuple I/O and ByteStream packages; `layers.py` must learn the CLIDComps build
+dependency), measure memory per compile on it, and the M3 deliverables (write/read a POOL file,
+conditions from SQLite).

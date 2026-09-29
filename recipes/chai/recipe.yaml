@@ -1,0 +1,78 @@
+context:
+  version: "2.1.0"
+
+package:
+  name: chai
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/crest-db/chai/-/archive/${{ version }}/chai-${{ version }}.tar.gz
+  sha256: dc18b1c113910530fff8f16bc04a6a394d954b1d601ee5024d10038b2e8aebce
+
+build:
+  number: 0
+  skip:
+    - win
+  script:
+    # As ATLAS installs it (atlasexternals' External/chai), without the python bindings: they
+    # are used by a single Athena script, and would make the package python-version specific.
+    # The tests need a CREST server.
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_CXX_STANDARD=23 -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_INCLUDEDIR=include/chai -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF
+    - cmake --build build --parallel ${CPU_COUNT}
+    - cmake --install build
+
+requirements:
+  # libchai.so.2
+  run_exports:
+    - ${{ pin_subpackage('chai', upper_bound='x') }}
+  build:
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+  host:
+    - crestapi
+    - nlohmann_json
+  run:
+    - nlohmann_json
+
+tests:
+  - package_contents:
+      lib:
+        - chai
+        - chaicontainer
+      files:
+        - include/chai/chai/Database.h
+        - lib/cmake/chai/chaiConfig.cmake
+        - lib/chai/plugins/libchai_plugin_crest_fs.so
+  - script:
+      - cmake -S test -B build -G Ninja
+      - cmake --build build
+      - ./build/roundtrip
+    requirements:
+      run:
+        - ${{ compiler('cxx') }}
+        - ${{ stdlib('c') }}
+        - cmake
+        - ninja
+    files:
+      recipe:
+        - test/
+
+about:
+  homepage: https://gitlab.cern.ch/crest-db/chai
+  summary: Conditions database access library for ATLAS (CREST and COOL)
+  description: |
+    chai is a C++ library giving uniform access to conditions databases through backend
+    plugins: a CREST server, a CREST file system tree, and COOL data served over REST. The
+    ATLAS Athena software reads conditions through it.
+  # chai is Apache-2.0; it bundles base64 and plog (MIT), see THIRD_PARTY.md
+  license: Apache-2.0 AND MIT
+  license_file:
+    - LICENSE
+    - THIRD_PARTY.md
+  repository: https://gitlab.cern.ch/crest-db/chai
+
+extra:
+  recipe-maintainers:
+    - ariostas

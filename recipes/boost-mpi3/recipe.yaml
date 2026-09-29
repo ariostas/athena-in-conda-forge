@@ -1,0 +1,72 @@
+context:
+  version: "0.81"
+
+package:
+  name: boost-mpi3
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.com/correaa/boost-mpi3/-/archive/v${{ version }}/boost-mpi3-v${{ version }}.tar.gz
+  sha256: e911661c322626191b98141c4a95bb280a6bc234b15e5ed04e3a5cf3adb7151b
+  patches:
+    # From atlasexternals (External/boost-mpi3): install the headers with a CMake
+    # configuration (bmpi3-config.cmake, target bmpi3::bmpi3), which Athena uses.
+    - 0001-atlas-install-a-cmake-configuration.patch
+
+build:
+  number: 0
+  noarch: generic
+  script:
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_INSTALL_LIBDIR=lib
+    - cmake --install build
+
+requirements:
+  build:
+    # the CMake project checks for a C++ compiler; nothing is compiled
+    - ${{ compiler('cxx') }}
+    - cmake
+    - ninja
+  host:
+    - openmpi
+    - libboost-devel
+  run:
+    # any MPI implementation; the configuration looks for it with find_package(MPI)
+    - mpi
+    - libboost-devel
+
+tests:
+  - package_contents:
+      include:
+        - mpi3/communicator.hpp
+      files:
+        - lib/cmake/bmpi3/bmpi3-config.cmake
+  - script:
+      # Open MPI refuses to start as root, which is what CI containers run as
+      - export OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+      - cmake -S test -B build -G Ninja
+      - cmake --build build
+      - ./build/hello
+    requirements:
+      run:
+        - ${{ compiler('cxx') }}
+        - cmake
+        - ninja
+        - openmpi
+    files:
+      recipe:
+        - test/
+
+about:
+  homepage: https://gitlab.com/correaa/boost-mpi3
+  summary: B-MPI3, a C++ wrapper for the MPI-3 interface
+  description: |
+    B-MPI3 is a header-only C++ library wrapping version 3.1 of the MPI standard interface. This
+    package carries the patch from ATLAS's atlasexternals that installs a CMake configuration
+    (bmpi3::bmpi3), as used by the ATLAS Athena software.
+  license: BSL-1.0
+  license_file: LICENSE
+  repository: https://gitlab.com/correaa/boost-mpi3
+
+extra:
+  recipe-maintainers:
+    - ariostas

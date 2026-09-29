@@ -1,0 +1,33 @@
+# Athena 25.0.73 is built and validated against ROOT 6.40.02 in C++23 mode (an exact match
+# with conda-forge's root_base 6.40.2, root_cxx_standard 23) and Boost 1.91; conda-forge's
+# closest is 1.90, which it is migrating to (migrations/libboost190.yaml in the pinning). Every
+# library in the stack must use the same ones. Drop the boost block once the global pinning
+# moves.
+root_base:
+  - "6.40.2"
+root_cxx_standard:
+  - "23"
+libboost_devel:
+  - "1.90"
+libboost_headers:
+  - "1.90"
+libboost_python_devel:
+  - "1.90"
+
+# ATLAS uses its fork of CLHEP 2.4.7.1. clhep is zipped with geant4 in the global pinning,
+# where 2.4.7.1 goes with 11.3.2.
+clhep:
+  - "2.4.7.1"
+geant4:
+  - "11.3.2"
+
+# ATLAS builds for EL9 (glibc 2.34). conda-forge's default 2.17 lacks mallinfo2, which Athena
+# uses, and pulls in the old pthread and librt split. On macOS, std::format's floating point
+# support (std::to_chars) needs 13.3.
+c_stdlib_version:
+  - if: linux
+    then: "2.34"
+    else: "13.3"
+MACOSX_DEPLOYMENT_TARGET:
+  - if: osx
+    then: "13.3"

@@ -1,0 +1,84 @@
+context:
+  version: "6.2.12"
+
+package:
+  name: crestapi
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/crest-db/CrestApi/-/archive/${{ version }}/CrestApi-${{ version }}.tar.gz
+  sha256: 0bfb92c592bc94c8a7e55f9b7eb02d9902862a07e4482ed808710162d4e1dde9
+
+build:
+  number: 0
+  skip:
+    - win
+  script:
+    # As ATLAS installs it (atlasexternals' External/CrestApi): the headers under
+    # include/CrestApi/CrestApi, found through the CrestApi::CrestApiLib target. The tests
+    # download googletest at configure time, so they are not built.
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_CXX_STANDARD=23 -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_INCLUDEDIR=include/CrestApi -DCRESTAPI_BUILD_EXAMPLES=FALSE -DBUILD_TESTING=FALSE
+    - cmake --build build --parallel ${CPU_COUNT}
+    - cmake --install build
+
+requirements:
+  # the soname is libCrestApiLib.so.<full version>
+  run_exports:
+    - ${{ pin_subpackage('crestapi', upper_bound='x.x.x') }}
+  build:
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+  host:
+    - libcurl
+    - openssl
+    - nlohmann_json
+    # CrestApiExt.h uses Boost.Parameter
+    - libboost-devel
+  run:
+    # the installed CMake configuration looks for these (Boost through its CMake configuration)
+    - nlohmann_json
+    - libboost-devel
+    - libcurl
+    - openssl
+
+tests:
+  - package_contents:
+      lib:
+        - CrestApiLib
+      files:
+        - include/CrestApi/CrestApi/CrestApi.h
+        - lib/cmake/CrestApi/CrestApiConfig.cmake
+  - script:
+      - cmake -S test -B build -G Ninja
+      - cmake --build build
+      - ./build/tagdto
+    requirements:
+      run:
+        - ${{ compiler('cxx') }}
+        - ${{ stdlib('c') }}
+        - cmake
+        - ninja
+    files:
+      recipe:
+        - test/
+
+about:
+  homepage: https://gitlab.cern.ch/crest-db/CrestApi
+  summary: C++ client for the CREST conditions database
+  description: |
+    CrestApi is the C++ client library of CREST, the REST-based conditions database developed
+    by ATLAS for Run 4. It talks to a CREST server over HTTP, or reads and writes the same data
+    in a local file system tree. The ATLAS Athena software reads conditions through it (via
+    chai).
+  # UNRESOLVED: the repository has no licence file; the sources carry the ATLAS copyright
+  # header ("CERN for the benefit of the ATLAS collaboration") without a licence statement.
+  # See LICENSE-STATUS.md.
+  license: LicenseRef-Unresolved
+  license_file: LICENSE-STATUS.md
+  repository: https://gitlab.cern.ch/crest-db/CrestApi
+
+extra:
+  recipe-maintainers:
+    - ariostas

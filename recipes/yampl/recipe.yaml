@@ -1,0 +1,72 @@
+context:
+  version: "1.2"
+
+package:
+  name: yampl
+  version: ${{ version }}
+
+source:
+  url: https://github.com/vitillo/yampl/archive/refs/tags/v${{ version }}.tar.gz
+  sha256: bcb28a5033c3334ddc0d290dc77a63322bc33951de5c4aca6d6e9eae1315394b
+  patches:
+    - 0001-use-system-zeromq.patch
+
+build:
+  number: 0
+  skip:
+    - not linux
+  script:
+    # the bundled ZeroMQ is replaced by conda-forge's (see the patch)
+    - rm -rf zeromq
+    - ./configure --prefix=${PREFIX}
+    - make -j${CPU_COUNT}
+    # the install rule uses bash brace expansion
+    - make install SHELL=/bin/bash
+
+requirements:
+  # libyampl.so has no soname version
+  run_exports:
+    - ${{ pin_subpackage('yampl', upper_bound='x.x') }}
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - make
+  host:
+    - zeromq
+    - cppzmq
+    - libuuid
+
+tests:
+  - package_contents:
+      lib:
+        - yampl
+      include:
+        - yampl/SocketFactory.h
+        - yampl/Channel.h
+  - script:
+      - ${CXX} ${CXXFLAGS} -I${PREFIX}/include test/pingpong.cpp -o pingpong ${LDFLAGS} -L${PREFIX}/lib -lyampl
+      - ./pingpong
+    requirements:
+      run:
+        - ${{ compiler('cxx') }}
+    files:
+      recipe:
+        - test/
+
+about:
+  homepage: https://github.com/vitillo/yampl
+  summary: Yet Another Message Passing Library
+  description: |
+    yampl is a small C++ message passing library for local and distributed communication over
+    ZeroMQ, pipes and shared memory. The ATLAS experiment's Athena software uses it for its
+    multi-process event service.
+  # UNRESOLVED: the repository has no licence file and the sources carry no licence headers.
+  # See LICENSE-STATUS.md.
+  license: LicenseRef-Unresolved
+  license_file: LICENSE-STATUS.md
+  repository: https://github.com/vitillo/yampl
+
+extra:
+  recipe-maintainers:
+    - ariostas

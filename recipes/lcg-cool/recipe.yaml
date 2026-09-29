@@ -1,0 +1,82 @@
+context:
+  version: "3.3.20"
+  tag: COOL_3_3_20
+
+package:
+  name: lcg-cool
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/lcgcool/cool/-/archive/${{ tag }}/cool-${{ tag }}.tar.gz
+  sha256: b961894be92b9d13003520b7545b9fdee34946bf4d3356b6a64a89b485a4da86
+  patches:
+    # empty environment values (no man, no Qt) break COOL's environment scripts generator
+    - 0001-empty-environment-values.patch
+
+build:
+  number: 0
+  skip:
+    - not linux
+  script:
+    file: build.sh
+
+requirements:
+  # the libraries have no soname version
+  run_exports:
+    - ${{ pin_subpackage('lcg-cool', upper_bound='x.x.x') }}
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+  host:
+    - python
+    - lcg-coral ==${{ version }}
+    - libboost-devel
+    - xerces-c
+    - cppunit
+    - tbb-devel
+    - vdt
+    # PyCool is built on cppyy
+    - root_base
+    - root_cxx_standard
+  run:
+    - python
+    - lcg-coral ==${{ version }}
+
+tests:
+  - package_contents:
+      lib:
+        - lcg_CoolKernel
+        - lcg_CoolApplication
+        - lcg_RelationalCool
+      include:
+        - CoolKernel/IDatabase.h
+        - CoolApplication/DatabaseSvcFactory.h
+      bin:
+        - coolDumpSchema
+  - script:
+      # create a COOL database in an SQLite file, write a payload and read it back
+      - python test_cool.py
+    files:
+      recipe:
+        - test_cool.py
+
+about:
+  homepage: https://gitlab.cern.ch/lcgcool/cool
+  summary: COOL, the LCG Conditions Database
+  description: |
+    COOL is the conditions database API of the LCG Persistency Framework: it stores
+    interval-of-validity data (detector conditions) through CORAL in any of its backends. The
+    ATLAS experiment's Athena software reads its conditions through COOL. This package is the
+    upstream COOL release used by ATLAS, with its command-line tools and PyCool.
+  # UNRESOLVED: the repository carries no licence file and the sources no licence headers.
+  # See LICENSE-STATUS.md.
+  license: LicenseRef-Unresolved
+  license_file: LICENSE-STATUS.md
+  repository: https://gitlab.cern.ch/lcgcool/cool
+
+extra:
+  recipe-maintainers:
+    - ariostas

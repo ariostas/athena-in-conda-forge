@@ -1,0 +1,90 @@
+context:
+  version: "3.3.20"
+  tag: CORAL_3_3_20
+
+package:
+  name: lcg-coral
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/lcgcoral/coral/-/archive/${{ tag }}/coral-${{ tag }}.tar.gz
+  sha256: 6210364eb59fa562c8e5351c33158fa1c641f3347912f279b216a57cf1a09b9d
+  patches:
+    # options to leave out backends and parts that need unavailable externals
+    - 0001-optional-backends.patch
+
+build:
+  number: 0
+  skip:
+    - not linux
+  script:
+    file: build.sh
+
+requirements:
+  # the libraries have no soname version
+  run_exports:
+    - ${{ pin_subpackage('lcg-coral', upper_bound='x.x.x') }}
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+  host:
+    - python
+    - libboost-devel
+    - xerces-c
+    - sqlite
+    - expat
+    - frontier-client
+    - libuuid
+    - zlib
+    # the unit tests of each package are configured even when they are not run
+    - cppunit
+  run:
+    - python
+  run_constraints:
+    # the CMS fork of CORAL 2.3 installs libraries with the same names
+    - coral <0a0
+
+tests:
+  - package_contents:
+      lib:
+        - lcg_CoralBase
+        - lcg_CoralKernel
+        - lcg_RelationalAccess
+        - lcg_SQLiteAccess
+        - lcg_FrontierAccess
+        - lcg_XMLLookupService
+        - lcg_XMLAuthenticationService
+      include:
+        - RelationalAccess/ISessionProxy.h
+        - CoralBase/AttributeList.h
+  - python:
+      imports:
+        - coral
+  - script:
+      # write and read back a table through the SQLite plugin
+      - python test_coral.py
+    files:
+      recipe:
+        - test_coral.py
+
+about:
+  homepage: https://gitlab.cern.ch/lcgcoral/coral
+  summary: CORAL, the LCG Common Relational Abstraction Layer
+  description: |
+    CORAL is a C++ abstraction layer for vendor-neutral access to relational databases,
+    developed as part of the LCG Persistency Framework. The ATLAS experiment's Athena software
+    uses it (and COOL on top of it) to read detector conditions from SQLite files and through
+    the Frontier web caching system. This package is the upstream CORAL release used by ATLAS,
+    without the Oracle and MySQL backends and the CORAL server.
+  # UNRESOLVED: the repository carries no licence file and the sources no licence headers.
+  # See LICENSE-STATUS.md.
+  license: LicenseRef-Unresolved
+  license_file: LICENSE-STATUS.md
+  repository: https://gitlab.cern.ch/lcgcoral/coral
+
+extra:
+  recipe-maintainers:
+    - ariostas

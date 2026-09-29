@@ -1,0 +1,149 @@
+AtlasCMake changes for building against conda-forge, from Chris Burr's atlascmake conda
+package (https://gitlab.cern.ch/cburr/atlascmake-conda-package, recipe/apply_patches.py):
+1. a stub lcg_generate_env() when AtlasLCG is not used;
+2. force CMAKE_INSTALL_LIBDIR back to "lib" when conda's CMAKE_ARGS made it absolute;
+3. ROOT_genreflex/rootcling_EXECUTABLE from ROOT's own ROOT_*_CMD variables;
+4. the module directory and the project root in CMAKE_FIND_ROOT_PATH, for find_file() under
+   the cross-compilation settings of conda's toolchain;
+5. "cf" (conda-forge) as the OS part of the platform name (e.g. aarch64-cf-gcc15-opt).
+
+diff -ruN a/Build/AtlasCMake/AtlasCMakeConfig.cmake b/Build/AtlasCMake/AtlasCMakeConfig.cmake
+--- a/Build/AtlasCMake/AtlasCMakeConfig.cmake	2026-09-29 13:53:24
++++ b/Build/AtlasCMake/AtlasCMakeConfig.cmake	2026-09-29 13:53:24
+@@ -25,6 +25,9 @@
+ set( ATLASCMAKE_MODULEDIR ${_thisdir}/modules CACHE STRING
+    "Directory holding the ATLAS CMake files" FORCE )
+ 
++# Allow find_file() to locate files under the modules dir (skeletons, etc.).
++list( APPEND CMAKE_FIND_ROOT_PATH "${ATLASCMAKE_MODULEDIR}" )
++
+ # Add it to the CMake module path:
+ list( INSERT CMAKE_MODULE_PATH 0 ${_thisdir}/modules )
+ list( REMOVE_DUPLICATES CMAKE_MODULE_PATH )
+@@ -52,6 +55,18 @@
+ 
+ # Include the AtlasFunctions file:
+ include( AtlasFunctions )
++
++# Provide a stub lcg_generate_env() when not building with LCG.
++# Creates an empty file when SH_FILE is specified, so that install()
++# calls referencing the output don't fail.
++if( NOT COMMAND lcg_generate_env )
++   macro( lcg_generate_env )
++      cmake_parse_arguments( _lcg_stub "" "SH_FILE" "REPLACE" ${ARGN} )
++      if( _lcg_stub_SH_FILE )
++         file( WRITE "${_lcg_stub_SH_FILE}" "# empty — no LCG environment\n" )
++      endif()
++   endmacro()
++endif()
+ 
+ # Enable/Configure the use of CTest in the project:
+ atlas_ctest_setup()
+diff -ruN a/Build/AtlasCMake/modules/AtlasDictionaryFunctions.cmake b/Build/AtlasCMake/modules/AtlasDictionaryFunctions.cmake
+--- a/Build/AtlasCMake/modules/AtlasDictionaryFunctions.cmake	2026-09-29 13:53:24
++++ b/Build/AtlasCMake/modules/AtlasDictionaryFunctions.cmake	2026-09-29 13:53:24
+@@ -291,6 +291,17 @@
+    # The library needs to be linked to the core ROOT libraries:
+    find_package( ROOT QUIET COMPONENTS Core )
+ 
++   # Bridge ROOT executable variable names (ROOT config provides _CMD,
++   # ATLAS code expects _EXECUTABLE).
++   if( NOT ROOT_genreflex_EXECUTABLE AND ROOT_genreflex_CMD )
++      set( ROOT_genreflex_EXECUTABLE "${ROOT_genreflex_CMD}"
++         CACHE FILEPATH "Path to genreflex" )
++   endif()
++   if( NOT ROOT_rootcling_EXECUTABLE AND ROOT_rootcling_CMD )
++      set( ROOT_rootcling_EXECUTABLE "${ROOT_rootcling_CMD}"
++         CACHE FILEPATH "Path to rootcling" )
++   endif()
++
+    # Resolve possible wildcards in the extra source file names:
+    set( _sources )
+    set( _extraFlags )
+@@ -424,6 +435,17 @@
+    # Find ROOT, as we need to get the dictionary generator's location from it:
+    find_package( ROOT COMPONENTS Core QUIET )
+ 
++   # Bridge ROOT executable variable names (ROOT config provides _CMD,
++   # ATLAS code expects _EXECUTABLE).
++   if( NOT ROOT_genreflex_EXECUTABLE AND ROOT_genreflex_CMD )
++      set( ROOT_genreflex_EXECUTABLE "${ROOT_genreflex_CMD}"
++         CACHE FILEPATH "Path to genreflex" )
++   endif()
++   if( NOT ROOT_rootcling_EXECUTABLE AND ROOT_rootcling_CMD )
++      set( ROOT_rootcling_EXECUTABLE "${ROOT_rootcling_CMD}"
++         CACHE FILEPATH "Path to rootcling" )
++   endif()
++
+    # Allow wildcarded expressions in the ROOT_HEADERS argument.
+    set( _headers )
+    set( _extraFlags )
+@@ -617,6 +639,17 @@
+ 
+    # Find ROOT, as we need to get the dictionary generator's location from it:
+    find_package( ROOT COMPONENTS Core QUIET )
++
++   # Bridge ROOT executable variable names (ROOT config provides _CMD,
++   # ATLAS code expects _EXECUTABLE).
++   if( NOT ROOT_genreflex_EXECUTABLE AND ROOT_genreflex_CMD )
++      set( ROOT_genreflex_EXECUTABLE "${ROOT_genreflex_CMD}"
++         CACHE FILEPATH "Path to genreflex" )
++   endif()
++   if( NOT ROOT_rootcling_EXECUTABLE AND ROOT_rootcling_CMD )
++      set( ROOT_rootcling_EXECUTABLE "${ROOT_rootcling_CMD}"
++         CACHE FILEPATH "Path to rootcling" )
++   endif()
+ 
+    # The name of the files that we'll be generating:
+    set( dictsource "${CMAKE_CURRENT_BINARY_DIR}" )
+diff -ruN a/Build/AtlasCMake/modules/AtlasFunctions.cmake b/Build/AtlasCMake/modules/AtlasFunctions.cmake
+--- a/Build/AtlasCMake/modules/AtlasFunctions.cmake	2026-09-29 13:53:24
++++ b/Build/AtlasCMake/modules/AtlasFunctions.cmake	2026-09-29 13:53:24
+@@ -133,6 +133,14 @@
+          CACHE PATH "Installation path for the project" FORCE )
+    endif()
+ 
++   # When CMAKE_INSTALL_LIBDIR is absolute (e.g. conda toolchain resolves
++   # relative PATH-type values), force it back to "lib" to prevent broken
++   # nested output directories.
++   if( IS_ABSOLUTE "${CMAKE_INSTALL_LIBDIR}" )
++      set( CMAKE_INSTALL_LIBDIR "lib" CACHE PATH
++         "Library installation directory" FORCE )
++   endif()
++
+    # Set where to put files during compilation.
+    set( _basedir "${CMAKE_BINARY_DIR}/${ATLAS_PLATFORM}" )
+    foreach( _config "" "_DEBUG" "_RELEASE" "_MINSIZEREL" "_RELWITHDEBINFO" )
+@@ -239,6 +247,15 @@
+    file( GLOB_RECURSE _cmakelistsFiles RELATIVE "${CMAKE_SOURCE_DIR}"
+       ${_extraFlags} "${ARG_PROJECT_ROOT}CMakeLists.txt" )
+    unset( _extraFlags )
++
++   # Add the project root to CMAKE_FIND_ROOT_PATH so find_file() works
++   # for in-tree files under cross-toolchains.
++   if( ARG_PROJECT_ROOT )
++      get_filename_component( _projRoot "${ARG_PROJECT_ROOT}" ABSOLUTE )
++      list( APPEND CMAKE_FIND_ROOT_PATH "${_projRoot}" )
++      unset( _projRoot )
++   endif()
++
+    # Ignore the CMakeLists.txt file calling this function.
+    list( REMOVE_ITEM _cmakelistsFiles "CMakeLists.txt" )
+    # Get the paths of all of those files.
+diff -ruN a/Build/AtlasCMake/modules/AtlasInternals.cmake b/Build/AtlasCMake/modules/AtlasInternals.cmake
+--- a/Build/AtlasCMake/modules/AtlasInternals.cmake	2026-09-29 13:53:24
++++ b/Build/AtlasCMake/modules/AtlasInternals.cmake	2026-09-29 13:53:24
+@@ -170,6 +170,13 @@
+ #
+ function( atlas_os_id os isValid )
+ 
++   # When building with conda-forge, use "cf" as the OS identifier
++   # instead of the host OS (e.g. "el9") to distinguish conda builds.
++   set( ATLAS_OS_ID "cf" CACHE INTERNAL "Compact platform name" )
++   set( "${os}" "cf" PARENT_SCOPE )
++   set( "${isValid}" TRUE PARENT_SCOPE )
++   return()
++
+    # Return cached result if possible:
+    if ( ATLAS_OS_ID )
+       set( "${os}" ${ATLAS_OS_ID} PARENT_SCOPE )
