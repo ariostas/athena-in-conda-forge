@@ -461,12 +461,30 @@ only). CORAL and yampl have no licence file.
 per dictionary; compiled tests roughly double the total. Heavier xAOD/Eigen code is still to
 be measured, and so is memory.
 
-**`athena.py` runs but HelloWorld does not yet:** `initConfigFlags()` imports `IOVDbSvc`,
-which needs **COOL, CrestApi and chai**. So the whole conditions client stack is needed from
-the first layer, as the package graph said for the core layer. Also found: `athena.py` is a
-`#!/bin/sh` script with bash arrays, which fails where `/bin/sh` is dash (Debian/Ubuntu); an
-upstream fix is `#!/bin/bash`.
+**HelloWorld runs.** `athena.py AthExHelloWorld/HelloWorldConfig.py` processes its 10 events
+and exits 0, and its output matches ATLAS's reference log for the test; with `--threads=2`
+the AvalancheScheduler runs two events in flight. Getting there took:
+- the whole conditions client stack, because `initConfigFlags()` imports `IOVDbSvc`: COOL
+  3_3_20 (one patch: COOL's environment-file generator misparses its lists when a value is
+  empty, which `man -w` and `$QT_PLUGIN_PATH` are in a minimal container), CrestApi 6.2.12 and
+  chai 2.1.0 (with nanobind), unpatched. So even the smallest useful layer needs CORAL, COOL,
+  CrestApi and chai;
+- the python closure of the configuration code (Tools/PyUtils, PyJobTransforms, Campaigns,
+  GeneratorConfig, GaudiSequencer, POOL's CollectionSvc/StorageSvc/PoolSvc, PathResolver),
+  found with `pyclosure.py` plus trial and error for imports inside functions;
+- `ROOT_pthread_LIBRARY=pthread` (as in cburr's shim): ~180 packages ask for a "pthread" ROOT
+  component, and AtlasLCG's FindROOT otherwise finds root_base's glibc 2.17 `libpthread.so`,
+  whose linker script does not resolve in the 2.34 build sysroot;
+- keeping the host prefix's sysroot out of `CMAKE_PREFIX_PATH` (a spike artifact: rattler-build
+  does not activate compilers in the host prefix).
 
-**Next:** COOL, CrestApi and chai in the spike until HelloWorld runs; then the first real
-recipes (`atlascmake` shim, `atlas-gaudi`, `lcg-coral`/`lcg-cool`, the small externals) and
-the first layer through rattler-build.
+Also found: `athena.py` is a `#!/bin/sh` script with bash arrays, which fails where `/bin/sh`
+is dash (Debian/Ubuntu); an upstream fix is `#!/bin/bash`.
+
+**The M1 stacking question is answered.** Open from M1: memory per compile job and the cost
+of heavier code (needs a bigger layer), and running this through rattler-build.
+
+**Next:** the first real recipes: the `atlascmake` shim (AtlasCMake + AtlasLCG with the
+patches, our Find modules, the conda PostConfig, the AthenaExternals base project), Gaudi
+(`atlas-gaudi`, ATLAS's fork), `lcg-coral`, `lcg-cool`, `crestapi`, `chai`, `yampl`,
+`boost-mpi3`, then the first Athena layer through rattler-build.

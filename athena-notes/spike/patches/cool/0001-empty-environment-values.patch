@@ -1,0 +1,29 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -124,6 +124,12 @@
+   execute_process(COMMAND env -i LANG=$ENV{LANG} man -C /etc/man.config -w OUTPUT_VARIABLE default_manpath OUTPUT_STRIP_TRAILING_WHITESPACE)
+ ENDIF()
+
++# Without man (e.g. in a minimal container) default_manpath is empty, and an empty value
++# shifts the (command, variable, value) triples of the environment lists.
++if(NOT default_manpath)
++  set(default_manpath /usr/share/man)
++endif()
++
+ coral_release_env(PREPEND PATH              ${CMAKE_INSTALL_PREFIX}/examples/bin
+                   PREPEND PATH              ${CMAKE_INSTALL_PREFIX}/tests/bin
+                   PREPEND PATH              ${CMAKE_INSTALL_PREFIX}/bin
+--- a/src/CoolTest/CMakeLists.txt
++++ b/src/CoolTest/CMakeLists.txt
+@@ -143,7 +143,10 @@
+ coral_build_and_release_env(SET COOL_PYCOOLTEST_SKIP_ROOT8458 1)
+
+ # Give release env for Qt5 (CORALCOOL-3006)
+-coral_build_and_release_env(SET QT_QPA_PLATFORM_PLUGIN_PATH $ENV{QT_PLUGIN_PATH})
++# (Only when set: an empty value shifts the triples of the environment lists.)
++if(NOT "$ENV{QT_PLUGIN_PATH}" STREQUAL "")
++  coral_build_and_release_env(SET QT_QPA_PLATFORM_PLUGIN_PATH $ENV{QT_PLUGIN_PATH})
++endif()
+ #coral_build_and_release_env(SET QT_QPA_PLATFORM_PLUGIN_PATH /cvmfs/sft.cern.ch/lcg/releases/qt5/5.9.2-774b9/x86_64-slc6-gcc62-opt/plugins/platforms/)
+ coral_build_and_release_env(SET QT_XKB_CONFIG_ROOT /usr/share/X11/xkb)
+ #----------------------------------------------------------------------------

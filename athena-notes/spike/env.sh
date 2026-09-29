@@ -16,3 +16,16 @@ unset PIP_ROOT
 # PATH, where root_base's own compiler (with the host's glibc 2.17 sysroot) lives.
 CC=$(command -v "${CC}") CXX=$(command -v "${CXX}") FC=$(command -v "${FC}")
 export CC CXX FC
+# The host prefix's own (glibc 2.17) sysroot must not be searched: rattler-build does not
+# activate compilers in the host prefix, but here root_base's compiler activation adds it.
+strip_host_sysroot() {
+  local out="" p
+  local IFS=:
+  for p in $1; do
+    [[ "$p" == "${PREFIX}/"*-conda-linux-gnu/sysroot* ]] && continue
+    out="${out:+${out}:}$p"
+  done
+  echo "$out"
+}
+CMAKE_PREFIX_PATH=$(strip_host_sysroot "${CMAKE_PREFIX_PATH}")
+export CMAKE_PREFIX_PATH

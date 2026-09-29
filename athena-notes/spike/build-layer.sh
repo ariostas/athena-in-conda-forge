@@ -28,7 +28,8 @@ set +u
 # shellcheck disable=SC1090
 source "${ROOT}/${BASE}/${VERSION}/InstallArea/${PLATFORM}/setup.sh"
 set -u
-CMAKE_PREFIXES="${CMAKE_PREFIX_PATH//:/;}"
+CMAKE_PREFIXES=$(strip_host_sysroot "${CMAKE_PREFIX_PATH}")
+CMAKE_PREFIXES="${CMAKE_PREFIXES//:/;}"
 
 rm -rf "${BLD}" "${INSTALL}" && mkdir -p "${BLD}"
 for p in "$@"; do echo "+ $p"; done > "${BLD}/package_filters.txt"

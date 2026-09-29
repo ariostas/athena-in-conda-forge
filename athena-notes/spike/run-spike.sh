@@ -1,5 +1,6 @@
 #!/bin/bash
-# Run the whole stacking spike in order: CORAL, the small externals and Gaudi into the host env,
+# Run the whole stacking spike in order: CORAL, the small externals, Gaudi and the other
+# conditions clients (COOL, CrestApi, chai) into the host env,
 # the stub AthenaExternals, then three Athena layers, the top one named "Athena".
 # Run inside the athena-dev container; logs go to /work/logs/spike-<step>.log.
 set -euo pipefail
@@ -24,6 +25,7 @@ want() { [ -z "${STEPS:-}" ] || [[ " ${STEPS} " == *" $1 "* ]]; }
   want coral && step coral bash $S/build-coral.sh
   want extras && step extras bash $S/build-extras.sh
   want gaudi && step gaudi bash $S/build-gaudi.sh
+  want conditions && step conditions bash $S/build-conditions.sh
 }
 want externals && step externals bash $S/build-externals.sh
 want layer1 && step layer1 bash $S/build-layer.sh AthSpikeBase AthenaExternals \
@@ -45,4 +47,5 @@ want layer3 && step layer3 bash $S/build-layer.sh Athena AthSpikeEvent \
   Control/GaudiSequencer Database/APR/CollectionSvc Generators/GeneratorConfig Tools/Campaigns \
   Tools/PyJobTransforms Tools/PyUtils Control/AthToolSupport/AsgMessaging \
   Control/AthToolSupport/AsgTools Database/APR/StorageSvc Database/AthenaPOOL/PoolSvc \
-  Tools/PathResolver
+  Tools/PathResolver Database/IOVDbSvc Database/CoraCool Database/DBLock \
+  DetectorDescription/GeoModel/GeoModelInterfaces
