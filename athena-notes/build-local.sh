@@ -15,7 +15,8 @@ shift
 RECIPES=("$@")
 if [ ${#RECIPES[@]} -eq 0 ]; then
   RECIPES=(recipes/boost-mpi3 recipes/yampl recipes/tdaq-common recipes/frontier-client recipes/lcg-coral recipes/lcg-cool
-           recipes/crestapi recipes/chai recipes/atlas-gaudi recipes/athena-externals)
+           recipes/crestapi recipes/chai recipes/atlas-gaudi recipes/athena-externals recipes/geomodel
+           recipes/atlas-acts)
 fi
 
 WORK=$(mkdir -p "${WORK:-/work}" && cd "${WORK:-/work}" && pwd)

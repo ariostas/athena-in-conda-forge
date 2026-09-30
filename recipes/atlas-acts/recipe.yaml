@@ -1,0 +1,97 @@
+context:
+  version: "47.7.0"
+
+# ACTS as ATLAS builds it in AthenaExternals (External/Acts): the Json, GeoModel and Root
+# plugins and Fatras, C++23 like the ROOT it links against. conda-forge's acts feedstock has
+# acts-core 45.5.1, without plugins. ACTS's installed CMake configuration lists every component
+# it was built with and loads all of them, and it requires the exact versions of Boost, Eigen,
+# nlohmann_json, ROOT and GeoModel it was built against, so this is one package pinned to
+# those.
+package:
+  name: atlas-acts
+  version: ${{ version }}
+
+source:
+  url: https://github.com/acts-project/acts/releases/download/v${{ version }}/acts-v${{ version }}.tar.gz
+  sha256: 1b0484698715c38cf32055d0a2ff6ea50771d541b728dc58b2e9a086d4c858e9
+
+build:
+  number: 0
+  skip:
+    - win
+  script:
+    # The release archive ships the generated code (prebuilt-codegen), so no Python is needed.
+    # ACTS_COMPILE_HEADERS compiles every public header on its own, as a check for ACTS's CI.
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_EXTENSIONS=OFF -DACTS_USE_SYSTEM_LIBS=ON -DACTS_CODEGEN_REQUIRE_PREBUILT=ON -DACTS_COMPILE_HEADERS=OFF -DACTS_BUILD_PLUGIN_JSON=ON -DACTS_BUILD_PLUGIN_GEOMODEL=ON -DACTS_BUILD_PLUGIN_ROOT=ON -DACTS_BUILD_FATRAS=ON
+    - cmake --build build --parallel ${CPU_COUNT}
+    - cmake --install build
+
+requirements:
+  build:
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+  host:
+    - libboost-devel
+    - eigen
+    - eigen-abi-devel
+    - nlohmann_json
+    - root_base
+    - root_cxx_standard
+    - geomodel-core ==6.29.0
+    - vdt
+  run:
+    # exact: ActsConfig.cmake finds them with EXACT
+    - ${{ pin_compatible('libboost-devel', upper_bound='x.x.x') }}
+    - ${{ pin_compatible('eigen', upper_bound='x.x.x') }}
+    - ${{ pin_compatible('nlohmann_json', upper_bound='x.x.x') }}
+    - ${{ pin_compatible('geomodel-core', upper_bound='x.x.x') }}
+  run_exports:
+    - ${{ pin_subpackage('atlas-acts', upper_bound='x.x.x') }}
+  run_constraints:
+    # the same files as conda-forge's acts-core
+    - acts-core <0a0
+
+tests:
+  - package_contents:
+      lib:
+        - ActsCore
+        - ActsFatras
+        - ActsPluginJson
+        - ActsPluginGeoModel
+        - ActsPluginRoot
+      include:
+        - Acts/Definitions/Algebra.hpp
+        - ActsFatras/Kernel/SingleParticleSimulation.hpp
+        - ActsPlugins/Json/SurfaceJsonConverter.hpp
+      files:
+        - lib/cmake/Acts/ActsConfig.cmake
+  - script:
+      - cmake -S test -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_PREFIX_PATH=${PREFIX}
+      - cmake --build build
+      - ./build/acts_test
+    files:
+      recipe:
+        - test/
+    requirements:
+      run:
+        - ${{ compiler('cxx') }}
+        - cmake
+        - ninja
+
+about:
+  homepage: https://acts.readthedocs.io/
+  repository: https://github.com/acts-project/acts
+  summary: ACTS track reconstruction toolkit, built with the plugins ATLAS uses
+  description: |
+    ACTS (A Common Tracking Software) is an experiment-independent toolkit for charged particle
+    track reconstruction. This build has the Json, GeoModel and Root plugins and the Fatras
+    fast simulation, as used by ATLAS's Athena.
+  license: MPL-2.0
+  license_file: LICENSE
+  documentation: https://acts.readthedocs.io/
+
+extra:
+  recipe-maintainers:
+    - ariostas

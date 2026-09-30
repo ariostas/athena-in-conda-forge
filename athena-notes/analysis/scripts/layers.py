@@ -42,6 +42,8 @@ LAYERS = [
             r"ByteStream|EventBookkeeper|EventContainers|EventPrimitives)",
             r"Event/xAOD/xAOD(Core|EventInfo|EventFormat|CnvInterfaces|Metadata|CutFlow)"
             r"(AthenaPool)?$",
+            # imported by job configurations, which the link graph does not show
+            r"Generators/(GeneratorConfig|McEventSelector)$",
         ],
         forbid_ext=HEAVY_TOP
         | {
@@ -71,10 +73,21 @@ LAYERS = [
             r"Tracking/Acts/ActsGeometry",
             r"MuonSpectrometer/MuonCablings/",
             r".*[Cc]abling",
+            # What the geometry job (DumpGeo) configures besides the geometry itself, found by
+            # running its configuration in ATLAS's release: the alignment and detector-element
+            # conditions algorithms, and the python configuration packages it imports.
+            r"Calorimeter/CaloAlignment/CaloAlignmentAlgs$",
+            r"LArCalorimeter/LArAlignment/LArAlignmentAlgs$",
+            r"MuonSpectrometer/MuonConditions/MuonCondGeneral/MuonCondAlg$",
+            r"InnerDetector/InDetConditions/(PixelConditionsAlgorithms|SCT_ConditionsAlgorithms|"
+            r"TRT_ConditionsAlgs)$",
+            r"(MuonSpectrometer/MuonConfig|LArCalorimeter/LArConfiguration|Tracking/TrkConfig|"
+            r"Tracking/Acts/ActsConfig|Simulation/Overlay/OverlayConfiguration|"
+            r"Trigger/TriggerCommon/TriggerJobOpts)$",
         ],
         forbid_ext=HEAVY_TOP
         | {"ML (onnxruntime,lwtnn)", "FastJet", "Triton client (gRPC,protobuf)"},
-        forbid_pkg=r"TestBeam/|Simulation/(?!HitManagement$)",
+        forbid_pkg=r"TestBeam/|Simulation/(?!HitManagement$|Overlay/OverlayConfiguration$)",
         absorb=r"(DetectorDescription|AtlasGeometryCommon|MagneticField)/|.*GeoModel|.*DetDescr",
     ),
     dict(

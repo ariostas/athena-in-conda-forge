@@ -2,24 +2,17 @@ context:
   version: "25.0.73"
 
 package:
-  name: athena-core
+  name: athena-detdescr
   version: ${{ version }}
 
 source:
   url: https://gitlab.cern.ch/atlas/athena/-/archive/release/${{ version }}/athena-release-${{ version }}.tar.gz
   sha256: e2df75b2fd966f97973e9ed89984222e4070be0d60ace0a4f3975e80e9ec1eba
-  patches:
-    # AtlasCLHEP_RandomGenerators with conda-forge's (upstream) CLHEP instead of ATLAS's fork
-    - 0001-AtlasCLHEP_RandomGenerators-upstream-CLHEP.patch
-    # the GeoModel configuration flags without DetectorDescription/GeoModel/DumpGeo (a later
-    # layer), as AthenaConfiguration does for other optional flag categories
-    - 0002-AthenaConfiguration-DumpGeo-flags-only-if-available.patch
 
 build:
   number: 0
   skip:
     - not linux
-    # the confdb2 files of Gaudi need dbm.sqlite3
     - match(python, "<3.13")
   script:
     file: build.sh
@@ -34,6 +27,16 @@ requirements:
     - cmake
     - ninja
   host:
+    - athena-core ==${{ version }}
+    # the externals of this layer
+    - geomodel-core ==6.29.0
+    - geomodel-tools ==6.29.0
+    - atlas-acts ==47.7.0
+    # IdDictParser
+    - libxml2
+    # GeoSpecialShapes
+    - gsl
+    # the externals of the layers below, whose headers this layer includes
     - athena-externals ==${{ version }}
     - atlas-gaudi
     - lcg-coral
@@ -84,38 +87,31 @@ requirements:
     # the build draws the python import graph of the packages (apydep)
     - pygraphviz
   run:
-    - athena-externals ==${{ version }}
+    - athena-core ==${{ version }}
     - python
     - root_base
-    - openmpi
-    - requests
-    - distro
 
 tests:
   - script:
-      # the ATLAS HelloWorld example, serial and multi-threaded
-      - bash test/run_hello.sh
-      - bash test/run_hello.sh --threads=2
-      # conditions: payloads written to a POOL file and registered in a COOL SQLite
-      # database, read back through IOVDbSvc
-      - bash test/run_conditions.sh
-      # raw data: an EventStorage file listed and copied with the ByteStream tools
-      - bash test/run_bytestream.sh
+      # identifiers decoded with the ID dictionaries of the release (no database needed)
+      - python test/check_ids.py
+      # the ATLAS geometry built from the geometry database, when CVMFS provides it
+      - bash test/run_geometry.sh
       # every component of the layer has its configurable
-      - python test/check_confdb.py "${AthenaCore_DIR}/lib/AthenaCore.components"
+      - python test/check_confdb.py "${AthenaDetDescr_DIR}/lib/AthenaDetDescr.components"
     files:
       recipe:
         - test/
 
 about:
   homepage: https://gitlab.cern.ch/atlas/athena
-  summary: The core of ATLAS's Athena software (framework, StoreGate, configuration)
+  summary: The detector description layer of ATLAS's Athena software
   description: |
     Athena is the offline software of the ATLAS experiment at CERN, built on the Gaudi
-    framework. This package is the first of the layers Athena is split into for conda-forge:
-    the framework itself (athena.py, StoreGate, the component configuration, AthenaMP,
-    performance monitoring, POOL and RNTuple I/O, raw data (ByteStream) I/O, conditions
-    access through IOVDb, COOL and CREST, the core of the xAOD event data model).
+    framework. This package is the second of the layers Athena is split into for conda-forge,
+    on top of athena-core: identifiers and the identifier dictionaries, the GeoModel geometry
+    of every subdetector, the readout geometry, the tracking geometry (legacy and ACTS), the
+    magnetic field, cabling and detector conditions data.
   license: Apache-2.0
   license_file: LICENSE
   repository: https://gitlab.cern.ch/atlas/athena

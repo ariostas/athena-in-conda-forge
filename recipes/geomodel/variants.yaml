@@ -1,0 +1,6 @@
+# ATLAS builds with Eigen 3.4 (3.4.1 in LCG_110). conda-forge's global pinning has moved to
+# Eigen 5, which is not API compatible (e.g. Eigen/Core no longer includes <cassert>): every
+# package with Eigen in its interface is built against eigen-abi-devel 3.4, whose run export
+# keeps it from being mixed with Eigen 5 builds.
+eigen_abi_devel:
+  - "3.4.0.100"

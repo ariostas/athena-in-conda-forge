@@ -623,3 +623,93 @@ default build order.
 - the runtime python dependencies of core (psutil, matplotlib, pandas, sqlalchemy for
   PerfMon's scripts; boto3 and stomp.py for EventIndex), deciding which become run
   requirements.
+
+### 2026-09-30: the detdescr layer (M4, first part)
+
+New externals:
+- **`geomodel` 6.29.0** (outputs `geomodel-core` and `geomodel-tools`), built as ATLAS builds it
+  (`GEOMODEL_BUILD_TOOLS` only). conda-forge's geomodel feedstock has the same split but builds
+  linux-64 only, and all its outputs depend on Geant4, Qt6, Coin3D, SoQt6 and HDF5 because they
+  share one staging build with the visualization. This recipe is meant as a contribution to that
+  feedstock: more platforms, and outputs that depend only on what they use. GeoModel's CMake
+  turns warnings into errors; the recipe turns that off. 3 minutes. Tests: a small geometry
+  written to SQLite and read back (through the CMake configuration), and a GeoModelXml
+  description turned into SQLite by `gmcat` with GMXPlugin.
+- **`atlas-acts` 47.7.0**: the Json, GeoModel and Root plugins and Fatras, C++23, like
+  AthenaExternals. One package: ACTS's installed CMake configuration lists every component it
+  was built with and loads all of them, and it requires the exact Boost, Eigen, nlohmann_json,
+  ROOT and GeoModel versions it was built against (`EXACT`), so split outputs would need
+  patches, and the run requirements are pinned to x.x.x. The release archive ships the
+  generated code, so no Python is needed (`ACTS_CODEGEN_REQUIRE_PREBUILT`), and
+  `ACTS_COMPILE_HEADERS=OFF` skips ACTS's compile-every-header check. 11 minutes, 5 MB.
+  `run_constraints: acts-core <0a0` (same files). Test: a surface written to JSON and read back,
+  a straight line intersected with it, a GeoModel material converted (X0 of iron).
+- vecmem is not needed before the trigger and GPU packages.
+
+**Eigen.** conda-forge's global pinning has moved to Eigen 5 (`eigen_abi_devel` 5.0.1), and a
+plain `eigen` host dependency resolves to 5.0.1. ATLAS builds with Eigen 3.4.1, and Eigen 5 is
+not API compatible (Athena's `EventPrimitivesHelpers.h` relied on Eigen/Core including
+`<cassert>`). geomodel, atlas-acts and the Athena layers now build against `eigen-abi-devel`
+3.4.0.100 (Eigen 3.4.0), whose run export keeps them from being mixed with Eigen 5 builds.
+
+**The layer contents.** The M4 deliverable is DumpGeo: `python -m DumpGeo.DumpGeoConfig` builds
+the whole ATLAS geometry for a tag and dumps it to a GeoModel SQLite file. Its configuration,
+run in ATLAS's own release from CVMFS (the new `athena-ref` container,
+`athena-notes/cvmfs-athena.sh`, `analysis/scripts/cfgdeps.py`), uses 43 python packages and 45
+component types. Mapped to layers, 11 packages were in later layers: the alignment and
+detector-element conditions algorithms (CaloAlignmentAlgs, LArAlignmentAlgs, MuonCondAlg,
+PixelConditionsAlgorithms, SCT_ConditionsAlgorithms, TRT_ConditionsAlgs) and python-only
+configuration packages (MuonConfig, LArConfiguration, TrkConfig, ActsConfig,
+OverlayConfiguration, TriggerJobOpts). They are now explicit seeds of `detdescr` in
+`layers.py`, as are GeneratorConfig and McEventSelector for `core` (which changes nothing in
+core). detdescr: 219 packages, 1,797 TUs; nothing needs a later layer at build time.
+
+**Runtime data.** The geometry comes from the ATLAS geometry database, and the job also reads
+conditions (alignment). Both are read through Frontier; ATLAS's public server answers direct
+requests from here (the proxy `asetup` adds answers 403), and conditions payloads come from
+CVMFS. The geometry databases on CVMFS (DBRelease `geomDB_sqlite`, 123 MB, 2022; GroupData
+`Geometry/*.db`, 51 MB DEV tags) have no clear licence and are not packaged. So the geometry
+test runs only where CVMFS is mounted; the identifier test needs nothing.
+
+Reference numbers (ATLAS's release, aarch64): DumpGeo for ATLAS-R3S-2021-03-02-00 takes 3
+minutes and writes 58,181 PhysVols, 26,226 FullPhysVols, 59,048 LogVols and 485 materials
+(30 MB); `gmcat` reads it back unchanged.
+
+**`athena-detdescr`** (project `AthenaDetDescr` on `AthenaCore`) builds with rattler-build on
+linux-aarch64 and passes:
+- **the ATLAS geometry**: DumpGeo for ATLAS-R3S-2021-03-02-00 builds every subdetector's
+  GeoModel description (beam pipe, Pixel, SCT, TRT, ID services, LAr, Tile, muons) and dumps it.
+  The result is **identical in size to ATLAS's own release** (the counts above), and `gmcat`
+  reads it back unchanged. 1.5 minutes. It needs CVMFS and network (Frontier), so it is skipped
+  elsewhere;
+- **identifiers**: SCT and pixel identifiers from the release's ID dictionaries through PyROOT
+  (a port of ATLAS's SCT_ID unit test, checked against ATLAS's release first);
+- the component check: 527 components, and every one has its configurable.
+
+Fixes on the way, in the recipes below the layer:
+- **`env_setup.sh`**: the layer projects now generate and install it, as `Projects/Athena`
+  does. It carries the environment that packages register (`CORAL_DBLOOKUP_PATH` and
+  `CORAL_AUTH_PATH` from AtlasAuthentication, `UBSAN_OPTIONS` from CxxUtils,
+  `COOL_DISABLE_CORALCONNECTIONPOOLCLEANUP`, ...), and CORAL needs `dblookup.xml` to resolve
+  logical database names such as `ATLASDD`. Paths into the build environment are rewritten to
+  the environment's prefix. The activation scripts save and restore the new variables.
+  `CORAL_AUTH_PATH` points at a directory with no `authentication.xml`, which is fine for
+  Frontier and SQLite.
+- **`frontier-client`** had no `run_exports`, so CORAL's Frontier plugin could not load
+  `libfrontier_client.so.2` at runtime (CMSSW's copy of the recipe has the same gap).
+- The deactivation scripts unset the `<project>_*` variables of every layer.
+
+**Cost** (`compile_cost.py`): 1,859 compiles at 5.6 CPU-s on average (2.9 CPU-h) plus about 1
+CPU-h of dictionaries: about 4 CPU-h, as `layers.py` predicted, so 2–2.5 h on a 2-core runner.
+The whole recipe takes 40 minutes at `-j10` here, tests included. Peak RSS per compile:
+median 0.5 GB, p90 1.25 GB, max 1.9 GB (ACTS and Eigen code, the MuonCondAlg component
+list): `-j4` still fits in 7 GB. The slowest single step is again a reflex dictionary
+(`xAODMuonPrepData`, 6–11 minutes of genreflex). Package: 39 MB.
+
+**Next:**
+- the `edm` layer (xAOD and trigger EDM; read AOD/DAOD in Athena and PyROOT), the rest of M4;
+- runtime data without CVMFS (D6): the geometry database. The DBRelease `geomDB_sqlite` or a
+  GeoModel SQLite geometry per tag would make the geometry test run anywhere, but needs ATLAS's
+  agreement on the licence, like a default `FRONTIER_SERVER`;
+- still open from M3: the runtime python dependencies of core, the licences of CORAL, COOL,
+  CrestApi and yampl.

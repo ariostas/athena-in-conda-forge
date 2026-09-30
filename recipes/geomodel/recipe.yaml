@@ -1,0 +1,205 @@
+schema_version: 1
+
+context:
+  version: "6.29.0"
+
+# GeoModel as ATLAS builds it in AthenaExternals (GEOMODEL_BUILD_TOOLS, nothing else), split
+# like conda-forge's geomodel feedstock: geomodel-core (kernel and SQLite I/O) and
+# geomodel-tools (XML/JSON parsers, validation, command-line tools). The feedstock builds
+# linux-64 only, and its outputs all depend on Geant4, Qt6, Coin3D, SoQt6 and HDF5 because
+# they share one staging build with the visualization. These two outputs are meant to become a
+# contribution to the feedstock: more platforms, and outputs that depend only on what they use.
+recipe:
+  name: geomodel-split
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/GeoModelDev/GeoModel/-/archive/${{ version }}/GeoModel-${{ version }}.tar.gz
+  sha256: e20dc3cad9d57d8bc56885a024768e61b1cd3507cbf9afd3015b66a115df9e73
+
+build:
+  number: 0
+  skip:
+    - win
+
+outputs:
+  - staging:
+      name: geomodel-build
+    build:
+      script: build.sh
+    requirements:
+      build:
+        - ${{ compiler('c') }}
+        - ${{ compiler('cxx') }}
+        - ${{ stdlib('c') }}
+        - cmake
+        - ninja
+      host:
+        - eigen
+        - eigen-abi-devel
+        - sqlite
+        - xerces-c
+        - nlohmann_json
+        # GeoModelXml
+        - zlib
+
+  - package:
+      name: geomodel-core
+    inherit: geomodel-build
+    build:
+      files:
+        - lib/libGeoGenericFunctions.*
+        - lib/libGeoModelKernel.*
+        - lib/libGeoModelHelpers.*
+        - lib/libGeoModelDBManager.*
+        - lib/libGeoModelIOHelpers.*
+        - lib/libGeoModelRead.*
+        - lib/libGeoModelWrite.*
+        - lib/libTFPersistification.*
+        - include/GeoGenericFunctions/**
+        - include/GeoModelKernel/**
+        - include/GeoModelHelpers/**
+        - include/GeoModelDBManager/**
+        - include/GeoModelIOHelpers/**
+        - include/GeoModelRead/**
+        - include/GeoModelWrite/**
+        - include/TFPersistification/**
+        - lib/cmake/GeoModelCore/**
+        - lib/cmake/GeoModelIO/**
+    requirements:
+      build:
+        - ${{ compiler('cxx') }}
+        - ${{ stdlib('c') }}
+      host:
+        - eigen
+        - eigen-abi-devel
+        - sqlite
+      run:
+        # GeoModelKernel's headers use Eigen, and GeoModelCoreConfig.cmake finds it
+        - eigen
+      run_exports:
+        - ${{ pin_subpackage('geomodel-core', upper_bound='x.x') }}
+    tests:
+      - package_contents:
+          lib:
+            - GeoModelKernel
+            - GeoModelHelpers
+            - GeoGenericFunctions
+            - GeoModelDBManager
+            - GeoModelRead
+            - GeoModelWrite
+            - GeoModelIOHelpers
+            - TFPersistification
+          include:
+            - GeoModelKernel/GeoBox.h
+            - GeoModelIOHelpers/GMIO.h
+          files:
+            - lib/cmake/GeoModelCore/GeoModelCoreConfig.cmake
+            - lib/cmake/GeoModelIO/GeoModelIOConfig.cmake
+      # a small geometry written to SQLite and read back, built through the CMake configuration
+      - script:
+          - cmake -S test -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_PREFIX_PATH=${PREFIX}
+          - cmake --build build
+          - ./build/write_read geometry.db
+        files:
+          recipe:
+            - test/
+        requirements:
+          run:
+            - ${{ compiler('cxx') }}
+            - cmake
+            - ninja
+    about:
+      summary: GeoModel core kernel and I/O libraries
+      description: |
+        The core GeoModel libraries (GeoModelKernel, GeoModelHelpers, GeoGenericFunctions)
+        and the I/O layer (GeoModelDBManager, GeoModelRead, GeoModelWrite, GeoModelIOHelpers,
+        TFPersistification) that reads and writes GeoModel SQLite geometry files.
+
+  - package:
+      name: geomodel-tools
+    inherit: geomodel-build
+    build:
+      files:
+        - lib/libExpressionEvaluator.*
+        - lib/libGDMLtoGM.*
+        - lib/libGeoModelJSONParser.*
+        - lib/libGeoModelValidation.*
+        - lib/libGeoModelXMLDumper.*
+        - lib/libGeoModelXMLParser.*
+        - lib/libGeoModelXml.*
+        - lib/libGMXPlugin.*
+        - include/ExpressionEvaluator/**
+        - include/GDMLInterface/**
+        - include/GeoModelJSONParser/**
+        - include/GeoModelValidation/**
+        - include/GeoModelXMLDumper/**
+        - include/GeoModelXMLParser/**
+        - include/GeoModelXml/**
+        - lib/cmake/GeoModelTools/**
+        - bin/gmcat
+        - bin/gmstatistics
+        - bin/gmintegritycheck
+        - bin/gdml2gm
+        - bin/dumpGeoXML
+        - share/GeoModelXml/**
+        - share/man/man1/**
+    requirements:
+      build:
+        - ${{ compiler('cxx') }}
+        - ${{ stdlib('c') }}
+      host:
+        - ${{ pin_subpackage('geomodel-core', exact=True) }}
+        - xerces-c
+        - nlohmann_json
+        - sqlite
+        - zlib
+      run:
+        - ${{ pin_subpackage('geomodel-core', exact=True) }}
+        # GeoModelToolsConfig.cmake finds it
+        - nlohmann_json
+      run_exports:
+        - ${{ pin_subpackage('geomodel-tools', upper_bound='x.x') }}
+    tests:
+      - package_contents:
+          lib:
+            - ExpressionEvaluator
+            - GeoModelXMLParser
+            - GeoModelJSONParser
+            - GeoModelXml
+            - GeoModelValidation
+          bin:
+            - gmcat
+            - gmstatistics
+            - gmintegritycheck
+          files:
+            - lib/cmake/GeoModelTools/GeoModelToolsConfig.cmake
+      # a geometry described in GeoModelXml, turned into SQLite by gmcat through GMXPlugin
+      - script:
+          - bash test/run_gmx.sh
+        files:
+          recipe:
+            - test/
+        requirements:
+          run:
+            - sqlite
+    about:
+      summary: GeoModel tools (XML/JSON parsers, validation, command-line utilities)
+      description: |
+        GeoModelXml, the GeoModel XML and JSON parsers, GeoModelValidation, the expression
+        evaluator, the GDML converter and the command-line tools gmcat, gmstatistics and
+        gmintegritycheck.
+
+about:
+  homepage: https://geomodel.web.cern.ch/
+  repository: https://gitlab.cern.ch/GeoModelDev/GeoModel
+  summary: GeoModel detector-geometry toolkit
+  description: |
+    GeoModel is a lightweight, framework-agnostic C++ toolkit for describing detector
+    geometries, originally developed for the ATLAS experiment.
+  license: Apache-2.0
+  license_file: LICENSE
+
+extra:
+  recipe-maintainers:
+    - ariostas

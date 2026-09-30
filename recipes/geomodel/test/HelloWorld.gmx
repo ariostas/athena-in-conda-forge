@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE geomodel SYSTEM "geomodel.dtd" []>
+
+<!-- GeoModel's GeoModelTools/GeoModelXML/GMXPlugin/data/HelloWorld.gmx -->
+<geomodel name="Hello World" version="1.0"
+  xmlns="http://www.nikhef.nl/%7Er29/gmx">
+
+  <materials>
+    <element name="Carbon"      shortname="C"  Z="6"  A="12.011"/>
+    <material name="Diamond" density="3.515">
+      <elementref fraction="1.0" ref="Carbon"/>
+    </material>
+  </materials>
+
+  <shapes>
+    <tube name="ShapeOneMeterCylinder"    rmin="0.2"    rmax="0.5"      zhalflength="0.5"/>
+  </shapes>
+
+  <addbranch>
+    <logvol name="DiamondCylinder" shape="ShapeOneMeterCylinder" material="Diamond"/>
+  </addbranch>
+
+</geomodel>
