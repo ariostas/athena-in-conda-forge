@@ -47,6 +47,41 @@ atlas_ctest_setup()
 atlas_project( USE ${ATHENA_LAYER_BASE} ${ATHENA_LAYER_VERSION}
    PROJECT_ROOT ${ATHENA_SOURCE_DIR}/ )
 
+# The CLIDs of the layer's event data types in its clid.db. AtlasCMake writes clid.db from the
+# component libraries only, so a type is in it when some component's code uses it: in ATLAS's
+# release that is often a reconstruction or trigger component, in a later layer here, and
+# without the CLID Athena cannot name such an object in an input file (xAOD::MissingETContainer,
+# xAOD::EventShape, xAOD::TrigConfKeys in a DAOD). Every persistent type has a POOL converter,
+# so the converter libraries (all named *PoolCnv) add theirs, as the components do.
+function( _layer_targets dir out )
+   get_property( _targets DIRECTORY ${dir} PROPERTY BUILDSYSTEM_TARGETS )
+   get_property( _subdirs DIRECTORY ${dir} PROPERTY SUBDIRECTORIES )
+   foreach( _sub ${_subdirs} )
+      _layer_targets( ${_sub} _subTargets )
+      list( APPEND _targets ${_subTargets} )
+   endforeach()
+   set( ${out} ${_targets} PARENT_SCOPE )
+endfunction()
+_layer_targets( ${CMAKE_CURRENT_SOURCE_DIR} _layerTargets )
+set( _cnvClidFiles )
+foreach( _target ${_layerTargets} )
+   if( _target MATCHES "PoolCnv$" AND NOT TARGET ${_target}ClidGen )
+      set( _clidFile ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/${_target}_clid.db )
+      add_custom_command( OUTPUT ${_clidFile}
+         COMMAND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/atlas_build_run.sh
+         genCLIDDB -p ${_target} -o ${_clidFile}
+         DEPENDS genCLIDDB CLIDComps ${_target} )
+      list( APPEND _cnvClidFiles ${_clidFile} )
+      file( APPEND
+         ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/${CMAKE_PROJECT_NAME}ClidMergeFiles.txt
+         "${_clidFile}\n" )
+   endif()
+endforeach()
+if( _cnvClidFiles )
+   add_custom_command( OUTPUT ${CMAKE_SHARE_OUTPUT_DIRECTORY}/clid.db APPEND
+      DEPENDS ${_cnvClidFiles} )
+endif()
+
 # The environment of the externals and of the packages (e.g. CORAL_DBLOOKUP_PATH from
 # AtlasAuthentication), for the build and installed: the layer's setup.sh sources it.
 lcg_generate_env( SH_FILE ${CMAKE_BINARY_DIR}/${ATLAS_PLATFORM}/env_setup.sh )

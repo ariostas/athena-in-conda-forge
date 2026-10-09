@@ -232,7 +232,7 @@ stub `AthenaExternalsConfig.cmake`). Offer the patches upstream to atlasexternal
 |---|---|---|---|---|
 | 1 | core | 1.2k | `athena.py`, StoreGate, ComponentAccumulator, POOL/RNTuple I/O, IOVDb/CREST, ByteStream | Gaudi, CORAL/COOL, CrestApi/chai, tdaq-common, HepMC3 |
 | 2 | detdescr | 1.6k | Identifiers, GeoModel geometry, ACTS tracking geometry, magnetic field | GeoModel, ACTS |
-| 3 | edm | 1.8k | xAOD and trigger EDM: read/write AOD/DAOD | |
+| 3 | edm | 1.7k | xAOD and trigger EDM: read/write AOD/DAOD | |
 | 4 | edm-det | 1.5k | RDO/ESD/HITS I/O | FastJet |
 | 5 | analysis | 1.7k | CP tools on DAOD_PHYS/PHYSLITE | onnxruntime, lwtnn, HDF5, LHAPDF, Triton client |
 | 6 | sim | 1.4k | `Sim_tf.py` | Geant4, Pythia8 |
@@ -713,3 +713,73 @@ list): `-j4` still fits in 7 GB. The slowest single step is again a reflex dicti
   agreement on the licence, like a default `FRONTIER_SERVER`;
 - still open from M3: the runtime python dependencies of core, the licences of CORAL, COOL,
   CrestApi and yampl.
+
+### 2026-10-09: the edm layer (M4, second part)
+
+**The layer contents.** `layers.py` put the event data classes, their T/P converters, POOL
+converters and dictionaries in `edm` (166 packages), but not two packages that event data I/O
+needs, because they have algorithms and tools and the layer forbids components:
+- `xAODTrackingAthenaPool` (the converter of `xAOD::TrackParticle`, in every AOD and DAOD)
+  includes an interface header of `xAODTrackingCnv`, whose algorithms link `MCTruthClassifier`
+  and its calorimeter and particle-flow tools;
+- writing a data file's metadata needs `LumiBlockComps` (the luminosity block metadata tool).
+
+A new `tool_seeds` entry in `layers.py` lets these two in with their closure (+21 packages,
++135 TUs, no new externals). edm: 187 packages, 1,739 TUs; nothing needs a later layer.
+The third metadata tool a DAOD copy uses, the trigger menu's (`xAODTriggerCnv`), stays out:
+in Athena mode that package brings the trigger decision and steering packages (+26 packages,
++395 TUs, L1Topo's algorithms, which download two ML models at build time). Found by running
+the test job in ATLAS's release with `cfgdeps.py` (which now also takes a job script) and the
+new `cfgmap.py` (configuration → packages → layers).
+
+**Test data.** ATLAS Open Data has DAOD_PHYSLITE files under CC0 (opendata.cern.ch records
+80000–80020). The smallest are tails of runs: `DAOD_PHYSLITE.37001701._000001.pool.root.1`
+(2015 data, run 276183, 132 events, 1 MB) is a second source of the recipe, downloaded with a
+sha256 like any source. The ATLAS test files on CVMFS (`data-art/ASG`, the old AODs of the
+T/P tests) have no clear licence and are only read in place.
+
+**`athena-edm`** (project `AthenaEDM` on `AthenaDetDescr`) builds on linux-aarch64 and passes:
+- **xAOD I/O without CVMFS**: Athena reads the Open Data file and dumps every object in it with
+  PyDumper (127,173 lines), and writes a copy with all its event data and its metadata
+  propagated (file metadata, cut bookkeepers, luminosity blocks, event format; not the trigger
+  menu); Athena reads the copy back. Both dumps are **identical to the dump ATLAS's own release
+  writes** (shipped as `test/data15_physlite.dump.xz`, 120 kB). PyROOT reads both files through
+  `xAOD::MakeTransientTree`, objects and element links (electron to track and cluster, muon to
+  track), and gets the same summary as ATLAS's release;
+- **ATLAS's T/P converter tests** of the layer's packages (`run_tpcnv_test`, 38 of 46): AODs
+  written by releases 15 to 21 read with the current classes and compared with ATLAS's
+  references, when CVMFS is there (`tpcnv_tests.py` lists them). The other 8 (`RecTPCnv`,
+  `TrackParticleTPCnv`) configure geometry and conditions that need the reco and edm-det
+  layers; all 46 pass in ATLAS's release;
+- the component check: 1,424 components, 745 configurables.
+
+Fixes on the way, in all the layers (core and detdescr rebuilt, tests still pass):
+- **`-fvisibility-inlines-hidden`** (from conda-forge's `CXXFLAGS`) is now stripped. ATLAS does
+  not use it, and its libraries export inline functions that other libraries link to:
+  `DATAVECTOR_BASE_FIN` defines `SG::bi_destroy<DataVector<T>>::destroy` inline in the class's
+  header, and code that sees only `DATAVECTOR_BASE_FWD` (VxJetVertex) linked to the copy in
+  `libxAODTracking.so`, which was hidden. The same thing that CMSSW patch 0006 works around, but
+  here it is the project's own convention.
+- **CLIDs of the layer's types.** AtlasCMake writes `clid.db` from the component libraries only,
+  so a type is in it when some component's code uses the type: in ATLAS's release that is often
+  a reconstruction or trigger component, in a later layer here. Without it Athena could not
+  name `xAOD::MissingETContainer`, `xAOD::EventShape` or `xAOD::TrigConfKeys` objects in a DAOD.
+  The layer `CMakeLists.txt` now runs `genCLIDDB` on every POOL converter library too and adds
+  the result to the project's merged `clid.db` (core's grew from 250 to 268 entries).
+- The `athena-ref` container needed libuuid-devel (cling parses `uuid/uuid.h`), libbrotli
+  (ROOT's TreePlayer) and diffutils (ATLAS's tests).
+
+**Cost** (`compile_cost.py`): unlike the first two layers, **dictionaries dominate**. 482
+genreflex steps took 6.2 h of summed wall time against 3.7 h for the 1,822 compiles (at `-j10`
+on 10 cores, so inflated by contention); the slowest is `xAODTrigL1CaloDict` (16 minutes, then
+`xAODTauDict` 7, `TrigMuonEventDict` 6, `egammaEvent` 5). The whole recipe takes 50 minutes here,
+tests included: at most 8 CPU-h, about twice `layers.py`'s estimate, which counts a dictionary
+as one TU. Peak RSS per compile: median 0.46 GB, p90 1.4 GB, max 3.0 GB (the trigger EDM's
+`*StorageDefinitions.cxx` and the converter component lists, 2.4–3.0 GB): `-j2` or `-j3` on a
+7 GB runner. Package: 49 MB.
+
+**Next:**
+- the `edm-det` layer (RDO/ESD/HITS), the end of M4; its T/P tests and the 8 above;
+- open: the trigger menu metadata tool (with the trigger decision tool, in `analysis`), a
+  default `FRONTIER_SERVER` and the geometry database without CVMFS (D6), the runtime python
+  dependencies of core, the licences of CORAL, COOL, CrestApi and yampl.

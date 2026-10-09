@@ -42,8 +42,13 @@ as the reference for what a job should do and which packages it needs:
 `docker exec -w <dir> athena-ref bash /work/tmp/cvmfs-athena.sh <command>`, a copy of
 `athena-notes/cvmfs-athena.sh`. That script sources the LCG gcc and the release's `setup.sh`, and
 sets `ATLAS_POOLCOND_PATH` and `FRONTIER_SERVER` (ATLAS's public Frontier server, directly: the
-proxy that `asetup` adds answers 403 from here). First reads from CVMFS are slow (minutes). `athena-notes/analysis/scripts/cfgdeps.py`, run the same
-way, lists the python packages and component types a configuration uses.
+proxy that `asetup` adds answers 403 from here). First reads from CVMFS are slow (minutes).
+`athena-notes/analysis/scripts/cfgdeps.py`, run the same way, lists the python packages and
+component types a configuration (a module or a job script) uses; `cfgmap.py` maps that to
+packages and layers. The container has the EL9 packages the release needs beyond the base
+image (libicu, libcurl, libuuid-devel for cling, libbrotli for ROOT's TreePlayer, diffutils
+for ATLAS's tests); install missing ones one at a time (`dnf install` gives up on the batch).
+If the host's CVMFS is remounted, the containers see it again without a restart.
 
 Recipes are built with `athena-notes/build-local.sh` (adapted from the CMSSW one):
 `docker exec athena-dev bash -c 'export PATH=/work/tools/bin:$PATH; cd /repo &&

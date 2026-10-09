@@ -1,0 +1,54 @@
+# ATLAS's T/P converter (schema evolution) tests of the packages of this layer: package, test,
+# ATLAS_REFERENCE_TAG, required libraries. Each <test>_test.py (installed in the layer's bin/)
+# reads a file written by an old release and compares a dump of some of its objects with a
+# reference; both are on CVMFS. From `athena-notes/analysis/scripts/tpcnv_tests.py
+# recipes/athena-edm/packages.txt`.
+# Commented out ("#later"): tests whose job configuration needs later layers, the "Reco" flags
+# (RecJobTransforms, reco layer) or the TRT conditions converters (InDetConditionsAthenaPool,
+# edm-det layer). They pass in ATLAS's release.
+Event/xAOD/xAODBTaggingAthenaPool xAODBTaggingAthenaPool_21.0.79 xAODBTaggingAthenaPool/xAODBTaggingAthenaPoolReference-01-01-00 xAODBTaggingAthenaPoolPoolCnv
+Event/xAOD/xAODCaloEventAthenaPool xAODCaloEventAthenaPool_20.1.7.2 xAODCaloEventAthenaPool/xAODCaloEventAthenaPoolReference-01-01-00 xAODCaloEventAthenaPoolPoolCnv
+Event/xAOD/xAODCaloEventAthenaPool xAODCaloEventAthenaPool_21.0.79 xAODCaloEventAthenaPool/xAODCaloEventAthenaPoolReference-01-01-00 xAODCaloEventAthenaPoolPoolCnv
+Event/xAOD/xAODCaloRingsAthenaPool xAODCaloRingsAthenaPool_21.0.79 xAODCaloRingsAthenaPool/xAODCaloRingsAthenaPoolReference-01-00-00 xAODCaloRingsAthenaPoolPoolCnv
+Event/xAOD/xAODEgammaAthenaPool xAODEgammaAthenaPool_20.1.7.2 xAODEgammaAthenaPool/xAODEgammaAthenaPoolReference-01-01-00 xAODEgammaAthenaPoolPoolCnv
+Event/xAOD/xAODEgammaAthenaPool xAODEgammaAthenaPool_21.0.79 xAODEgammaAthenaPool/xAODEgammaAthenaPoolReference-01-01-00 xAODEgammaAthenaPoolPoolCnv
+Event/xAOD/xAODEventShapeAthenaPool xAODEventShapeAthenaPool_21.0.79 xAODEventShapeAthenaPool/xAODEventShapeAthenaPoolReference-01-00-01 xAODEventShapeAthenaPoolPoolCnv
+Event/xAOD/xAODJetAthenaPool xAODJetAthenaPool_20.7.2.2 xAODJetAthenaPool/xAODJetAthenaPoolReference-01-01-00 xAODJetAthenaPoolPoolCnv
+Event/xAOD/xAODJetAthenaPool xAODJetAthenaPool_21.0.79 xAODJetAthenaPool/xAODJetAthenaPoolReference-01-01-00 xAODJetAthenaPoolPoolCnv
+Event/xAOD/xAODMissingETAthenaPool xAODMissingETAthenaPool_20.1.7.2 xAODMissingETAthenaPool/xAODMissingETAthenaPoolReference-01-03-00 xAODMissingETAthenaPoolPoolCnv
+Event/xAOD/xAODMissingETAthenaPool xAODMissingETAthenaPool_21.0.79 xAODMissingETAthenaPool/xAODMissingETAthenaPoolReference-01-03-00 xAODMissingETAthenaPoolPoolCnv
+Event/xAOD/xAODMuonAthenaPool xAODMuonAthenaPool_master-20190911 xAODMuonAthenaPool/xAODMuonAthenaPoolReference-01-01-00 xAODMuonAthenaPoolPoolCnv
+Event/xAOD/xAODMuonAthenaPool xAODMuonAthenaPool_20.1.7.2 xAODMuonAthenaPool/xAODMuonAthenaPoolReference-01-01-00 xAODMuonAthenaPoolPoolCnv
+Event/xAOD/xAODMuonAthenaPool xAODMuonAthenaPool_20.7.2.2 xAODMuonAthenaPool/xAODMuonAthenaPoolReference-01-01-00 xAODMuonAthenaPoolPoolCnv
+Event/xAOD/xAODMuonAthenaPool xAODMuonAthenaPool_20.7.9.9 xAODMuonAthenaPool/xAODMuonAthenaPoolReference-01-01-00 xAODMuonAthenaPoolPoolCnv
+Event/xAOD/xAODMuonAthenaPool xAODMuonAthenaPool_21.0.79 xAODMuonAthenaPool/xAODMuonAthenaPoolReference-01-01-00 xAODMuonAthenaPoolPoolCnv
+Event/xAOD/xAODPFlowAthenaPool xAODPFlowAthenaPool_21.0.79 xAODPFlowAthenaPool/xAODPFlowAthenaPoolReference-01-01-00 xAODPFlowAthenaPoolPoolCnv
+Event/xAOD/xAODParticleEventAthenaPool xAODParticleAthenaPool_21.0.79 xAODParticleEventAthenaPool/xAODParticleEventAthenaPoolReference-01-00-00 xAODParticleEventAthenaPoolPoolCnv
+Event/xAOD/xAODTauAthenaPool xAODTauAthenaPool_20.1.7.2 xAODTauAthenaPool/xAODTauAthenaPoolReference-01-01-00 xAODTauAthenaPoolPoolCnv
+Event/xAOD/xAODTauAthenaPool xAODTauAthenaPool_20.7.2.2 xAODTauAthenaPool/xAODTauAthenaPoolReference-01-01-00 xAODTauAthenaPoolPoolCnv
+Event/xAOD/xAODTauAthenaPool xAODTauAthenaPool_21.0.79 xAODTauAthenaPool/xAODTauAthenaPoolReference-01-01-00 xAODTauAthenaPoolPoolCnv
+Event/xAOD/xAODTrackingAthenaPool xAODTrackingAthenaPool_20.1.7.2 xAODTrackingAthenaPool/xAODTrackingAthenaPoolReference-02-01-00 xAODTrackingAthenaPoolPoolCnv
+Event/xAOD/xAODTrackingAthenaPool xAODTrackingAthenaPool_20.7.2.2 xAODTrackingAthenaPool/xAODTrackingAthenaPoolReference-02-01-00 xAODTrackingAthenaPoolPoolCnv
+Event/xAOD/xAODTrackingAthenaPool xAODTrackingAthenaPool_21.0.79 xAODTrackingAthenaPool/xAODTrackingAthenaPoolReference-02-01-00 xAODTrackingAthenaPoolPoolCnv
+Event/xAOD/xAODTrackingAthenaPool xAODTrackingAthenaPool_master-20190911 xAODTrackingAthenaPool/xAODTrackingAthenaPoolReference-02-01-00 xAODTrackingAthenaPoolPoolCnv
+Event/xAOD/xAODTrigCaloAthenaPool xAODTrigCaloAthenaPool_20.0.0.3 xAODTrigCaloAthenaPool/xAODTrigCaloAthenaPoolReference-01-00-00 xAODTrigCaloAthenaPoolPoolCnv
+Event/xAOD/xAODTrigCaloAthenaPool xAODTrigCaloAthenaPool_21.0.79 xAODTrigCaloAthenaPool/xAODTrigCaloAthenaPoolReference-01-00-00 xAODTrigCaloAthenaPoolPoolCnv
+Event/xAOD/xAODTrigEgammaAthenaPool xAODTrigEgammaAthenaPool_21.0.79 xAODTrigEgammaAthenaPool/xAODTrigEgammaAthenaPoolReference-01-02-00 xAODTrigEgammaAthenaPoolPoolCnv
+Event/xAOD/xAODTrigMissingETAthenaPool xAODTrigMissingETAthenaPool_21.0.79 xAODTrigMissingETAthenaPool/xAODTrigMissingETAthenaPoolReference-01-00-00 xAODTrigMissingETAthenaPoolPoolCnv
+Event/xAOD/xAODTrigMuonAthenaPool xAODTrigMuonAthenaPool_20.1.7.2 xAODTrigMuonAthenaPool/xAODTrigMuonAthenaPoolReference-01-01-00 xAODTrigMuonAthenaPoolPoolCnv
+Event/xAOD/xAODTrigMuonAthenaPool xAODTrigMuonAthenaPool_21.0.79 xAODTrigMuonAthenaPool/xAODTrigMuonAthenaPoolReference-01-01-00 xAODTrigMuonAthenaPoolPoolCnv
+Event/xAOD/xAODTrigRingerAthenaPool xAODTrigRingerAthenaPool_21.0.79 xAODTrigRingerAthenaPool/xAODTrigRingerAthenaPoolReference-01-00-00 xAODTrigRingerAthenaPoolPoolCnv
+Event/xAOD/xAODTriggerAthenaPool xAODTriggerAthenaPool_master-20190911 xAODTriggerAthenaPool/xAODTriggerAthenaPoolReference-01-00-00 xAODTriggerAthenaPoolPoolCnv
+Event/xAOD/xAODTriggerAthenaPool xAODTriggerAthenaPool_20.1.7.2 xAODTriggerAthenaPool/xAODTriggerAthenaPoolReference-01-00-00 xAODTriggerAthenaPoolPoolCnv
+Event/xAOD/xAODTruthAthenaPool xAODTruthAthenaPool_21.0.79 xAODTruthAthenaPool/xAODTruthAthenaPoolReference-02-00-01 xAODTruthAthenaPoolPoolCnv
+#later Reconstruction/RecAthenaPool RecTPCnv_15.0.0 RecAthenaPool/RecAthenaPoolReference-02-00-02 JetEventAthenaPoolPoolCnv
+#later Reconstruction/RecAthenaPool RecTPCnv_15.6.1 RecAthenaPool/RecAthenaPoolReference-02-00-02 JetEventAthenaPoolPoolCnv
+#later Reconstruction/RecAthenaPool RecTPCnv_17.0.6 RecAthenaPool/RecAthenaPoolReference-02-00-02 JetEventAthenaPoolPoolCnv
+#later Reconstruction/RecAthenaPool RecTPCnv_18.0.0 RecAthenaPool/RecAthenaPoolReference-02-00-02 JetEventAthenaPoolPoolCnv
+#later Reconstruction/TrackParticleAthenaPool TrackParticleTPCnv_16.6.3 TrackParticleAthenaPool/TrackParticleAthenaPoolReference-04-00-01
+#later Reconstruction/TrackParticleAthenaPool TrackParticleTPCnv_17.2.8 TrackParticleAthenaPool/TrackParticleAthenaPoolReference-04-00-01
+#later Reconstruction/TrackParticleAthenaPool TrackParticleTPCnv_18.0.0 TrackParticleAthenaPool/TrackParticleAthenaPoolReference-04-00-01
+#later Reconstruction/TrackParticleTruthAthenaPool TrackParticleTruthTPCnv_18.0.0 TrackParticleTruthAthenaPool/TrackParticleTruthAthenaPoolReference-01-00-01
+Trigger/TrigEvent/TrigSteeringEventAthenaPool TrigSteeringEventAthenaPool_15.6.1 TrigSteeringEventAthenaPool/TrigSteeringEventAthenaPoolReference-01-00-00
+Trigger/TrigEvent/TrigSteeringEventAthenaPool TrigSteeringEventAthenaPool_18.0.0 TrigSteeringEventAthenaPool/TrigSteeringEventAthenaPoolReference-01-00-00
+Trigger/TrigEvent/TrigSteeringEventAthenaPool TrigSteeringEventAthenaPool_20.1.7.2 TrigSteeringEventAthenaPool/TrigSteeringEventAthenaPoolReference-01-00-00

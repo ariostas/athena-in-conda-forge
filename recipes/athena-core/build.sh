@@ -20,6 +20,12 @@ INSTALL=${ROOT}/${LAYER}/${PKG_VERSION}/InstallArea/${PLATFORM}
 # first in PATH, where root_base's own compiler (with the host's glibc 2.17 sysroot) lives.
 CC=$(command -v "${CC}") CXX=$(command -v "${CXX}")
 export CC CXX
+# ATLAS does not build with conda-forge's -fvisibility-inlines-hidden, and its libraries rely on
+# exporting inline functions: DATAVECTOR_BASE_FIN defines SG::bi_destroy<...>::destroy inline in
+# the class's header, and code that sees only the forward declaration (DATAVECTOR_BASE_FWD) links
+# to the copy in the class's library.
+CXXFLAGS=${CXXFLAGS//-fvisibility-inlines-hidden/}
+export CXXFLAGS
 
 # The build loads and runs what it builds and what the layers below built (genconf,
 # genCLIDDB, job options, python modules), and AtlasCMake sets no RPATH. ATLAS gets that

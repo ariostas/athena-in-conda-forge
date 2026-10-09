@@ -106,10 +106,16 @@ LAYERS = [
         ],
         forbid_ext=HEAVY_TOP
         | {"ML (onnxruntime,lwtnn)", "Triton client (gRPC,protobuf)"},
-        forbid_pkg=r"PhysicsAnalysis/DerivationFramework",
+        forbid_pkg=r"PhysicsAnalysis/DerivationFramework/(?!DerivationFrameworkInterfaces$)",
         # EDM means data classes: a package with Gaudi components that are not converters
         # (algorithms, tools, services) belongs to a later layer.
         forbid_components=True,
+        # ...except what event data I/O needs: the xAOD::TrackParticle converter includes an
+        # interface of xAODTrackingCnv, whose algorithms need MCTruthClassifier and its
+        # calorimeter and particle-flow tools; writing the metadata of a data file needs the
+        # luminosity block metadata tool. (The trigger menu's metadata tool, in xAODTriggerCnv,
+        # would bring the trigger decision and steering packages: not here.)
+        tool_seeds=[r"Event/xAOD/xAODTrackingCnv$", r"LumiBlock/LumiBlockComps$"],
         absorb=r"Event/|Trigger/TrigEvent/",
     ),
     dict(
@@ -264,15 +270,18 @@ def build_layers(g, layers=LAYERS):
             if p not in assigned
             and (name == layers[-1]["name"] or not NOT_SEED.match(p))
         }
+        # Seeds whose closure may have components although the layer forbids them.
+        tools = seed_set(g, L.get("tool_seeds", []), projects) - set(assigned)
         frx = re.compile("^(" + L["forbid_pkg"] + ")") if L["forbid_pkg"] else None
 
-        def bad(p):
+        def bad(p, components_ok=False):
             if p in assigned:
                 return False
             if frx and frx.match(p):
                 return True
             if (
-                L.get("forbid_components")
+                not components_ok
+                and L.get("forbid_components")
                 and "component" in g[p]["kinds"]
                 and not re.search(r"(AthenaPool|Cnv|TPCnv|Conv)$", p)
                 and not ALLOW_COMPONENTS.match(p)
@@ -282,8 +291,8 @@ def build_layers(g, layers=LAYERS):
 
         keep = set()
         drop = {}
-        for p in seed:
-            offenders = [q for q in graph.closure(g, [p]) if bad(q)]
+        for p in seed | tools:
+            offenders = [q for q in graph.closure(g, [p]) if bad(q, p in tools)]
             if offenders:
                 drop[p] = sorted(offenders)
             else:

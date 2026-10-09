@@ -1,8 +1,9 @@
 """The python packages and component types an Athena configuration uses.
 
-    cvmfs-athena.sh python cfgdeps.py <module> <out.json> [job arguments ...]
+    cvmfs-athena.sh python cfgdeps.py <module or script.py> <out.json> [job arguments ...]
 
-Runs `python -m <module> --config-only=cfgdeps.pkl` in-process, then writes to <out.json> the
+Runs `python -m <module> --config-only=cfgdeps.pkl` in-process (a script instead runs until it
+calls ComponentAccumulator.run, which stores the configuration), then writes to <out.json> the
 top-level python packages imported from the release's install areas and the C++ types of every
 component in the stored configuration (algorithms, services, tools, recursively through tool
 handles). Mapping those to packages and layers: the release's <project>.components files give
@@ -15,9 +16,21 @@ import runpy
 import sys
 
 mod, out = sys.argv[1], sys.argv[2]
-sys.argv = [mod, "--config-only=cfgdeps.pkl"] + sys.argv[3:]
 try:
-    runpy.run_module(mod, run_name="__main__")
+    if mod.endswith(".py"):
+        from AthenaConfiguration.ComponentAccumulator import ComponentAccumulator
+
+        def store(self, *args, **kwargs):
+            with open("cfgdeps.pkl", "wb") as f:
+                self.store(f)
+            sys.exit(0)
+
+        ComponentAccumulator.run = store
+        sys.argv = [mod] + sys.argv[3:]
+        runpy.run_path(mod, run_name="__main__")
+    else:
+        sys.argv = [mod, "--config-only=cfgdeps.pkl"] + sys.argv[3:]
+        runpy.run_module(mod, run_name="__main__")
 except SystemExit:
     pass
 mods = sorted(

@@ -1,0 +1,15 @@
+events 132
+runs [276183]
+AnalysisElectrons 15 pt 187532
+AnalysisPhotons 177 pt 921417
+AnalysisMuons 67 pt 553469
+AnalysisTauJets 13 pt 506703
+AnalysisJets 295 pt 8.79873e+06
+AnalysisLargeRJets 11 pt 2.45222e+06
+InDetTrackParticles 417 pt 3.06067e+06
+PrimaryVertices 1295 z -21304.6
+egammaClusters 192 pt 1.10392e+06
+MET_Core_AnalysisMET 264 met 2.24918e+06
+electron tracks 198407
+electron clusters 188367
+muon tracks 551883
