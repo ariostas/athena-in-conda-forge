@@ -1,0 +1,29 @@
+--- a/Tools/PathResolver/Root/PathResolver.cxx
++++ b/Tools/PathResolver/Root/PathResolver.cxx
+@@ -68,8 +68,18 @@ namespace {
+     setupOk &= setCurlOption(CURLOPT_WRITEDATA, &file);
+     // Optional: follow redirects
+     setupOk &= setCurlOption(CURLOPT_FOLLOWLOCATION, 1L);
++    // An HTTP error (e.g. 404 for a file that is not on the server) is a failed download,
++    // not a file with the error page in it
++    setupOk &= setCurlOption(CURLOPT_FAILONERROR, 1L);
++    // Leave no empty or partial file behind: the next search would find it
++    auto removeFile = [&file, &output_path]() {
++      file.close();
++      std::error_code ec;
++      fs::remove(output_path, ec);
++    };
+     if (not setupOk) {
+       asgmsg.msg(MSG::WARNING) << "curl setup failed in PathResolver." <<endmsg;
++      removeFile();
+       return false;
+     }
+     CURLcode res = curl_easy_perform(curl);
+@@ -77,6 +87,7 @@ namespace {
+       asgmsg.msg(MSG::WARNING) << "error downloading file: "
+                              << curl_easy_strerror(res)
+                              << " (" << res << ")" << endmsg;
++      removeFile();
+       return false;
+     }
+ 

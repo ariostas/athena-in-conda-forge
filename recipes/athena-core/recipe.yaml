@@ -17,6 +17,9 @@ source:
     # athena.py is a "#!/bin/sh" script with bash arrays, which fails where /bin/sh is dash
     # (Debian, Ubuntu)
     - 0003-AthenaCommon-athena.py-runs-with-bash.patch
+    # PathResolver's HTTP downloads (GroupData without CVMFS): an HTTP error is a failed
+    # download, not a file with the error page in it, and a failed download leaves no file
+    - 0004-PathResolver-no-error-pages-or-empty-files-from-failed-downloads.patch
 
 build:
   number: 0
@@ -104,6 +107,8 @@ tests:
       - bash test/run_conditions.sh
       # raw data: an EventStorage file listed and copied with the ByteStream tools
       - bash test/run_bytestream.sh
+      # GroupData through PathResolver: from CVMFS if mounted, downloaded otherwise
+      - bash test/run_groupdata.sh
       # every component of the layer has its configurable
       - python test/check_confdb.py "${AthenaCore_DIR}/lib/AthenaCore.components"
     files:

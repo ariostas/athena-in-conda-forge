@@ -1,0 +1,142 @@
+# The analysis of the Open Data file (2015 collision data, DAOD_PHYSLITE) with ATLAS's CP
+# algorithms (CPRun.py): calibrated and selected muons, electrons, photons, taus, small- and
+# large-R jets with flavour tagging, tracks, missing transverse momentum, overlap removal, the
+# good-runs list, trigger decisions and trigger matching. Built from ATLAS's
+# test_configuration_Run2.yaml (AnalysisAlgorithmsConfig), for data and without an event
+# selection: every event with a primary vertex is written out.
+CommonServices:
+  runSystematics: False
+
+EventCleaning:
+  runEventCleaning: True
+  noFilter: True
+  # the recommended good-runs list of 2015, as a decoration (passGRL)
+  GRLDict:
+    passGRL: GoodRunsLists/data15_13TeV/20170619/data15_13TeV.periodAllYear_DetStatus-v89-pro21-02_Unknown_PHYS_StandardGRL_All_Good_25ns.xml
+
+Jets:
+  - containerName: AnaJets
+    jetCollection: AntiKt4EMPFlowJets
+    runJvtUpdate: False
+    runNNJvtUpdate: True
+    JVTWorkingPoint:
+     - selectionName: baselineJvt
+       jvtWP: FixedEffPt
+    FlavourTagging:
+      - selectionName: ftag
+        # the tagger of the Open Data files, with its MC20 calibration
+        btagger: DL1dv01
+        btagWP: FixedCutBEff_77
+        bTagCalibFile: xAODBTaggingEfficiency/13TeV/2023-22-13TeV-MC20-CDI-2023-09-13_v1.root
+        saveScores: All
+  - containerName: AnaLargeRJets
+    jetCollection: AntiKt10UFOCSSKSoftDropBeta100Zcut10Jets
+
+Electrons:
+  - containerName: AnaElectrons
+    writeTrackD0Z0: True
+    minPt: 10000.0
+    WorkingPoint:
+      - selectionName: loose
+        identificationWP: LooseBLayerLH
+        isolationWP: Tight_VarRad
+
+Photons:
+  - containerName: AnaPhotons
+    recomputeIsEM: False
+    minPt: 10000.0
+    WorkingPoint:
+      - selectionName: tight
+        qualityWP: Tight
+        isolationWP: FixedCutTight
+        recomputeIsEM: False
+
+Muons:
+  - containerName: AnaMuons
+    writeTrackD0Z0: True
+    WorkingPoint:
+      - selectionName: medium
+        quality: Medium
+        isolation: Loose_VarRad
+
+TauJets:
+  - containerName: AnaTauJets
+    WorkingPoint:
+      - selectionName: tight
+        quality: Tight
+
+InDetTracks:
+  - containerName: AnaTracks
+    minPt: 500
+    maxEta: 2.5
+    WorkingPoint:
+      - selectionName: tight
+        cutLevel: TightPrimary
+
+MissingET:
+  - containerName: AnaMET
+    jets: AnaJets
+    taus: AnaTauJets.tight
+    electrons: AnaElectrons.loose
+    photons: AnaPhotons.tight
+    muons: AnaMuons.medium
+
+OverlapRemoval:
+  inputLabel: preselectOR
+  outputLabel: passesOR
+  jets: AnaJets.baselineJvt
+  taus: AnaTauJets.tight
+  electrons: AnaElectrons.loose
+  photons: AnaPhotons.tight
+  muons: AnaMuons.medium
+
+Trigger:
+  triggerChainsPerYear:
+    2015:
+      - HLT_e24_lhmedium_L1EM20VH || HLT_e60_lhmedium || HLT_e120_lhloose
+      - HLT_mu20_iloose_L1MU15 || HLT_mu40
+      - HLT_2g20_tight
+  triggerMatchingChainsPerYear:
+    2015:
+      - HLT_e24_lhmedium_L1EM20VH || HLT_e60_lhmedium || HLT_e120_lhloose
+      - HLT_mu20_iloose_L1MU15 || HLT_mu40
+  noFilter: True
+  electrons: AnaElectrons.loose
+  photons: AnaPhotons.tight
+  muons: AnaMuons.medium
+
+Thinning:
+  - containerName: AnaElectrons
+    outputName: OutElectrons
+    selectionName: loose
+  - containerName: AnaPhotons
+    outputName: OutPhotons
+    selectionName: tight
+  - containerName: AnaMuons
+    outputName: OutMuons
+    selectionName: medium
+  - containerName: AnaTauJets
+    outputName: OutTauJets
+    selectionName: tight
+  - containerName: AnaJets
+    outputName: OutJets
+  - containerName: AnaLargeRJets
+    outputName: OutLargeRJets
+  - containerName: AnaTracks
+    outputName: OutTracks
+    selectionName: tight
+
+Output:
+  treeName: analysis
+  metVars:
+    - AnaMET_%SYS%.met -> met_%SYS%
+  containers:
+    mu_: OutMuons
+    el_: OutElectrons
+    ph_: OutPhotons
+    tau_: OutTauJets
+    jet_: OutJets
+    larger_jet_: OutLargeRJets
+    met_: AnaMET
+    trk_: OutTracks
+    "": EventInfo

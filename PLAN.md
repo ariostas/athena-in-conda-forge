@@ -234,7 +234,7 @@ stub `AthenaExternalsConfig.cmake`). Offer the patches upstream to atlasexternal
 | 2 | detdescr | 1.6k | Identifiers, GeoModel geometry, ACTS tracking geometry, magnetic field | GeoModel, ACTS |
 | 3 | edm | 1.7k | xAOD and trigger EDM: read/write AOD/DAOD | |
 | 4 | edm-det | 1.3k | RDO/ESD/HITS I/O | FastJet |
-| 5 | analysis | 1.7k | CP tools on DAOD_PHYS/PHYSLITE | onnxruntime, lwtnn, HDF5, LHAPDF, Triton client |
+| 5 | analysis | 1.6k | CP tools on DAOD_PHYS/PHYSLITE | onnxruntime, lwtnn, HDF5, LHAPDF, fjcontrib |
 | 6 | sim | 1.4k | `Sim_tf.py` | Geant4, Pythia8 |
 | 7 | reco-tracking | 1.2k | ID/ITk tracking, vertexing | (Eigen-heavy) |
 | 8 | reco | 2.2k | `Digi_tf.py`, `Reco_tf.py` without trigger | |
@@ -853,3 +853,78 @@ read and written as in ATLAS's release.
 - open: a default `FRONTIER_SERVER` and the geometry database without CVMFS (D6; every test of
   this layer needs both), the runtime python dependencies of core, the licences of CORAL,
   COOL, CrestApi and yampl; upstream the athena.py shebang.
+
+### 2026-10-10: the analysis layer (M5)
+
+**The layer contents.** `layers.py`'s analysis layer (the AthAnalysis project's packages, built
+in Athena mode) had everything that CP algorithm jobs on DAOD_PHYS and DAOD_PHYSLITE load: three
+jobs run in ATLAS's release with the libraries and python packages they load listed (the Open
+Data job below and two of ATLAS's own CP tests) needed nothing from a later layer (one
+library of `rest`, `DataQualityInterfaces`, is a ROOT autoload only). Added: `Asg_Test` (the
+`ASG_TEST_FILE_*` variables of ATLAS's analysis tests and examples, no dependencies). 169
+packages, 1.6k TUs. New externals, all from conda-forge: onnxruntime-cpp 1.26 (cpu), lwtnn,
+fastjet-contrib, HDF5, lz4, LHAPDF, nanobind, and PyYAML at run time (`CPRun.py` and every
+YAML configuration of the CP algorithms import it).
+
+**Fixes:**
+- **`ROOT_FOUND` was false in every layer.** AtlasLCG's FindROOT requires ROOT's python modules
+  in `<ROOT>/lib`; conda-forge has them in `site-packages`. Nothing noticed until a package
+  asked for ROOT with `REQUIRED` (HyPERAnalysisAlgorithms). athena-externals' PostConfig now
+  sets `ROOT_PYTHON_PATH`; all layers were rebuilt with it and pass their tests.
+- **Find modules for conda-forge's layouts** (athena-externals): `FindFastJetContrib` (one
+  `libfastjetcontribfragile` instead of LCG's library per contrib) and `Findonnxruntime`
+  (conda-forge has the API headers in `include/onnxruntime/core/session/`, Microsoft's tarball
+  in `include/`). Each project installs a copy of its base's find modules, so such a change
+  needs every layer rebuilt (CLAUDE.md).
+- **Triton** (inference on a server; not on conda-forge): FlavorTagInference builds its Triton
+  service only where the client is found (analysis patch 0001); the flag that selects it,
+  `BTagging.UseTriton`, is off by default and the ONNX path is unchanged.
+- **GroupData without CVMFS.** The CP tools read calibration files through PathResolver from
+  `CALIBPATH`, which PathResolver's environment sets as in ATLAS's release: CVMFS, EOS, then
+  ATLAS's web servers. A file is taken from a web server only with
+  `PATHRESOLVER_ALLOWHTTPDOWNLOAD`, which athena-core's activation now sets (if unset); it is
+  downloaded to the job's working directory. PathResolver saved an HTTP error page as the file
+  and left an empty file behind after a failed download (one of the two web servers answers
+  404 for everything): core patch 0004 (upstreamable). Core's new test resolves a file from
+  CVMFS and downloads it, and checks that a missing file leaves nothing behind.
+
+**`athena-analysis`** (project `AthenaAnalysis` on `AthenaEDMDet`) builds on linux-aarch64 and
+passes:
+- **ATLAS's unit tests at build time**: 78 tests of 31 packages, those that need no input
+  files, CVMFS or network (checked in a container with neither); the 21 others of those
+  packages and all tests of the other packages read ATLAS's test files (CVMFS), GroupData or the
+  geometry database, or need later layers. onnxruntime prints a warning in containers where it
+  cannot tell the CPU's vendor, which breaks reference comparisons: `build.sh` sets ATLAS's
+  ignore pattern for it;
+- **an analysis of ATLAS Open Data with the CP algorithms** (`CPRun.py`, `test/opendata_data15.yaml`
+  from ATLAS's Run 2 test configuration): the 2015 DAOD_PHYSLITE file of the edm layer, with
+  the good-runs list, calibrated and selected muons, electrons, photons, taus, small- and
+  large-R jets with flavour tagging (DL1dv01, the tagger of the Open Data files), tracks,
+  missing transverse momentum, overlap removal, trigger decisions and trigger matching. The
+  n-tuple (116 events, 80 branches) is **identical to the one ATLAS's release writes**,
+  including with the calibration files downloaded instead of read from CVMFS. This needs
+  **no CVMFS**, but network: GroupData (44 MB) from ATLAS's web server, and the geometry
+  database through Frontier (the configuration looks up the LHC period of the file's geometry
+  tag);
+- with CVMFS, **two of ATLAS's own CP tests** on its MC test files: TestCPRunFullSim (DAOD_PHYS,
+  150 events: every object with its systematic variations, scale factors and truth; 5,130
+  branches, identical to ATLAS's) and TestCPRunPhysliteLikePhyslite (DAOD_PHYSLITE, 1,000
+  events on 4 threads, no errors). With threads, CP jobs that write n-tuples fail in ATLAS's
+  release too (the n-tuple makers' data dependencies); ATLAS's multi-threaded test writes none;
+- the component check: 1,198 components, 1,511 configurables.
+
+**Cost** (`compile_cost.py`): 1,622 compiles took 4.9 h of summed wall time at `-j10`,
+dictionaries 1.3 h: about 5 CPU-h, within `layers.py`'s 3.7–6.9 h. The recipe takes 38 minutes
+here: 35 for the build with the unit tests, 3 for the tests. Peak RSS per compile: median 0.8
+GB, p90 1.6 GB, max 3.3 GB (TrigOutputHandling's `HLTEDMCreator.cxx`, then the component lists
+of the CP algorithm packages, 2.1–2.6 GB): `-j2` on a 7 GB runner. Package: 76 MB.
+
+**M5 is done**: ATLAS's CP tools analyse DAOD_PHYSLITE in a conda environment as in ATLAS's
+release, without CVMFS.
+
+**Next:**
+- M6: reco-tracking, reco and trigger;
+- open: a default `FRONTIER_SERVER` and the geometry database without CVMFS (D6; even the Open
+  Data analysis needs the geometry database, for the LHC period), the licences of CORAL, COOL,
+  CrestApi and yampl; upstream the athena.py shebang, PathResolver's downloads and
+  FlavorTagInference's optional Triton.

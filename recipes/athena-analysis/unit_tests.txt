@@ -1,0 +1,35 @@
+# The packages of this layer whose unit tests (ATLAS's ctest tests) are built and run by
+# build.sh: those that need no input files, CVMFS or network, but for the tests in
+# unit_tests_excluded.txt. The tests of the layer's other packages all read ATLAS's test files
+# (CVMFS), calibration files (GroupData) or the geometry database, or need later layers.
+Control/AthToolSupport/AsgExampleTools
+Control/AthViews
+PhysicsAnalysis/Algorithms/AnalysisAlgorithmsConfig
+PhysicsAnalysis/Algorithms/AsgAnalysisAlgorithms
+PhysicsAnalysis/Algorithms/EventSelectionAlgorithms
+PhysicsAnalysis/Algorithms/SelectionHelpers
+PhysicsAnalysis/AnalysisCommon/AssociationUtils
+PhysicsAnalysis/AnalysisCommon/FakeBkgTools
+PhysicsAnalysis/AnalysisCommon/HDF5Utils
+PhysicsAnalysis/AnalysisCommon/PileupReweighting
+PhysicsAnalysis/AnalysisCommon/ReweightUtils
+PhysicsAnalysis/AnalysisCommon/ThinningUtils
+PhysicsAnalysis/Columnar/ColumnarToolWrapper
+PhysicsAnalysis/CommonTools/ExpressionEvaluation
+PhysicsAnalysis/ElectronPhotonID/ElectronPhotonSelectorTools
+PhysicsAnalysis/JetTagging/FlavorTagDiscriminants
+PhysicsAnalysis/JetTagging/FlavorTagInference
+PhysicsAnalysis/JetTagging/JetTagConfig
+PhysicsAnalysis/JetTagging/LZ4Plugin
+Reconstruction/Jet/JetRec
+Reconstruction/Jet/JetRecConfig
+Reconstruction/MVAUtils
+Trigger/TrigAnalysis/TrigAnalysisHelpers
+Trigger/TrigAnalysis/TrigBunchCrossingTool
+Trigger/TrigAnalysis/TrigGlobalEfficiencyCorrection
+Trigger/TrigConfiguration/TrigConfIO
+Trigger/TrigMonitoring/TrigCostMonitor
+Trigger/TrigSteer/DecisionHandling
+Trigger/TrigSteer/TrigCompositeUtils
+Trigger/TrigSteer/TrigOutputHandling
+Trigger/TrigT1/L1Topo/L1TopoSimulationUtils

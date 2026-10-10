@@ -154,8 +154,10 @@ LAYERS = [
         seeds=["@AthAnalysis"],
         forbid_ext=HEAVY_TOP,
         forbid_pkg=None,
+        # (and Asg_Test: the environment of ATLAS's analysis tests and examples, the
+        # ASG_TEST_FILE_* variables that name their input files on CVMFS)
         absorb=r"PhysicsAnalysis/(AnalysisCommon|ElectronPhotonID|MuonID|JetMissingEtID|"
-        r"TauID|JetTagging|Algorithms|Interfaces|TrackingID)",
+        r"TauID|JetTagging|Algorithms|Interfaces|TrackingID)|AsgExternal/Asg_Test$",
     ),
     dict(
         name="sim",

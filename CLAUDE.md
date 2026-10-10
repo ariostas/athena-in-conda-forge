@@ -67,6 +67,15 @@ built. `KEEP_BUILD=1` keeps the build directories in `/work/output/bld`, for
   fails the sha256 check. The fix is to seed its cache: put the tarball in
   `/work/output/src_cache/<key>_<file>`, the unpacked tree (without the top directory) in
   `<key>_extracted`, and a `.metadata/<key>.json` like the other entries there.
+- Every ATLAS project installs a copy of its base project's CMake find modules, and the copy of
+  the layer just below comes first. A change to athena-externals' `cmake/Find*.cmake` reaches a
+  layer only once every layer below it is rebuilt (its `conda-postconfig.cmake` is read from
+  AthenaExternals itself, so it reaches every layer right away).
+- To try configure or compile fixes without a full recipe build, use a kept build tree
+  (`KEEP_BUILD=1`): its `work/conda_build.sh` is `build.sh` inside `( ... )` after the
+  environment setup; a truncated copy (closing the parenthesis) reruns any part of it. For
+  tests without CVMFS or network, as on conda-forge's CI, run them in a throwaway container:
+  `docker run --rm --network none -v athena-work:/work condaforge/miniforge3:latest ...`.
 
 ## Conventions
 

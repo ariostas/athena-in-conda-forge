@@ -77,3 +77,6 @@ sed -e "s|@LAYER@|${LAYER}|g" -e "s|@PLATFORM@|${PLATFORM}|g" -e "s|@VERSION@|${
   "${RECIPE_DIR}/activate.sh" > "${PREFIX}/etc/conda/activate.d/${PKG_NAME}_activate.sh"
 sed -e "s|@LAYER@|${LAYER}|g" \
   "${RECIPE_DIR}/deactivate.sh" > "${PREFIX}/etc/conda/deactivate.d/${PKG_NAME}_deactivate.sh"
+# Downloads of GroupData files (see groupdata-activate.sh).
+cp "${RECIPE_DIR}/groupdata-activate.sh" "${PREFIX}/etc/conda/activate.d/${PKG_NAME}_groupdata.sh"
+cp "${RECIPE_DIR}/groupdata-deactivate.sh" "${PREFIX}/etc/conda/deactivate.d/${PKG_NAME}_groupdata.sh"

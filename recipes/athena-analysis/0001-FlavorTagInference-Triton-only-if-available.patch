@@ -1,0 +1,62 @@
+--- a/PhysicsAnalysis/JetTagging/FlavorTagInference/CMakeLists.txt
++++ b/PhysicsAnalysis/JetTagging/FlavorTagInference/CMakeLists.txt
+@@ -18,14 +18,20 @@ find_package( Boost COMPONENTS unit_test_framework )
+ 
+ set(TRITON_LIBRARIES "")
+ 
++# Inference through a Triton server, in Athena only, and only where the Triton client is
++# available.
++set(FTI_WITH_TRITON FALSE)
+ if (NOT XAOD_ANALYSIS)
++  find_package(TritonClient QUIET)
++endif()
++if (TritonClient_FOUND)
+   find_package(OpenSSL)
+   find_package(gRPC)
+   find_package(Protobuf)
+   find_package(TritonCommon)
+-  find_package(TritonClient)
+ 
+   set(TRITON_LIBRARIES TritonClient::grpcclient_static gRPC::grpc++)
++  set(FTI_WITH_TRITON TRUE)
+ endif()
+ 
+ # source files, depend on the build
+@@ -65,7 +71,7 @@ if (NOT XAOD_STANDALONE)
+     )
+ endif()
+ 
+-if (NOT XAOD_ANALYSIS)
++if (FTI_WITH_TRITON)
+   list(
+     APPEND FTISource
+     Root/SaltModelTriton.cxx
+@@ -106,6 +112,9 @@ if (NOT XAOD_STANDALONE)
+     src/components/FlavorTagInference_entries.cxx
+     LINK_LIBRARIES FlavorTagInference
+     )
++  if (FTI_WITH_TRITON)
++    target_compile_definitions( FlavorTagInferenceLib PRIVATE FTI_WITH_TRITON )
++  endif()
+ 
+   # Suppress spurious warnings seen in the LTO build originating in
+   # the boost parser code.
+--- a/PhysicsAnalysis/JetTagging/FlavorTagInference/src/components/FlavorTagInference_entries.cxx
++++ b/PhysicsAnalysis/JetTagging/FlavorTagInference/src/components/FlavorTagInference_entries.cxx
+@@ -10,7 +10,7 @@
+ #include "FlavorTagInference/MultifoldGNNTool.h"
+ #include "FlavorTagInference/GNNDataLoader.h"
+ 
+-#ifndef XAOD_ANALYSIS
++#ifdef FTI_WITH_TRITON
+ #include "FlavorTagInference/NNSharingTritonSvc.h"
+ #endif
+ 
+@@ -26,6 +26,6 @@ DECLARE_COMPONENT(PassThroughModelSvc)
+ DECLARE_COMPONENT(MultifoldGNNTool)
+ DECLARE_COMPONENT(FoldDecoratorAlg)
+ 
+-#ifndef XAOD_ANALYSIS
++#ifdef FTI_WITH_TRITON
+ DECLARE_COMPONENT(NNSharingTritonSvc)
+ #endif

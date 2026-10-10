@@ -1,0 +1,159 @@
+context:
+  version: "25.0.73"
+
+package:
+  name: athena-analysis
+  version: ${{ version }}
+
+source:
+  - url: https://gitlab.cern.ch/atlas/athena/-/archive/release/${{ version }}/athena-release-${{ version }}.tar.gz
+    sha256: e2df75b2fd966f97973e9ed89984222e4070be0d60ace0a4f3975e80e9ec1eba
+    patches:
+      # FlavorTagInference builds its Triton inference service only where the Triton client
+      # is available (it is not on conda-forge); the ONNX one is always there
+      - 0001-FlavorTagInference-Triton-only-if-available.patch
+  # For the tests: a DAOD_PHYSLITE file of ATLAS Open Data (CC0-1.0), 2015 data, run 276183,
+  # 132 events, from https://doi.org/10.7483/OPENDATA.ATLAS.AOQL.8TT3
+  - url: https://opendata.cern.ch/eos/opendata/atlas/rucio/data15_13TeV/DAOD_PHYSLITE.37001701._000001.pool.root.1
+    sha256: 1043dd056a40d7fe3cd3758c99b5a6b4bcd723078c3e4ad8abd318450adb52bf
+    target_directory: opendata
+
+build:
+  number: 0
+  skip:
+    - not linux
+    - match(python, "<3.13")
+  script:
+    file: build.sh
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    # AthExFortranAlgorithm
+    - ${{ compiler('fortran') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+    # AtlasLCG's Findlz4
+    - pkg-config
+  host:
+    - athena-edm-det ==${{ version }}
+    # flavour tagging, tau, egamma and lepton identification networks
+    - onnxruntime-cpp 1.26.* *_cpu
+    - lwtnn
+    # jet substructure (as in ATLAS's release, fjcontrib 1.10x on FastJet 3.5.1)
+    - fastjet-contrib
+    # HDF5Utils, the HDF5 writers of flavour tagging
+    - hdf5
+    - lz4-c
+    # PDF reweighting (ReweightUtils, AsgAnalysisAlgorithms)
+    - lhapdf
+    # the python bindings of the columnar tools (ColumnarToolWrapperPython)
+    - nanobind
+    # the YAML configurations of the CP algorithms (the unit tests run them)
+    - pyyaml
+    # the externals of the layers below, whose headers this layer includes
+    - fastjet-cxx ==3.5.1 *_5
+    - athena-edm ==${{ version }}
+    - athena-detdescr ==${{ version }}
+    - athena-core ==${{ version }}
+    - libxml2
+    - geomodel-core ==6.29.0
+    - geomodel-tools ==6.29.0
+    - atlas-acts ==47.7.0
+    - gsl
+    - athena-externals ==${{ version }}
+    - atlas-gaudi
+    - lcg-coral
+    - lcg-cool
+    - crestapi
+    - chai
+    - tdaq-common
+    - yampl
+    - boost-mpi3
+    - openmpi
+    - python
+    - root_base
+    - root_cxx_standard
+    - libboost-devel
+    - libboost-python-devel
+    - tbb-devel
+    - eigen
+    - eigen-abi-devel
+    - clhep
+    - libuuid
+    - nlohmann_json
+    - fmt
+    - range-v3
+    - ms-gsl
+    - xerces-c
+    - zlib
+    - sqlite
+    - gtest
+    - gmock
+    - cppunit
+    - expat
+    - aida
+    - heppdt
+    - zeromq
+    - cppzmq
+    - hepmc3
+    # ByteStream input from remote storage
+    - xrootd
+    - davix
+    # EventIndexProducer
+    - libprotobuf
+    # PerfMonGPerfTools
+    - gperftools
+    # headers only (AthenaServices)
+    - valgrind
+    - libcurl
+    - vdt
+    # the build draws the python import graph of the packages (apydep)
+    - pygraphviz
+  run:
+    - athena-edm-det ==${{ version }}
+    - python
+    - root_base
+    # the YAML configurations of the CP algorithms (CPRun.py)
+    - pyyaml
+
+tests:
+  - script:
+      # ATLAS's CP algorithms (CPRun.py and a YAML configuration) run an analysis of the Open
+      # Data file: every object calibrated and selected, with trigger decisions and matching
+      # and missing transverse momentum; checked against ATLAS's release. The calibration
+      # files come from CVMFS if it is mounted, otherwise over HTTP. With CVMFS, ATLAS's own
+      # CP algorithm tests on its MC test files too.
+      - bash test/run_cp.sh
+      # every component of the layer has its configurable
+      - python test/check_confdb.py "${AthenaAnalysis_DIR}/lib/AthenaAnalysis.components"
+    requirements:
+      run:
+        # reads the n-tuples for the comparisons
+        - uproot
+    files:
+      recipe:
+        - test/
+      source:
+        - opendata/
+
+about:
+  homepage: https://gitlab.cern.ch/atlas/athena
+  summary: The analysis layer of ATLAS's Athena software (CP tools, trigger decision tool)
+  description: |
+    Athena is the offline software of the ATLAS experiment at CERN, built on the Gaudi
+    framework. This package is the fifth of the layers Athena is split into for conda-forge,
+    on top of athena-edm-det: ATLAS's analysis software in Athena, the combined performance
+    (CP) tools and algorithms that calibrate and select physics objects and give their
+    systematic uncertainties and scale factors, the trigger decision and trigger matching
+    tools, flavour tagging inference and the jet tools, to analyse DAOD_PHYS and
+    DAOD_PHYSLITE files such as ATLAS Open Data.
+  license: Apache-2.0
+  license_file: LICENSE
+  repository: https://gitlab.cern.ch/atlas/athena
+
+extra:
+  recipe-maintainers:
+    - ariostas
