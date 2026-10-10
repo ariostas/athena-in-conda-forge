@@ -235,15 +235,17 @@ stub `AthenaExternalsConfig.cmake`). Offer the patches upstream to atlasexternal
 | 3 | edm | 1.7k | xAOD and trigger EDM: read/write AOD/DAOD | |
 | 4 | edm-det | 1.3k | RDO/ESD/HITS I/O | FastJet |
 | 5 | analysis | 1.6k | CP tools on DAOD_PHYS/PHYSLITE | onnxruntime, lwtnn, HDF5, LHAPDF, fjcontrib |
-| 6 | sim | 1.4k | `Sim_tf.py` | Geant4, Pythia8 |
-| 7 | reco-tracking | 1.2k | ID/ITk tracking, vertexing | (Eigen-heavy) |
-| 8 | reco | 2.2k | `Digi_tf.py`, `Reco_tf.py` without trigger | |
-| 9 | trigger | 1.6k | L1/HLT | |
+| 6 | reco-tracking | 1.3k | ID/ITk tracking, vertexing | (Eigen-heavy) |
+| 7 | reco | 2.1k | `Digi_tf.py`, `Reco_tf.py` without trigger | |
+| 8 | trigger | 1.5k | L1/HLT | |
+| 9 | sim | 1.1k | `Sim_tf.py` | Geant4, Pythia8 |
 | 10 | rest | 1.3k | derivations, DQ, VP1 | Qt5/Coin3D |
 
-  The worst case is reco at about 4.5 h wall on 2 cores at 15 CPU-s/TU, before tests. In
-  practice the layers form a chain (sim is needed by reco-tracking and reco through shared
-  monitoring and interface packages); moving those down might let sim become a leaf. If the
+  The worst case is reco at about 4.5 h wall on 2 cores at 15 CPU-s/TU, before tests. The
+  layers form a chain. sim was first placed before reco-tracking, which needed it only for
+  its non-Geant4 part (monitoring, muon interfaces, fitter utilities); since M6 the
+  reconstruction and trigger layers come first and take those packages themselves, and sim
+  (Geant4) comes after them. If the
   measured cost allows, or conda-forge grants larger runners, merge neighbouring layers: fewer
   feedstocks matter a lot for maintenance.
 

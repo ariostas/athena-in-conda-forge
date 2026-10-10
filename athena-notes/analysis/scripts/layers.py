@@ -29,6 +29,10 @@ import graph  # noqa: E402
 from scan import WORK  # noqa: E402
 
 HEAVY_TOP = {"Geant4", "Qt/Coin3D", "MC generators", "GPU (traccc,vecmem,CUDA)"}
+# Reconstruction and trigger come before simulation: what they took from the sim layer was its
+# non-Geant4 part (monitoring, muon reconstruction interfaces, fitter utilities), which they
+# now take themselves. Simulation (Geant4, generators) waits for its Geant4 decision (D5).
+NO_SIM = {"Geant4", "MC generators"}
 
 LAYERS = [
     dict(
@@ -160,33 +164,35 @@ LAYERS = [
         r"TauID|JetTagging|Algorithms|Interfaces|TrackingID)|AsgExternal/Asg_Test$",
     ),
     dict(
-        name="sim",
-        desc="Generator interfaces (AthGeneration), Geant4 full simulation, ISF/FastCaloSim, "
-        "sensitive detectors of all subdetectors (AthSimulation). Deliverable: Sim_tf.py "
-        "(EVNT -> HITS), Gen_tf.py for generators available on conda-forge.",
-        seeds=[
-            "@AthSimulation",
-            "@AthGeneration",
-            r"Simulation/",
-            r"Generators/",
-            r".*(G4_SD|G4Sim|G4Utilities|SimUtils)$",
-        ],
-        forbid_ext={"Qt/Coin3D", "GPU (traccc,vecmem,CUDA)"},
-        forbid_pkg=r"Trigger/(?!TrigT1/TrigT1Interfaces|TrigEvent|TrigConfiguration)",
-        absorb=r"Simulation/|Generators/",
-    ),
-    dict(
         name="reco-tracking",
         desc="Inner-detector and ITk data preparation and tracking (legacy Trk, InDet, ACTS "
         "CPU), HGTD, vertexing, ID digitization. Deliverable: RDO -> tracks/vertices for "
         "ID/ITk; the tracking piece of Reco_tf.py.",
-        seeds=[r"InnerDetector/", r"Tracking/", r"HighGranularityTimingDetector/"],
-        forbid_ext={"Qt/Coin3D", "GPU (traccc,vecmem,CUDA)"},
+        seeds=[
+            r"InnerDetector/",
+            r"Tracking/",
+            r"HighGranularityTimingDetector/",
+            # What ATLAS's ID tracking test (python -m InDetConfig.TrackRecoConfig) configures
+            # beyond those, found by running it in ATLAS's release: the track particle and
+            # perigee tools, and python configuration packages it imports.
+            r"Reconstruction/RecoTools/TrackToVertex$",
+            r"(Reconstruction/RecJobTransforms|Simulation/Digitization/DigitizationConfig|"
+            r"Simulation/Overlay/TrackOverlay/TrackOverlayConfig|"
+            r"PhysicsAnalysis/DerivationFramework/DerivationFrameworkInDet)$",
+        ],
+        forbid_ext=NO_SIM | {"Qt/Coin3D", "GPU (traccc,vecmem,CUDA)"},
+        # No muon reconstruction, except the interfaces and helpers that the track particle
+        # creator (TrkParticleCreator), the ACTS track reconstruction and the derivation tools
+        # link.
         forbid_pkg=r"Trigger/(TrigHypothesis|TrigMonitoring|TrigValidation|TriggerCommon|"
         r"TrigAlgorithms|EFTracking|TrigAccel)|HLT/|DataQuality/|"
-        r"PhysicsAnalysis/DerivationFramework|MuonSpectrometer/|"
+        r"PhysicsAnalysis/DerivationFramework/(?!DerivationFrameworkInDet$)|"
+        r"MuonSpectrometer/(?!MuonReconstruction/(MuonDataPrep/MuonClusterization|"
+        r"MuonRecEvent/MuonEDM_AssociationObjects|MuonRecTools/MuonRecToolInterfaces|"
+        r"MuonRecUtils/MuonLayerHough)$|"
+        r"MuonPhaseII/(Event/xAOD/xAODMuonViews|MuonRecToolInterfacesR4)$)|"
         r"Reconstruction/(egamma|Jet|tau|MET|MuonIdentification|PFlow|RecExample|"
-        r"RecJobTransforms|DiTau|PanTau|eflow|HeavyIon)",
+        r"DiTau|PanTau|eflow|HeavyIon)",
         absorb=r"InnerDetector/|Tracking/|HighGranularityTimingDetector/",
     ),
     dict(
@@ -206,12 +212,22 @@ LAYERS = [
             r"ForwardDetectors/",
             r"LumiBlock/",
             r".*Digitization",
+            # What Reco_tf.py on an MC RDO configures from the simulation packages, found by
+            # running it in ATLAS's release: the track record filter of the muon truth, and the
+            # pile-up helpers that the digitization flags import (no Geant4 in either).
+            r"Simulation/(G4Utilities/MCTruthAlgs|RunDependentSim/RunDependentSimComps)$",
+            # ...and the trigger configuration flags (TriggerJobOpts) import the menu's python
+            # code and the HLT monitoring's (below), also when the trigger is off.
+            r"Trigger/TriggerCommon/TriggerMenuMT$",
         ],
-        forbid_ext={"Qt/Coin3D", "GPU (traccc,vecmem,CUDA)"},
+        # (a seed, but its name makes it look like a monitoring package, which never is one)
+        tool_seeds=[r"Trigger/TrigMonitoring/TrigHLTMonitoring$"],
+        forbid_ext=NO_SIM | {"Qt/Coin3D", "GPU (traccc,vecmem,CUDA)"},
         # Reconstruction needs a few trigger packages (ViewAlgs for IDC caches, L1 hardware
         # emulation for RPC/L1Calo decoding); the HLT proper, the menu and monitoring are
-        # forbidden.
-        forbid_pkg=r"Trigger/(TrigHypothesis|TrigMonitoring|TrigValidation|TriggerCommon|"
+        # forbidden (but for the python packages above).
+        forbid_pkg=r"Trigger/(TrigHypothesis|TrigMonitoring/(?!TrigHLTMonitoring$)|"
+        r"TrigValidation|TriggerCommon/(?!TriggerMenuMT$)|"
         r"TrigAlgorithms|EFTracking|TrigAccel)|HLT/|DataQuality/|"
         r"PhysicsAnalysis/DerivationFramework",
         absorb=r"Reconstruction/|Tracking/|InnerDetector/|MuonSpectrometer/|Calorimeter/|"
@@ -224,9 +240,28 @@ LAYERS = [
         "trigger monitoring. Deliverable: trigger in RAW->AOD reconstruction and "
         "RDO->RDO_TRIG.",
         seeds=[r"Trigger/", r"HLT/"],
-        forbid_ext={"Qt/Coin3D"},
-        forbid_pkg=r"DataQuality/|PhysicsAnalysis/DerivationFramework",
+        # (no GPU/FPGA externals: vecmem for the EF tracking data transfer, and the Xilinx
+        # HLS types of the Phase-II global trigger simulation, both outside Run 3 jobs)
+        forbid_ext=NO_SIM | {"Qt/Coin3D", "GPU (traccc,vecmem,CUDA)"},
+        # (nor the online monitoring service, which needs the full TDAQ release)
+        forbid_pkg=r"DataQuality/|PhysicsAnalysis/DerivationFramework|HLT/Event/ByteStreamEmonSvc$",
         absorb=r"Trigger/|HLT/",
+    ),
+    dict(
+        name="sim",
+        desc="Generator interfaces (AthGeneration), Geant4 full simulation, ISF/FastCaloSim, "
+        "sensitive detectors of all subdetectors (AthSimulation). Deliverable: Sim_tf.py "
+        "(EVNT -> HITS), Gen_tf.py for generators available on conda-forge.",
+        seeds=[
+            "@AthSimulation",
+            "@AthGeneration",
+            r"Simulation/",
+            r"Generators/",
+            r".*(G4_SD|G4Sim|G4Utilities|SimUtils)$",
+        ],
+        forbid_ext={"Qt/Coin3D", "GPU (traccc,vecmem,CUDA)"},
+        forbid_pkg=r"Trigger/(?!TrigT1/TrigT1Interfaces|TrigEvent|TrigConfiguration)",
+        absorb=r"Simulation/|Generators/",
     ),
     dict(
         name="rest",

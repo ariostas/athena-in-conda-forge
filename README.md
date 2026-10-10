@@ -2,8 +2,13 @@
 
 This repository is an effort to package [Athena](https://gitlab.cern.ch/atlas/athena), the
 software framework of the ATLAS experiment at CERN, for [conda-forge](https://conda-forge.org).
-The goal is to install it with `conda install`, `mamba install` or `pixi add` on **linux-64,
-linux-aarch64 and osx-arm64**, without CVMFS or an ATLAS-specific environment.
+The goal is to install it with
+
+```sh
+conda install -c conda-forge athena-analysis   # or pixi add / mamba install
+```
+
+on **linux-64, linux-aarch64 and osx-arm64**, without CVMFS or an ATLAS-specific environment.
 
 It is a fork of [conda-forge/staged-recipes](https://github.com/conda-forge/staged-recipes), the
 entry point for new conda-forge packages. The original staged-recipes README is in
@@ -11,7 +16,352 @@ entry point for new conda-forge packages. The original staged-recipes README is 
 [cmssw-in-conda-forge](https://github.com/ariostas/cmssw-in-conda-forge), which does this for
 CMSSW.
 
-> **Status: planning.** Nothing has been built or submitted to conda-forge yet.
+> **Status: proof of concept.** Five Athena layers build and pass their tests on linux-aarch64;
+> linux-64 and osx-arm64 have not been tried. Nothing has been submitted to conda-forge yet.
 
 The reference release is Athena [`release/25.0.73`](https://gitlab.cern.ch/atlas/athena/-/tree/release/25.0.73).
-The analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
+
+## Why this is hard
+
+- **Size:** Athena is a monorepo of about 2,000 packages and 15k C++ translation units (not
+  counting tests). A full build is far too large for a single conda-forge CI job, so it has to be
+  split into several packages that are built on top of each other.
+- **Build system:** ATLAS builds with its own CMake framework,
+  [AtlasCMake](https://gitlab.cern.ch/atlas/atlasexternals), on top of an `AthenaExternals`
+  project and an LCG release of externals from CVMFS. Some externals are ATLAS forks
+  (Gaudi, CLHEP), and several are not on conda-forge at all (CORAL, COOL, the CREST clients,
+  tdaq-common, yampl).
+- **Build-time code execution:** the build runs freshly built code: ROOT dictionaries,
+  Gaudi's configurable generation (`genconf`), the class ID database (`clid.db`) and python
+  configuration databases.
+- **Platforms:** ATLAS builds for EL9 with GCC (x86-64 and aarch64). macOS has only ever been
+  supported for the AnalysisBase subset.
+- **Runtime data:** jobs read calibration files (GroupData), the geometry database and detector
+  conditions, all of which normally come from CVMFS.
+
+The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
+
+## Approach
+
+- **Build with AtlasCMake inside rattler-build, against conda-forge's externals.** Athena's own
+  CMake code is used unchanged. `athena-externals` is ATLAS's `AthenaExternals` project itself,
+  configured with no bundled externals: AtlasCMake and AtlasLCG with a few patches (from Chris
+  Burr's conda proof of concept, plus two of ours), find modules for conda-forge's layouts and a
+  conda PostConfig.
+- **Use conda-forge externals** (ROOT 6.40 C++23, Boost, TBB, Eigen, HepMC3, onnxruntime, ...).
+  Missing ones get their own recipes. Gaudi is built from ATLAS's fork with Athena's compiler
+  (conda-forge's gaudi is a gcc 14 build, which is ABI-incompatible with gcc 15 code that uses
+  `std::format`).
+- **Split Athena into layers, each its own ATLAS project.** Each layer is built against the
+  installed layers below it, as ATLAS stacks AthSimulation or AthAnalysis on AthenaExternals,
+  and installed in the CVMFS layout, `$PREFIX/opt/athena/<Project>/25.0.73/InstallArea/<platform>`.
+  So no two packages share files, and ATLAS's own `setup.sh` chaining works. The layers are
+  pinned exactly to each other.
+- **Replace `asetup` with conda activation scripts**, which source the layer's `setup.sh` and
+  save and restore what it changes. No CVMFS is needed at runtime; it is used when mounted.
+- **Choose layers by what they deliver**, not by an even split of the code
+  ([layers.py](athena-notes/analysis/scripts/layers.py)), and check each one by running its
+  target jobs in ATLAS's own release from CVMFS and listing the packages they load.
+- **Test against ATLAS's release.** Each layer's tests run real jobs and compare their output
+  with what ATLAS's release writes for the same job: dumps of every object, n-tuples, geometry
+  counts. Each layer also builds and runs ATLAS's own unit tests where they need no input files.
+
+## Status
+
+| Package | Recipe | linux-aarch64 | linux-64 | osx-arm64 |
+|---|---|---|---|---|
+| `boost-mpi3` (C++ wrapper for MPI-3, with ATLAS's patch) | [recipes/boost-mpi3](recipes/boost-mpi3) | ✅ | · | · |
+| `yampl` (message passing library, for AthenaMP) | [recipes/yampl](recipes/yampl) | ✅ | · | · |
+| `frontier-client` (Frontier database caching client) | [recipes/frontier-client](recipes/frontier-client) | ✅ | · | · |
+| `lcg-coral` (LCG relational abstraction layer) | [recipes/lcg-coral](recipes/lcg-coral) | ✅ | · | · |
+| `lcg-cool` (LCG conditions database) | [recipes/lcg-cool](recipes/lcg-cool) | ✅ | · | · |
+| `crestapi` (CREST conditions database client) | [recipes/crestapi](recipes/crestapi) | ✅ | · | · |
+| `chai` (conditions access for CREST and COOL) | [recipes/chai](recipes/chai) | ✅ | · | · |
+| `tdaq-common` (event format, event storage, error reporting) | [recipes/tdaq-common](recipes/tdaq-common) | ✅ | · | · |
+| `atlas-gaudi` (Gaudi, ATLAS's fork v40r4.002) | [recipes/atlas-gaudi](recipes/atlas-gaudi) | ✅ | · | · |
+| `athena-externals` (the base project: AtlasCMake, AtlasLCG, find modules) | [recipes/athena-externals](recipes/athena-externals) | ✅ | · | · |
+| `geomodel-core`, `geomodel-tools` (GeoModel 6.29.0, detector geometry toolkit) | [recipes/geomodel](recipes/geomodel) | ✅ | · | · |
+| `atlas-acts` (ACTS 47.7.0 with the plugins ATLAS uses) | [recipes/atlas-acts](recipes/atlas-acts) | ✅ | · | · |
+| `athena-core` (framework, StoreGate, configuration, POOL I/O, conditions, ByteStream) | [recipes/athena-core](recipes/athena-core) | ✅ | · | · |
+| `athena-detdescr` (identifiers, GeoModel geometry, ACTS geometry, magnetic field) | [recipes/athena-detdescr](recipes/athena-detdescr) | ✅ | · | · |
+| `athena-edm` (xAOD and trigger event data model: AOD/DAOD I/O) | [recipes/athena-edm](recipes/athena-edm) | ✅ | · | · |
+| `athena-edm-det` (detector event data: HITS/RDO/ESD I/O) | [recipes/athena-edm-det](recipes/athena-edm-det) | ✅ | · | · |
+| `athena-analysis` (CP tools and algorithms, trigger decision tool) | [recipes/athena-analysis](recipes/athena-analysis) | ✅ | · | · |
+
+✅ = builds locally with rattler-build (natively in Docker on an Apple-silicon Mac) and passes
+the recipe tests. · = not tried yet.
+
+All recipes are version 25.0.73 of the Athena release or the version of the external that
+AthenaExternals 25.0.73 uses. Only python 3.13 is built locally.
+
+**What works**
+
+- **`athena.py` runs from a plain conda environment.** `athena-core` (179 packages, 34 MB)
+  runs ATLAS's HelloWorld job, serial and multi-threaded, and its output matches ATLAS's
+  reference log for the test:
+
+  ```sh
+  athena.py AthExHelloWorld/HelloWorldConfig.py
+  athena.py --threads=2 AthExHelloWorld/HelloWorldConfig.py
+  ```
+
+- **Conditions from SQLite through POOL and COOL**: ATLAS's IOVDbTestAlg write job puts
+  conditions payloads in a POOL file and registers them in a COOL SQLite database, and the read
+  job reads them back through IOVDbSvc. The output matches ATLAS's reference logs except for
+  three framework debug lines.
+- **Raw data**: an EventStorage file of random events is written with tdaq-common's eformat,
+  then listed and copied with Athena's `AtlListBSEvents` and `AtlCopyBSEvent`.
+- **The ATLAS geometry builds and agrees with ATLAS's release.** With `athena-detdescr` (219
+  packages, 39 MB), DumpGeo builds every subdetector's GeoModel description for
+  `ATLAS-R3S-2021-03-02-00` and writes it to a GeoModel SQLite file:
+
+  ```sh
+  python -m DumpGeo.DumpGeoConfig --outFilename=geometry.db
+  ```
+
+  The result has the same counts as ATLAS's own release (58,181 PhysVols, 26,226 FullPhysVols,
+  59,048 LogVols, 485 materials), and GeoModel's `gmcat` reads it back unchanged. The geometry
+  comes from ATLAS's geometry database through Frontier, so this needs network and CVMFS
+  (conditions payloads). Identifiers are decoded from the release's ID dictionaries, without
+  either.
+- **xAOD files are read and written without CVMFS.** With `athena-edm` (187 packages, 49 MB),
+  Athena reads an [ATLAS Open Data](https://opendata.cern.ch) DAOD_PHYSLITE file (2015 data,
+  CC0), dumps every object in it, and writes a copy with all its event data and metadata, which
+  it reads back. Both dumps (127,173 lines) are **identical to the dump ATLAS's release
+  writes**. PyROOT reads both files through `xAOD::MakeTransientTree`, element links included:
+
+  ```python
+  import ROOT
+  f = ROOT.TFile.Open("DAOD_PHYSLITE.37001701._000001.pool.root.1")
+  tree = ROOT.xAOD.MakeTransientTree(f)
+  for i in range(tree.GetEntries()):
+      tree.GetEntry(i)
+      print([e.pt() for e in tree.AnalysisElectrons])
+  ```
+
+  With CVMFS, 38 of ATLAS's T/P converter tests (AODs written by releases 15 to 21) pass too.
+- **HITS, RDO and ESD files.** With `athena-edm-det` (137 packages, 23 MB), Athena reads ATLAS's
+  Run 3 test files (sim hits, raw data, calorimeter cells, prepared data, tracks), dumps every
+  object and writes copies; all six dumps are **identical to ATLAS's release**. The layer's 364
+  compiled T/P round-trip unit tests pass at build time. These jobs need CVMFS (ATLAS's test
+  files and conditions).
+- **Physics analysis of ATLAS Open Data with the CP tools, without CVMFS.** `athena-analysis`
+  (169 packages, 76 MB) runs ATLAS's CP algorithms on the Open Data file: good-runs list,
+  calibrated and selected muons, electrons, photons, taus, small- and large-R jets with flavour
+  tagging, tracks, missing transverse momentum, overlap removal, and trigger decisions and
+  matching:
+
+  ```sh
+  CPRun.py -i DAOD_PHYSLITE.37001701._000001.pool.root.1 -t opendata_data15.yaml -o opendata
+  ```
+
+  The n-tuple (116 events, 80 branches) is **identical to the one ATLAS's release writes**.
+  Without CVMFS, the calibration files (44 MB of GroupData) are downloaded from ATLAS's web
+  server by PathResolver, which `athena-core`'s activation enables, and the geometry database
+  is read through Frontier. With CVMFS, two of ATLAS's own CP algorithm tests also pass: the
+  full-simulation one (150 events, every systematic variation, 5,130 branches, identical to
+  ATLAS's) and the multi-threaded PHYSLITE one. 78 of ATLAS's unit tests pass at build time.
+- **Every component has its configurable.** Each layer's test checks the Gaudi configuration
+  databases against the component lists, because a crash in `genconf` drops a component silently
+  without failing the build (this is how the Gaudi ABI problem showed up).
+
+## Where this stands
+
+**Five Athena layers build and pass their tests on linux-aarch64.** They hold 891 of the
+release's 1,966 packages (as `layers.py` counts them): about 7.5k of its 14.9k translation units,
+or **half of the build**. That is enough to run Athena jobs, build the geometry, read and write
+every ATLAS data format from HITS to DAOD_PHYSLITE, and analyse DAOD_PHYS and DAOD_PHYSLITE with
+the CP tools. Simulation, reconstruction and the trigger are not built yet.
+
+| Layer | Packages | CPU-h | Max RSS per compile | Jobs on 7 GB | Recipe here (`-j10`) | Package |
+|---|---|---|---|---|---|---|
+| `athena-core` | 179 | ~2.5 | 2.2 GB | 4 | 13 min | 34 MB |
+| `athena-detdescr` | 219 | ~4 | 1.9 GB | 4 | 40 min | 39 MB |
+| `athena-edm` | 187 | ≤8 | 3.0 GB | 2–3 | 50 min | 49 MB |
+| `athena-edm-det` | 137 | ~3 | 2.6 GB | 2–3 | 50 min | 23 MB |
+| `athena-analysis` | 169 | ~5 | 3.3 GB | 2 | 38 min | 76 MB |
+
+CPU time and memory are measured with
+[compile_cost.py](athena-notes/analysis/scripts/compile_cost.py) from the ninja log of a kept
+build tree. Recipe times include the tests.
+
+**Proven so far**
+
+- AtlasCMake runs inside rattler-build against conda-forge's externals with three small patches
+  to AtlasCMake/AtlasLCG and a handful of find modules.
+- Stacking works: five Athena projects on AthenaExternals, each built only against the installed
+  ones: six projects deep, where ATLAS's own release uses three. Dictionaries, `genconf`, the
+  CLID database and the python configuration work across projects.
+- Jobs give the same results as ATLAS's release, checked object by object.
+- Analysis of ATLAS Open Data works without CVMFS (with network).
+- Build cost matches `layers.py`'s estimates (3–8 CPU-h per layer), so each layer should fit a
+  default conda-forge runner.
+
+**Not proven yet** (roughly by risk)
+
+1. **Licences** of CORAL, COOL, CrestApi and yampl (below): nothing that reads conditions can go
+   to conda-forge without them, and CORAL is in the core layer.
+2. **Runtime data without CVMFS.** The geometry database (even the Open Data analysis needs it,
+   to find the LHC period of the file) and the conditions are read through ATLAS's Frontier
+   servers, and POOL conditions payloads exist only on CVMFS. Publishing a default
+   `FRONTIER_SERVER` needs ATLAS's agreement.
+3. **Memory on CI.** The heaviest compiles peak at 3.3 GB, so the heavier layers need `-j2` on a
+   7 GB runner: roughly 2.5–4 hours of the 6-hour limit. The reco layers (Eigen- and
+   ACTS-heavy) are not measured yet.
+4. **Reconstruction, trigger and simulation** (M6, M7). Simulation also needs a Geant4 decision
+   (ATLAS uses its own fork).
+5. **linux-64 and osx-arm64.** linux-64 should be routine; osx-arm64 needs Gaudi on macOS and an
+   unknown amount of libc++ work in code that has never seen macOS.
+6. Maintenance: every ROOT/Boost/python migration forces a coordinated rebuild of all layers in
+   order, as for CMSSW.
+
+**Known issues / open questions**
+
+- Several dependencies have **no licence** and cannot go to conda-forge until that is resolved
+  (each of their recipes has a `LICENSE-STATUS.md`):
+  - `lcg-coral` and `lcg-cool`: no licence file and no licence headers (the same open question
+    as for the CMS fork of CORAL in the sister project). `lcg-coral` conflicts with that
+    `coral` package (same library names).
+  - `crestapi`: ATLAS's copyright header without a licence; Apache-2.0 is likely.
+  - `yampl`: no licence file and no headers.
+- **ATLAS's `authentication.xml` is never shipped** (it holds Oracle passwords). AtlasAuthentication
+  installs one when it finds it on AFS; the build fails if one is ever installed.
+  `CORAL_AUTH_PATH` points at a directory without one, which is fine for Frontier and SQLite.
+- **Runtime data** (PLAN.md, D6):
+  - the geometry database and conditions need `FRONTIER_SERVER`. The tests set ATLAS's public
+    server, which answers direct requests (the proxy `asetup` adds answers 403 from outside
+    CERN). The geometry databases on CVMFS have no clear licence and are not packaged;
+  - POOL conditions payloads exist only on CVMFS (an MC payload package would be about 3.8 GB);
+  - ATLAS's test files on CVMFS (`data-art`, `ASG` test files) have no clear licence and are
+    only read in place, when CVMFS is mounted. Tests that need no CVMFS use ATLAS Open Data
+    (CC0), downloaded as a recipe source;
+  - GroupData is downloaded over HTTP when CVMFS is absent. PathResolver used to save an HTTP
+    error page as the file and leave empty files after failed downloads (one of ATLAS's two web
+    mirrors answers 404 for everything): fixed by core patch 0004 (**upstreamable**).
+- **Gaudi is built here** (ATLAS's fork, v40r4.002) rather than taken from conda-forge:
+  conda-forge's 40.4 is a gcc 14 build that exports libstdc++'s `std::format` internals, and
+  Athena code built with gcc 15 binds to them; `genconf` then crashes for every component with
+  a `double` property, and the build does not fail. It also needs the gaudi feedstock's
+  plugin-path patch. (conda-forge's gaudi exports `GaudiKernel` with an absolute path to
+  `librt.so` in its feedstock's build sysroot: worth reporting there.)
+- **CLHEP**: ATLAS uses a fork. AtlasCLHEP_RandomGenerators relies on members that are protected
+  only in the fork; core patch 0001 reads them as protected without an ABI change
+  (**upstreamable**). The fork also changes the Ziggurat generators, which changes random
+  sequences: this matters for simulation and digitisation reproducibility, to be raised with
+  the clhep feedstock and ATLAS before the sim layer.
+- **Eigen 3.4, not 5.** conda-forge's pinning has moved to Eigen 5, which is not API
+  compatible with ATLAS's code. geomodel, atlas-acts and the layers build against
+  `eigen-abi-devel` 3.4.0, whose run export keeps them from being mixed with Eigen 5 builds.
+- **`fastjet-cxx` is pinned to 3.5.1 build 5**, the last one that ships its headers. Since build
+  6 they are in `fastjet-cxx-devel`, which needs a `cgal-cpp` that does not exist for both
+  Boost 1.90 and Eigen 3.4.
+- **The Linux sysroot is glibc 2.34** (EL9's, what ATLAS targets): PerfMonComps uses `mallinfo2`.
+  The compilers and python are given to CMake by absolute path, because `root_base` brings its
+  own compiler with the 2.17 sysroot into the host prefix.
+- **`-fvisibility-inlines-hidden`** (from conda-forge's `CXXFLAGS`) is stripped: ATLAS's
+  libraries export inline functions that other libraries link to.
+- **Find modules for conda-forge's layouts**, in `athena-externals`: TBB (conflicts with TBB's
+  own CMake configuration), CORAL (AtlasLCG's requires the CORAL server, which is not built),
+  tdaq-common (no TDAQ environment), FastJet contrib (one `libfastjetcontribfragile` instead of
+  a library per contrib) and onnxruntime (headers in `include/onnxruntime/core/session/`).
+  Because every ATLAS project installs a copy of its base's find modules, changing one means
+  rebuilding every layer.
+- **`ROOT_FOUND` was false in every layer**: AtlasLCG's FindROOT looks for ROOT's python
+  modules in `<ROOT>/lib`, and conda-forge has them in `site-packages`. Nothing noticed until a
+  package required ROOT. The PostConfig now sets `ROOT_PYTHON_PATH`.
+- **`clid.db` lacked types of lower layers**: AtlasCMake builds it from the component
+  libraries, so a type is listed only if some component uses it, often a reconstruction or
+  trigger component in a later layer. The layers also run `genCLIDDB` on their POOL converter
+  libraries.
+- **`athena.py` is a `#!/bin/sh` script with bash arrays**, which fails where `/bin/sh` is dash
+  (Debian, Ubuntu). Core patch 0003 makes it `#!/bin/bash` (**upstreamable**).
+- **GeoModel flags in core-only jobs**: every IOVDb job reads a GeoModel flag whose module lives
+  in a later layer. Core patch 0002 guards the import (**upstreamable**); core-only conditions
+  jobs must set `GeoModel.Run` explicitly.
+- **Triton is not on conda-forge**: FlavorTagInference builds its Triton inference service only
+  where the client is found (analysis patch 0001, **upstreamable**). It is off by default, and
+  the ONNX path is unchanged.
+- **onnxruntime prints a warning** where it cannot tell the CPU's vendor (containers,
+  emulation), which breaks ATLAS's reference comparisons; the analysis layer's unit tests ignore
+  it.
+- `frontier-client` had no `run_exports`, so CORAL's Frontier plugin could not load it (the
+  CMSSW project's copy of the recipe has the same gap).
+- **GitLab's archive endpoint sometimes returns an empty 200 response** for the 58 MB athena
+  tarball, which fails the sha256 check. Locally the source cache is seeded by hand; in CI a
+  mirror may be needed.
+- The tdaq-common packages that need ROOT (dqm_core, dqm_algorithm_helper, ...) are not built
+  yet; data quality and trigger will need them. `df_ef_interface` has no licence file.
+- The activation scripts still source ATLAS's `setup.sh` (provisional): plain activation
+  scripts are planned (D6).
+- The install areas carry the packages' sources (`src/`), as on CVMFS; to be weighed against
+  package size.
+
+## Roadmap
+
+1. **M6 (in progress):** the `reco-tracking`, `reco` and `trigger` layers, towards `Reco_tf.py`
+   on a small RDO file.
+2. **M7:** simulation (Geant4, D5), the remaining packages, an `athena` metapackage, and the
+   developer workflow: a user's `Projects/WorkDir` build on top of the conda release.
+3. **M8:** linux-64, and osx-arm64 (Gaudi on macOS, AtlasCMake Apple fixes, libc++ fixes).
+4. **M9:** submit the external recipes, upstream the patches (AtlasCMake/AtlasLCG to
+   atlasexternals, Athena's to athena, GeoModel's split to its feedstock), and hand off.
+5. Ask ATLAS (pure lead time): licences for CORAL, COOL, CrestApi and yampl; a default
+   `FRONTIER_SERVER` for anonymous users; the geometry database and POOL conditions payloads
+   without CVMFS.
+
+See [PLAN.md](PLAN.md) for details.
+
+## Repository layout
+
+- [PLAN.md](PLAN.md): analysis, decisions, milestones and progress log.
+- [recipes/](recipes): the recipes. The upstream staged-recipes `example-*` recipes are also here.
+  Each Athena layer has its `packages.txt` (from `layers.py`), its project `CMakeLists.txt`,
+  activation scripts, patches and tests.
+- [athena-notes/research](athena-notes/research): background research: the build system, every
+  external against conda-forge, the package graph, prior art, and runtime data and platforms.
+- [athena-notes/analysis/scripts](athena-notes/analysis/scripts): scripts (python3, stdlib only)
+  that read the release on CVMFS:
+  - `depgraph.py`, `cmakeparse.py`, `graph.py`: every package's CMakeLists.txt evaluated into
+    targets, sources and link edges;
+  - `includes.py`, `pyimports.py`: dependencies the link graph does not show (`#include`s and
+    python imports);
+  - `layers.py`: partitions Athena into deliverable-driven layers and checks their closure and
+    cost (`--list <layer>` gives a layer's packages);
+  - `cfgdeps.py`, `cfgmap.py`: the python packages and component types a job configuration
+    uses, run in ATLAS's release, and the packages and layers they map to;
+  - `compile_cost.py`: CPU time and peak memory of a layer's compile jobs;
+  - `tpcnv_tests.py`: the T/P converter tests of a layer's packages;
+  - `stats.py`, `heavy.py`, `projects.py`: size, heavy externals and ATLAS's own projects.
+- [athena-notes/spike](athena-notes/spike): the M1 spike that showed Athena projects stack in a
+  conda prefix (superseded by the recipes).
+- [athena-notes/build-local.sh](athena-notes/build-local.sh): builds the recipes inside a
+  container.
+- [athena-notes/cvmfs-athena.sh](athena-notes/cvmfs-athena.sh): runs a command in ATLAS's own
+  release from CVMFS, the reference for the tests.
+- [CLAUDE.md](CLAUDE.md): notes for AI coding agents working on this repository.
+
+## Building locally
+
+The recipes use the [rattler-build](https://rattler.build) v1 format. On an Apple-silicon Mac
+they are built natively for linux-aarch64 in a `condaforge/miniforge3` container, with the
+repository at `/repo` and a volume at `/work`:
+
+```sh
+docker run -d --name athena-dev -v "$PWD":/repo -v athena-work:/work \
+  -v /cvmfs:/cvmfs:ro condaforge/miniforge3 sleep infinity   # /cvmfs is optional
+docker exec athena-dev bash -c '
+  mamba create -y -p /work/tools -c conda-forge rattler-build conda-forge-pinning
+  cp /work/tools/conda_build_config.yaml /work/'
+docker exec athena-dev bash -c 'export PATH=/work/tools/bin:$PATH; cd /repo &&
+  ./athena-notes/build-local.sh linux_aarch64 [recipes/<name> ...]'
+```
+
+With no recipes, `build-local.sh` builds the externals in dependency order; the Athena layers
+are given explicitly (`recipes/athena-core recipes/athena-detdescr ...`). Built packages end up
+in `/work/output`, which is used as a local channel, and logs in `/work/logs`. `KEEP_BUILD=1`
+keeps the build directories, for `compile_cost.py` or to rerun parts of a build. With `/cvmfs`
+mounted, the tests that need ATLAS's test files run too; without it they are skipped.
+
+The reference outputs come from ATLAS's own release on CVMFS, run in an `almalinux:9` container
+with [cvmfs-athena.sh](athena-notes/cvmfs-athena.sh); see [CLAUDE.md](CLAUDE.md) for the
+details of both containers.

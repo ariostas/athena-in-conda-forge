@@ -63,6 +63,12 @@ built. `KEEP_BUILD=1` keeps the build directories in `/work/output/bld`, for
 - Scripts that `source` conda activation must do so with `set +eu` (bash errors out inside
   conda's `activate` function otherwise) and without redirecting the `source`.
 - Do not edit a bash script while it is running.
+- Run long jobs detached inside the containers (`docker exec -d`), not as a background
+  `docker exec` from the host: when the host-side client is killed, the job dies with it.
+  `athena-notes/bg-build.sh <recipe> ...` (copied to `/work/bg-build.sh` in athena-dev) runs
+  `build-local.sh` that way, exit code in `/work/logs/bg-build.rc`;
+  `athena-notes/bg.sh <dir> <name> <command>` (`/work/tmp/bg.sh`, for athena-ref) runs a
+  command in `<dir>`, output in `<name>.out`, exit code in `<name>.rc`.
 - GitLab sometimes answers the athena archive URL with an empty 200 response. rattler-build then
   fails the sha256 check. The fix is to seed its cache: put the tarball in
   `/work/output/src_cache/<key>_<file>`, the unpacked tree (without the top directory) in
