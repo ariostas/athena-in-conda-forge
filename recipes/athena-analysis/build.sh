@@ -83,7 +83,11 @@ fi
 cmake --install build
 
 # ATLAS's authentication.xml holds database passwords: AtlasAuthentication installs it when it
-# finds it in ${ATLAS_EXTERNAL} (on AFS by default), which is pointed nowhere above.
+# finds it in ${ATLAS_EXTERNAL} (on AFS by default), which is pointed nowhere above. The
+# install area also carries the packages' sources (src/), as on CVMFS, and one package keeps
+# an authentication.xml with credentials in its sources (PixelConditionsTools/share/): no
+# copy of it is shipped.
+find "${INSTALL}/src" -name authentication.xml -print -delete
 if find "${INSTALL}" -name authentication.xml | grep .; then
   echo "authentication.xml must not be packaged"
   exit 1

@@ -33,6 +33,12 @@ HEAVY_TOP = {"Geant4", "Qt/Coin3D", "MC generators", "GPU (traccc,vecmem,CUDA)"}
 # non-Geant4 part (monitoring, muon reconstruction interfaces, fitter utilities), which they
 # now take themselves. Simulation (Geant4, generators) waits for its Geant4 decision (D5).
 NO_SIM = {"Geant4", "MC generators"}
+# Externals that packages use without declaring them in their CMakeLists.txt (so the graph does
+# not show them), and that are not packaged: such packages go to the last layer.
+UNDECLARED_EXT = {
+    # the ITk pixel data decoder, which AthenaExternals builds (ATLAS_BUILD_ITKSW_ENDEC)
+    "InnerDetector/InDetEventCnv/ITkPixelByteStreamCnv": "itksw-endec",
+}
 
 LAYERS = [
     dict(
@@ -240,6 +246,14 @@ LAYERS = [
         "trigger monitoring. Deliverable: trigger in RAW->AOD reconstruction and "
         "RDO->RDO_TRIG.",
         seeds=[r"Trigger/", r"HLT/"],
+        # What ATLAS's HLT on simulation (TriggerJobOpts.runHLT, the Dev menu) configures beyond
+        # them, found by running it in ATLAS's release: the L1 result's xAOD conversion, and the
+        # muon RDO-to-digit algorithms of the L1 muon simulation (a package whose name makes it
+        # look like a test, which is never a seed).
+        tool_seeds=[
+            r"PhysicsAnalysis/AnalysisTrigger/AnalysisTriggerAlgs$",
+            r"MuonSpectrometer/MuonCnv/MuonByteStreamCnvTest$",
+        ],
         # (no GPU/FPGA externals: vecmem for the EF tracking data transfer, and the Xilinx
         # HLS types of the Phase-II global trigger simulation, both outside Run 3 jobs)
         forbid_ext=NO_SIM | {"Qt/Coin3D", "GPU (traccc,vecmem,CUDA)"},
@@ -326,6 +340,8 @@ def build_layers(g, layers=LAYERS):
         def bad(p, components_ok=False):
             if p in assigned:
                 return False
+            if p in UNDECLARED_EXT:
+                return True
             if frx and frx.match(p):
                 return True
             if (

@@ -225,7 +225,10 @@ build tree. Recipe times include the tests.
   - `crestapi`: ATLAS's copyright header without a licence; Apache-2.0 is likely.
   - `yampl`: no licence file and no headers.
 - **ATLAS's `authentication.xml` is never shipped** (it holds Oracle passwords). AtlasAuthentication
-  installs one when it finds it on AFS; the build fails if one is ever installed.
+  installs one when it finds it on AFS; the build fails if one is ever installed. One package,
+  `PixelConditionsTools`, keeps an `authentication.xml` with credentials in its sources
+  (`share/`, in ATLAS's public repository), and the install area carries the packages'
+  sources: the layers drop it from the sources they ship. Worth reporting to ATLAS.
   `CORAL_AUTH_PATH` points at a directory without one, which is fine for Frontier and SQLite.
 - **Runtime data** (PLAN.md, D6):
   - the geometry database and conditions need `FRONTIER_SERVER`. The tests set ATLAS's public

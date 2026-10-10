@@ -1,0 +1,146 @@
+context:
+  version: "25.0.73"
+
+package:
+  name: athena-reco-tracking
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/atlas/athena/-/archive/release/${{ version }}/athena-release-${{ version }}.tar.gz
+  sha256: e2df75b2fd966f97973e9ed89984222e4070be0d60ace0a4f3975e80e9ec1eba
+
+build:
+  number: 0
+  skip:
+    - not linux
+    - match(python, "<3.13")
+  script:
+    file: build.sh
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    # AthExFortranAlgorithm
+    - ${{ compiler('fortran') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+    # AtlasLCG's Findlz4
+    - pkg-config
+  host:
+    - athena-analysis ==${{ version }}
+    # the alignment's matrix algebra (TrkAlgebraUtils)
+    - libblas
+    - liblapack
+    # RooFFTConvPdf in InDetDiMuonMonitoring
+    - fftw
+    # JiveXML's event server (ONC RPC)
+    - libtirpc
+    # the externals of the layers below, whose headers this layer includes:
+    # flavour tagging, tau, egamma and lepton identification networks
+    - onnxruntime-cpp 1.26.* *_cpu
+    - lwtnn
+    # jet substructure (as in ATLAS's release, fjcontrib 1.10x on FastJet 3.5.1)
+    - fastjet-contrib
+    # HDF5Utils, the HDF5 writers of flavour tagging
+    - hdf5
+    - lz4-c
+    # PDF reweighting (ReweightUtils, AsgAnalysisAlgorithms)
+    - lhapdf
+    # the python bindings of the columnar tools (ColumnarToolWrapperPython)
+    - nanobind
+    # the YAML configurations of the CP algorithms (the unit tests run them)
+    - pyyaml
+    - fastjet-cxx ==3.5.1 *_5
+    - athena-edm-det ==${{ version }}
+    - athena-edm ==${{ version }}
+    - athena-detdescr ==${{ version }}
+    - athena-core ==${{ version }}
+    - libxml2
+    - geomodel-core ==6.29.0
+    - geomodel-tools ==6.29.0
+    - atlas-acts ==47.7.0
+    - gsl
+    - athena-externals ==${{ version }}
+    - atlas-gaudi
+    - lcg-coral
+    - lcg-cool
+    - crestapi
+    - chai
+    - tdaq-common
+    - yampl
+    - boost-mpi3
+    - openmpi
+    - python
+    - root_base
+    - root_cxx_standard
+    - libboost-devel
+    - libboost-python-devel
+    - tbb-devel
+    - eigen
+    - eigen-abi-devel
+    - clhep
+    - libuuid
+    - nlohmann_json
+    - fmt
+    - range-v3
+    - ms-gsl
+    - xerces-c
+    - zlib
+    - sqlite
+    - gtest
+    - gmock
+    - cppunit
+    - expat
+    - aida
+    - heppdt
+    - zeromq
+    - cppzmq
+    - hepmc3
+    # ByteStream input from remote storage
+    - xrootd
+    - davix
+    # EventIndexProducer
+    - libprotobuf
+    # PerfMonGPerfTools
+    - gperftools
+    # headers only (AthenaServices)
+    - valgrind
+    - libcurl
+    - vdt
+    # the build draws the python import graph of the packages (apydep)
+    - pygraphviz
+  run:
+    - athena-analysis ==${{ version }}
+    - python
+    - root_base
+
+tests:
+  - script:
+      # ATLAS's inner detector tracking test (InDetConfig.TrackRecoConfig) on its Run 3 RDO
+      # test file, with CVMFS: the tracks and vertices are checked against ATLAS's release
+      - bash test/run_tracking.sh
+      # every component of the layer has its configurable
+      - python test/check_confdb.py "${AthenaRecoTracking_DIR}/lib/AthenaRecoTracking.components"
+    files:
+      recipe:
+        - test/
+
+about:
+  homepage: https://gitlab.cern.ch/atlas/athena
+  summary: The tracking layer of ATLAS's Athena software (inner detector and ITk tracking, vertexing)
+  description: |
+    Athena is the offline software of the ATLAS experiment at CERN, built on the Gaudi
+    framework. This package is the sixth of the layers Athena is split into for conda-forge,
+    on top of athena-analysis: the inner detector and ITk data preparation (clustering, space
+    points), track finding and fitting (ATLAS's Trk/InDet chain and ACTS), primary and
+    secondary vertexing, the HGTD, the inner detector digitization, and their monitoring and
+    validation.
+  license: Apache-2.0
+  license_file: LICENSE
+  repository: https://gitlab.cern.ch/atlas/athena
+
+extra:
+  recipe-maintainers:
+    - ariostas
