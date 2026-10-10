@@ -96,6 +96,11 @@ requirements:
     - openmpi
     - requests
     - distro
+    # PerfMonComps' monitoring service, which the job transforms switch on (perfmon fastmonmt)
+    - psutil
+    # the job transforms (PyJobTransforms) run ps, and prmon for their memory monitoring
+    - procps-ng
+    - prmon
 
 tests:
   - script:

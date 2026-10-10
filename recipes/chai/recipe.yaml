@@ -10,14 +10,16 @@ source:
   sha256: dc18b1c113910530fff8f16bc04a6a394d954b1d601ee5024d10038b2e8aebce
 
 build:
-  number: 0
+  number: 1
   skip:
     - win
   script:
-    # As ATLAS installs it (atlasexternals' External/chai), without the python bindings: they
-    # are used by a single Athena script, and would make the package python-version specific.
-    # The tests need a CREST server.
-    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_CXX_STANDARD=23 -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_INCLUDEDIR=include/chai -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF
+    # Without the python bindings: they are used by a single Athena script, and would make the
+    # package python-version specific. The tests need a CREST server. The headers go in
+    # include/chai/, as in the TDAQ release's externals, where Athena packages also find them
+    # as tdaq-common components (chai, chaicontainer); atlasexternals installs them one level
+    # deeper (include/chai/chai/).
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_CXX_STANDARD=23 -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF
     - cmake --build build --parallel ${CPU_COUNT}
     - cmake --install build
 
@@ -42,7 +44,7 @@ tests:
         - chai
         - chaicontainer
       files:
-        - include/chai/chai/Database.h
+        - include/chai/Database.h
         - lib/cmake/chai/chaiConfig.cmake
         - lib/chai/plugins/libchai_plugin_crest_fs.so
   - script:

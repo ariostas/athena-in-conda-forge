@@ -1,0 +1,83 @@
+schema_version: 1
+
+context:
+  tag_version: "2_4_7_1"
+  version: ${{ tag_version | replace('_', '.') }}
+
+package:
+  name: clhep
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/CLHEP/CLHEP/-/archive/CLHEP_${{ tag_version }}/CLHEP-CLHEP_${{ tag_version }}.tar.gz
+  sha256: 6c39dfecfb8369c4ba9d353471fa7cc818116f9c4dfef35bb5a086a9b2ccd40b
+  target_directory: CLHEP
+
+build:
+  number: 1
+  skip: win
+  dynamic_linking:
+    overlinking_behavior: error
+    overdepending_behavior: error
+
+requirements:
+  build:
+    - cmake
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib("c") }}
+    - make
+  run_exports:
+    - ${{ pin_subpackage('clhep', upper_bound='x.x.x.x') }}
+
+tests:
+  - package_contents:
+      strict: true
+      bin:
+        - clhep-config
+      lib:
+        - CLHEP
+      include:
+        - CLHEP/ClhepVersion.h
+      files:
+        exists:
+          # One config script per component, plus the top-level one.
+          - bin/*-config
+          - include/CLHEP/**
+          # module.modulemap up to 2.4.4.0, clhep.modulemap from 2.4.4.1 on.
+          - include/*.modulemap
+          # Shared and static, full library and per-component, each also under a
+          # version-stamped name.
+          - lib/libCLHEP*
+          - lib/CLHEP-${{ version }}/CLHEPConfig.cmake
+          - lib/CLHEP-${{ version }}/**
+          - lib/pkgconfig/*.pc
+  - script:
+      file: test_clhep
+      env:
+        CLHEP_VERSION: ${{ version }}
+    requirements:
+      build:
+        - ${{ compiler('cxx') }}
+        - ${{ stdlib('c') }}
+        - cmake
+        - make
+
+about:
+  license: LGPL-3.0-only
+  license_file: CLHEP/COPYING.LESSER
+  summary: A Class Library for High Energy Physics
+  description: |
+    It is intended to be a set of HEP specific foundation and utility classes such as
+    random generators, physics vectors, geometry and linear algebra.
+  homepage: http://proj-clhep.web.cern.ch/proj-clhep/
+  repository: https://gitlab.cern.ch/CLHEP/CLHEP
+  documentation: http://proj-clhep.web.cern.ch/proj-clhep/index.html#docu
+
+extra:
+  recipe-maintainers:
+    - giacomov
+    - jasercion
+    - Areustle
+    - chrisburr
+    - tkittel
