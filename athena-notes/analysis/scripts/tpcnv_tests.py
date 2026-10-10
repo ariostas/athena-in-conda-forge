@@ -23,7 +23,9 @@ SET = re.compile(r"^\s*set\s*\(\s*(\w+)\s+([^\s)]+)\s*\)", re.M)
 
 def main():
     with open(sys.argv[1]) as f:
-        packages = [line.strip() for line in f if line.strip() and not line.startswith("#")]
+        packages = [
+            line.strip() for line in f if line.strip() and not line.startswith("#")
+        ]
     with open(os.path.join(WORK, "cmakelists.json")) as f:
         cmakelists = json.load(f)
     for p in packages:
@@ -31,7 +33,10 @@ def main():
         variables = dict(SET.findall(text))
         name = p.rsplit("/", 1)[-1]
         for args in CALL.findall(text):
-            words = [variables.get(w[2:-1], w) if w.startswith("${") else w for w in args.split()]
+            words = [
+                variables.get(w[2:-1], w) if w.startswith("${") else w
+                for w in args.split()
+            ]
             test = words[0]
             opts = {"REFERENCE_TAG": [], "REQUIRED_LIBRARIES": []}
             key = None

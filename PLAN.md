@@ -233,7 +233,7 @@ stub `AthenaExternalsConfig.cmake`). Offer the patches upstream to atlasexternal
 | 1 | core | 1.2k | `athena.py`, StoreGate, ComponentAccumulator, POOL/RNTuple I/O, IOVDb/CREST, ByteStream | Gaudi, CORAL/COOL, CrestApi/chai, tdaq-common, HepMC3 |
 | 2 | detdescr | 1.6k | Identifiers, GeoModel geometry, ACTS tracking geometry, magnetic field | GeoModel, ACTS |
 | 3 | edm | 1.7k | xAOD and trigger EDM: read/write AOD/DAOD | |
-| 4 | edm-det | 1.5k | RDO/ESD/HITS I/O | FastJet |
+| 4 | edm-det | 1.3k | RDO/ESD/HITS I/O | FastJet |
 | 5 | analysis | 1.7k | CP tools on DAOD_PHYS/PHYSLITE | onnxruntime, lwtnn, HDF5, LHAPDF, Triton client |
 | 6 | sim | 1.4k | `Sim_tf.py` | Geant4, Pythia8 |
 | 7 | reco-tracking | 1.2k | ID/ITk tracking, vertexing | (Eigen-heavy) |
@@ -783,3 +783,73 @@ as one TU. Peak RSS per compile: median 0.46 GB, p90 1.4 GB, max 3.0 GB (the tri
 - open: the trigger menu metadata tool (with the trigger decision tool, in `analysis`), a
   default `FRONTIER_SERVER` and the geometry database without CVMFS (D6), the runtime python
   dependencies of core, the licences of CORAL, COOL, CrestApi and yampl.
+
+### 2026-10-09: the edm-det layer (M4, last part)
+
+**The layer contents.** `layers.py`'s edm-det (131 packages) lacked what a job reading HITS, RDO
+and ESD files needs at run time, found by running the test job in ATLAS's release (with
+`cfgdeps.py`, and by listing the libraries the process loads):
+- `G4SimAthenaPOOL`, the converter of the track records (`CaloEntryLayer`, ... in every HITS
+  and RDO file), was in sim: the seed and absorb patterns matched `AthenaPool`, not ATLAS's
+  spelling `AthenaPOOL`;
+- new tool seeds: `InDetEventCnvTools` and `MuonEventCnvTools` (the `Trk::Track` converters
+  find the detector elements of measurements through them: ESD reading and the unit tests of
+  MuonEventTPCnv), `CaloCondAthenaPool` with `CaloTriggerTool` (the LAr alignment,
+  `CaloAlignCondAlg` in detdescr, reads `CaloRec::CaloCellPositionShift` through it: no job
+  that builds the aligned calorimeter geometry ran without it) and `HepMCWeightSvc` (the
+  `McEventCollection` converters of edm use it for the generator weights).
+
+edm-det: 137 packages, 1,260 TUs; nothing needs a later layer. New external: FastJet
+(EventShapeEvent's headers use `fastjet::RangeDefinition`). As in the CMSSW project,
+`fastjet-cxx ==3.5.1 *_5` (ATLAS's version) is pinned: since build 6 the headers are in
+`fastjet-cxx-devel`, which requires `cgal-cpp`, and no `cgal-cpp` goes with both Boost 1.90 and
+Eigen 3.4 (the 1.90 builds need eigen-abi 5).
+
+**Unit tests at build time.** ATLAS's compiled tests of the T/P converters (round trips of
+transient objects through each persistent version) need no input files. `build.sh` builds the
+`Package_<name>_tests` targets of the packages in `unit_tests.txt` (41 of the layer's) and runs
+them with ctest, which labels each test with its package, excluding the packages' T/P converter
+tests (CVMFS and the geometry database; the recipe's tests run those). **All 364 pass**; about
+300 more TUs. One needed a fix in core: `athena.py` is a `#!/bin/sh` script with bash arrays,
+and fails where `/bin/sh` is dash (Debian, Ubuntu, this container); core's patch 0003 makes it
+`#!/bin/bash` (upstreamable; core rebuilt, its HelloWorld test now runs `athena.py` directly).
+
+**`athena-edm-det`** (project `AthenaEDMDet` on `AthenaEDM`) builds on linux-aarch64 and passes:
+- **HITS, RDO and ESD I/O**, with CVMFS: ATLAS's Run 3 test files (`TestDefaults` HITS_RUN3,
+  RDO_RUN3, ESD_RUN3_MC; licence unclear, read in place). Athena reads 2 events of each, dumps
+  every object with PyDumper (sim hits of every subdetector, the raw data and sim data of ID,
+  calorimeters and muons, calorimeter cells, prepared data, tracks: 147k, 587k and 2.25M lines)
+  and writes a copy, which it reads back and dumps. **All six dumps are identical to the ones
+  ATLAS's release writes**; the recipe has their sha256 sums only. The copies differ from their
+  inputs in ATLAS's release too: silicon hit positions lose precision in their persistent form,
+  and ESD truth links are lost when the file has no truth event. The jobs build the geometry
+  from the files' tags, through Frontier;
+- **ATLAS's T/P converter tests** (CVMFS), 33 here (29 of the layer, 4 of edm's track particle
+  converters): 23 pass. The 4 without a reference tag look for their reference in
+  `../share/`, which only exists in a build tree (they fail in ATLAS's installed release
+  too); the recipe ships those references, from the source. 9 need the reco layer (the `Reco`
+  flags of RecJobTransforms, CaloRec's `CaloTopoTowerBuilderTool`); `TrkEventTPCnv_14.5.0`
+  fails in ATLAS's release too (CSC measurements without detector elements);
+- the component check: 857 components, 754 configurables.
+
+The activation scripts run alphabetically, so `athena-edm-det`'s before `athena-edm`'s. That is
+harmless: each `setup.sh` returns early when its project is already set up
+(`<Project>_SET_UP`).
+
+**Cost** (`compile_cost.py`): 1,686 compiles (unit tests included) took 2.9 h of summed wall
+time at `-j10`, dictionaries 0.5 h; about 3 CPU-h in all, as `layers.py` predicted. The whole
+recipe takes 50 minutes here: 21–27 for the build with the unit tests, 22 for the tests (the
+ESD job most of it).
+Peak RSS per compile: median 0.54 GB, p90 1.7 GB, max 2.6 GB (the converter component lists of
+MuonEventAthenaPool and LArCondAthenaPool): `-j2` or `-j3` on a 7 GB runner. Package: 23 MB.
+
+**M4 is done**: the geometry builds, and AOD/DAOD (Athena and PyROOT), HITS, RDO and ESD are
+read and written as in ATLAS's release.
+
+**Next:**
+- M5, the `analysis` layer (CP tools on DAOD_PHYSLITE, ATLAS Open Data), with the trigger menu
+  metadata tool and the trigger decision tool;
+- the T/P tests deferred to reco (13: edm's 4 RecTPCnv and the 9 above);
+- open: a default `FRONTIER_SERVER` and the geometry database without CVMFS (D6; every test of
+  this layer needs both), the runtime python dependencies of core, the licences of CORAL,
+  COOL, CrestApi and yampl; upstream the athena.py shebang.

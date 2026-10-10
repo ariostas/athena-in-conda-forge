@@ -14,6 +14,9 @@ source:
     # the GeoModel configuration flags without DetectorDescription/GeoModel/DumpGeo (a later
     # layer), as AthenaConfiguration does for other optional flag categories
     - 0002-AthenaConfiguration-DumpGeo-flags-only-if-available.patch
+    # athena.py is a "#!/bin/sh" script with bash arrays, which fails where /bin/sh is dash
+    # (Debian, Ubuntu)
+    - 0003-AthenaCommon-athena.py-runs-with-bash.patch
 
 build:
   number: 0

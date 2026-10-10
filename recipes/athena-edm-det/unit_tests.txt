@@ -1,0 +1,44 @@
+# The packages of this layer whose unit tests (ATLAS's ctest tests: mostly round trips of
+# transient objects through their persistent forms) are built and run by build.sh. They need
+# no input files, CVMFS or network.
+Calorimeter/CaloCnv/CaloSimEventTPCnv
+Calorimeter/CaloCnv/CaloTPCnv
+ForwardDetectors/AFP/AFP_EventCnv/AFP_EventTPCnv
+ForwardDetectors/ALFA/ALFA_EventCnv/ALFA_EventTPCnv
+ForwardDetectors/ForwardSimulation/ForwardRegion_EventCnv/ForwardRegion_EventTPCnv
+ForwardDetectors/LUCID/LUCID_Cnv/LUCID_EventTPCnv
+ForwardDetectors/ZDC/ZdcCnv/ZdcEventTPCnv
+Generators/HepMCWeightSvc
+HighGranularityTimingDetector/HGTD_EventCnv/HGTD_EventTPCnv
+HighGranularityTimingDetector/HGTD_RawEvent/HGTD_RawData
+HighGranularityTimingDetector/HGTD_Reconstruction/HGTD_RecEvent/HGTD_PrepRawData
+HighGranularityTimingDetector/HGTD_Reconstruction/HGTD_RecEvent/HGTD_RIO_OnTrack
+InnerDetector/InDetConditions/InDetByteStreamErrorsAthenaPool
+InnerDetector/InDetEventCnv/InDetBCM_EventAthenaPool
+InnerDetector/InDetEventCnv/InDetEventAthenaPool
+InnerDetector/InDetEventCnv/InDetEventTPCnv
+InnerDetector/InDetEventCnv/InDetSimEventTPCnv
+LArCalorimeter/LArCnv/LArCondAthenaPool
+LArCalorimeter/LArCnv/LArCondTPCnv
+LArCalorimeter/LArCnv/LArSimEventTPCnv
+LArCalorimeter/LArCnv/LArTPCnv
+LumiBlock/LumiBlockPers/LumiBlockTPCnv
+MuonSpectrometer/MuonCnv/MuonEventAthenaPool
+MuonSpectrometer/MuonCnv/MuonEventTPCnv
+MuonSpectrometer/MuonCnv/MuonSimEventTPCnv
+MuonSpectrometer/MuonConditions/MuonConditionsAthenaPool
+MuonSpectrometer/MuonPhaseII/Event/MuonTrackEvent
+MuonSpectrometer/MuonPhaseII/Event/xAOD/xAODMuonSimHit
+Simulation/G4SimCnv/G4SimTPCnv
+Simulation/ISF/ISF_Core/ISF_Event
+TestBeam/TBTPCnv
+TileCalorimeter/TileSvc/TileSimEventTPCnv
+TileCalorimeter/TileSvc/TileTPCnv
+Tracking/Acts/ActsCalibration/ActsCalibrators
+Tracking/Acts/ActsEvent
+Tracking/TrkEventCnv/TrkEventTopLevelCnv
+Tracking/TrkEventCnv/TrkTruthTPCnv
+Trigger/TrigConfiguration/TrigConfBase
+Trigger/TrigT1/L1Topo/L1TopoRDO
+Trigger/TrigT1/TrigT1EventTPCnv
+Trigger/TrigT1/TrigT1Result

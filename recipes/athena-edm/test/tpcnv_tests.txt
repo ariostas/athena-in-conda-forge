@@ -5,7 +5,7 @@
 # recipes/athena-edm/packages.txt`.
 # Commented out ("#later"): tests whose job configuration needs later layers, the "Reco" flags
 # (RecJobTransforms, reco layer) or the TRT conditions converters (InDetConditionsAthenaPool,
-# edm-det layer). They pass in ATLAS's release.
+# edm-det layer: athena-edm-det runs these). They pass in ATLAS's release.
 Event/xAOD/xAODBTaggingAthenaPool xAODBTaggingAthenaPool_21.0.79 xAODBTaggingAthenaPool/xAODBTaggingAthenaPoolReference-01-01-00 xAODBTaggingAthenaPoolPoolCnv
 Event/xAOD/xAODCaloEventAthenaPool xAODCaloEventAthenaPool_20.1.7.2 xAODCaloEventAthenaPool/xAODCaloEventAthenaPoolReference-01-01-00 xAODCaloEventAthenaPoolPoolCnv
 Event/xAOD/xAODCaloEventAthenaPool xAODCaloEventAthenaPool_21.0.79 xAODCaloEventAthenaPool/xAODCaloEventAthenaPoolReference-01-01-00 xAODCaloEventAthenaPoolPoolCnv

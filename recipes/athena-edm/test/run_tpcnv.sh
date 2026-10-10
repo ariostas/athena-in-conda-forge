@@ -18,10 +18,18 @@ export ATLAS_POOLCOND_PATH=${ATLAS_POOLCOND_PATH:-/cvmfs/atlas-condb.cern.ch/rep
 
 run_one() {
   local pkg=$1 test=$2 tag=$3
-  mkdir -p "tpcnv/${test}"
-  cd "tpcnv/${test}"
+  mkdir -p "tpcnv/${test}/run"
   local status=0
-  ATLAS_REFERENCE_TAG=${tag} "${test}_test.py" > log 2>&1 || status=$?
+  if [ "${tag}" = - ]; then
+    # No reference tag: the reference is in the package's share/ (a source file of the
+    # recipe), which ATLAS's dumper looks for in ../share.
+    cp -r "${here}/../${pkg}/share" "tpcnv/${test}/"
+    cd "tpcnv/${test}/run"
+    "${test}_test.py" > log 2>&1 || status=$?
+  else
+    cd "tpcnv/${test}/run"
+    ATLAS_REFERENCE_TAG=${tag} "${test}_test.py" > log 2>&1 || status=$?
+  fi
   if [ "${status}" != 0 ] ||
       grep -Ea "^ERROR | ERROR |^FATAL | FATAL | WARNING\s*FPE|runtime error:" log > errors; then
     echo "FAILED ${test} (${pkg}, exit code ${status}):"
@@ -32,6 +40,7 @@ run_one() {
   echo "ok ${test}"
 }
 export -f run_one
+export here
 
 grep -v '^#' "${here}/tpcnv_tests.txt" |
   xargs -P "${CPU_COUNT:-4}" -L 1 bash -c 'run_one "$0" "$1" "$2"'

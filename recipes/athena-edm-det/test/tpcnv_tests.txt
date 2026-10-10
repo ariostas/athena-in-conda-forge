@@ -1,0 +1,44 @@
+# ATLAS's T/P converter (schema evolution) tests of the packages of this layer: package, test,
+# ATLAS_REFERENCE_TAG, required libraries. Each <test>_test.py (installed in bin/) reads a file
+# written by an old release and compares a dump of some of its objects with a reference; both
+# are on CVMFS. From `athena-notes/analysis/scripts/tpcnv_tests.py
+# recipes/athena-edm-det/packages.txt`, plus the tests of athena-edm packages that need this
+# layer's converters (the TRT conditions, InDetConditionsAthenaPool).
+# The tag "-": the test has no reference tag, and its reference is in the package's share/.
+# Commented out: "#later", tests whose job configuration needs the reco layer (the "Reco" flags
+# of RecJobTransforms, or CaloRec's CaloTopoTowerBuilderTool); they pass in ATLAS's release.
+# "#broken", TrkEventTPCnv_14.5.0, which fails in ATLAS's release too (the conversion tool
+# finds no detector element for the CSC measurements of that file).
+Calorimeter/CaloCnv/CaloAthenaPool CaloTPCnv_14.5.0 CaloAthenaPool/CaloAthenaPoolReference-01-00-00
+Calorimeter/CaloCnv/CaloAthenaPool CaloTPCnv_15.1.0 CaloAthenaPool/CaloAthenaPoolReference-01-00-00
+Calorimeter/CaloCnv/CaloAthenaPool CaloTPCnv_15.5.0 CaloAthenaPool/CaloAthenaPoolReference-01-00-00
+#later Calorimeter/CaloCnv/CaloAthenaPool CaloTPCnv_18.0.0 CaloAthenaPool/CaloAthenaPoolReference-01-00-00
+Calorimeter/CaloCnv/CaloAthenaPool CaloTPCnv_20.1.7.2 CaloAthenaPool/CaloAthenaPoolReference-01-00-00
+ForwardDetectors/ZDC/ZdcCnv/ZdcEventAthenaPool ZdcEventTPCnv_15.6.7 -
+InnerDetector/InDetEventCnv/InDetBCM_EventAthenaPool InDetBCM_EventAthenaPool_20.1.7.2 -
+InnerDetector/InDetEventCnv/InDetEventAthenaPool InDetEventTPCnv_16.6.2.1 InDetEventAthenaPool/InDetEventAthenaPoolReference-03-00-00
+InnerDetector/InDetEventCnv/InDetSimEventAthenaPool InDetSimEventTPCnv_HITS InDetSimEventAthenaPool/InDetSimEventAthenaPoolReference-02-01-00
+LArCalorimeter/LArCnv/LArAthenaPool LArTPCnv_15.6.7 -
+LArCalorimeter/LArCnv/LArAthenaPool LArTPCnv_20.1.7.2 -
+LArCalorimeter/LArCnv/LArSimEventAthenaPool LArSimEventTPCnv_HITS LArSimEventAthenaPool/LArSimEventAthenaPoolReference-01-00-00
+#later MuonSpectrometer/MuonCnv/MuonEventAthenaPool MuonEventTPCnv_17.0.0 MuonEventAthenaPool/MuonEventAthenaPoolReference-04-00-01
+#later MuonSpectrometer/MuonCnv/MuonEventAthenaPool MuonEventTPCnv_20.1.7.2 MuonEventAthenaPool/MuonEventAthenaPoolReference-04-00-01
+MuonSpectrometer/MuonCnv/MuonSimEventAthenaPool MuonSimEventTPCnv_HITS MuonSimEventAthenaPool/MuonSimEventAthenaPoolReference-02-01-00
+#later Reconstruction/egamma/egammaAthenaPool egammaEventTPCnv_15.1.0 egammaAthenaPool/egammaAthenaPoolReference-01-00-01
+#later Reconstruction/egamma/egammaAthenaPool egammaEventTPCnv_15.6.9 egammaAthenaPool/egammaAthenaPoolReference-01-00-01
+#later Reconstruction/egamma/egammaAthenaPool egammaEventTPCnv_16.6.7.1 egammaAthenaPool/egammaAthenaPoolReference-01-00-01
+#later Reconstruction/egamma/egammaAthenaPool egammaEventTPCnv_18.0.0 egammaAthenaPool/egammaAthenaPoolReference-01-00-01
+TileCalorimeter/TileSvc/TileEventAthenaPool TileTPCnv_15.6.4 TileEventAthenaPool/TileEventAthenaPoolReference-01-00-00
+TileCalorimeter/TileSvc/TileEventAthenaPool TileTPCnv_20.1.7.2 TileEventAthenaPool/TileEventAthenaPoolReference-01-00-00
+TileCalorimeter/TileSvc/TileSimEventAthenaPool TileSimEventTPCnv_HITS TileSimEventAthenaPool/TileSimEventAthenaPoolReference-01-00-00
+#broken Tracking/TrkEventCnv/TrkEventAthenaPool TrkEventTPCnv_14.5.0 TrkEventAthenaPool/TrkEventAthenaPoolReference-06-00-06 TrackParticleAthenaPoolPoolCnv
+Tracking/TrkEventCnv/TrkEventAthenaPool TrkEventTPCnv_15.6.7 TrkEventAthenaPool/TrkEventAthenaPoolReference-06-00-06 TrackParticleAthenaPoolPoolCnv
+Tracking/TrkEventCnv/TrkEventAthenaPool TrkEventTPCnv_16.6.2.1 TrkEventAthenaPool/TrkEventAthenaPoolReference-06-00-06 TrackParticleAthenaPoolPoolCnv
+Tracking/TrkEventCnv/TrkEventAthenaPool TrkEventTPCnv_17.2.8 TrkEventAthenaPool/TrkEventAthenaPoolReference-06-00-06 TrackParticleAthenaPoolPoolCnv
+Tracking/TrkEventCnv/TrkEventAthenaPool TrkEventTPCnv_18.0.0 TrkEventAthenaPool/TrkEventAthenaPoolReference-06-00-06 TrackParticleAthenaPoolPoolCnv
+Tracking/TrkEventCnv/TrkEventAthenaPool TrkEventTPCnv_20.1.7.2 TrkEventAthenaPool/TrkEventAthenaPoolReference-06-00-06 TrackParticleAthenaPoolPoolCnv
+Trigger/TrigT1/TrigT1EventAthenaPool TrigT1EventTPCnv_18.0.0 TrigT1EventAthenaPool/TrigT1EventAthenaPoolReference-01-00-00
+Reconstruction/TrackParticleAthenaPool TrackParticleTPCnv_16.6.3 TrackParticleAthenaPool/TrackParticleAthenaPoolReference-04-00-01
+Reconstruction/TrackParticleAthenaPool TrackParticleTPCnv_17.2.8 TrackParticleAthenaPool/TrackParticleAthenaPoolReference-04-00-01
+#later Reconstruction/TrackParticleAthenaPool TrackParticleTPCnv_18.0.0 TrackParticleAthenaPool/TrackParticleAthenaPoolReference-04-00-01
+#later Reconstruction/TrackParticleTruthAthenaPool TrackParticleTruthTPCnv_18.0.0 TrackParticleTruthAthenaPool/TrackParticleTruthAthenaPoolReference-01-00-01

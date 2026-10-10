@@ -125,14 +125,26 @@ LAYERS = [
         "T/P, AthenaPool and bytestream converters. Deliverable: read and write "
         "RDO/ESD/HITS.",
         seeds=[
-            r".*/\w*(Event|EventTPCnv|EventAthenaPool|AthenaPool|TPCnv|RawData|RawEvent|"
-            r"PrepRawData|RIO_OnTrack|SimEvent|EventCnv|SimData|RDO)$"
+            r".*/\w*(Event|EventTPCnv|EventAthenaPool|AthenaPool|AthenaPOOL|TPCnv|RawData|"
+            r"RawEvent|PrepRawData|RIO_OnTrack|SimEvent|EventCnv|SimData|RDO)$"
         ],
         forbid_ext=HEAVY_TOP
         | {"ML (onnxruntime,lwtnn)", "Triton client (gRPC,protobuf)"},
         forbid_pkg=r"PhysicsAnalysis/DerivationFramework",
         forbid_components=True,
-        absorb=r".*(Event|AthenaPool|TPCnv|RawData)$",
+        # ...except the tools that the Trk::Track converters use to find the detector elements
+        # of ID and muon measurements (reading an ESD, and the T/P tests of MuonEventTPCnv),
+        # and the calorimeter conditions converters: building the aligned LAr geometry
+        # (CaloAlignCondAlg) reads CaloRec::CaloCellPositionShift, and CaloCondAthenaPool
+        # links CaloTriggerTool, which has tools; and the service that the McEventCollection
+        # converters use for the generator weights (truth in EVNT, HITS and RDO files).
+        tool_seeds=[
+            r"InnerDetector/InDetEventCnv/InDetEventCnvTools$",
+            r"MuonSpectrometer/MuonCnv/MuonEventCnvTools$",
+            r"Calorimeter/CaloCnv/CaloCondAthenaPool$",
+            r"Generators/HepMCWeightSvc$",
+        ],
+        absorb=r".*(Event|AthenaPool|AthenaPOOL|TPCnv|RawData)$",
     ),
     dict(
         name="analysis",

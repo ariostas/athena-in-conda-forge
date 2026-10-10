@@ -1,0 +1,8 @@
+--- a/Control/AthenaCommon/share/athena.py
++++ b/Control/AthenaCommon/share/athena.py
+@@ -1,4 +1,4 @@
+-#!/bin/sh
++#!/bin/bash
+ # Emacs, this is mostly -*-Python-*-
+ #
+ # Copyright (C) 2002-2026 CERN for the benefit of the ATLAS collaboration
