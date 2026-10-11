@@ -33,11 +33,17 @@ HEAVY_TOP = {"Geant4", "Qt/Coin3D", "MC generators", "GPU (traccc,vecmem,CUDA)"}
 # non-Geant4 part (monitoring, muon reconstruction interfaces, fitter utilities), which they
 # now take themselves. Simulation (Geant4, generators) waits for its Geant4 decision (D5).
 NO_SIM = {"Geant4", "MC generators"}
-# Externals that packages use without declaring them in their CMakeLists.txt (so the graph does
-# not show them), and that are not packaged: such packages go to the last layer.
+# Externals that are not packaged and that the graph does not show (used without being declared
+# in the package's CMakeLists.txt, or parts of an external that is packaged only in part): the
+# packages that need them go to the last layer.
 UNDECLARED_EXT = {
     # the ITk pixel data decoder, which AthenaExternals builds (ATLAS_BUILD_ITKSW_ENDEC)
     "InnerDetector/InDetEventCnv/ITkPixelByteStreamCnv": "itksw-endec",
+    # the online data flow interface of tdaq-common (df_ef_interface, which has no licence file)
+    "HLT/Event/TrigByteStreamCnvSvc": "df_ef_interface",
+    "HLT/Trigger/TrigControl/TrigDFEmulator": "df_ef_interface",
+    # tdaq-common's ROOT-dependent part (webdaq), for athenaHLT's services (not in athena jobs)
+    "HLT/Trigger/TrigControl/TrigServices": "webdaq",
 }
 
 LAYERS = [

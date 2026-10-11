@@ -1,0 +1,70 @@
+context:
+  version: "6.1.0"
+
+package:
+  name: pycrest-client
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/crest-db/crest-client/-/archive/pycrest_client-${{ version }}/crest-client-pycrest_client-${{ version }}.tar.gz
+  sha256: b7db3f39f6a807c2b3a9c85d62586607091671cb2faf76912cd5bcc94fcb4353
+
+build:
+  number: 0
+  noarch: python
+  script: ${{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+  python:
+    entry_points:
+      - pycrest = pycrest.cli.pycrest_cli:main
+
+requirements:
+  host:
+    - python ${{ python_min }}.*
+    - pip
+    - setuptools >=42
+    - wheel
+  run:
+    - python >=${{ python_min }}
+    - urllib3 >=1.25.3
+    - python-dateutil >=2.9.0
+    - hep-crest-client >=6.0.0
+    - pysocks >=1.7.1
+    - requests >=2.31
+    - attrs >=23.1.0
+
+tests:
+  - python:
+      imports:
+        - pycrest
+        - pycrest.api.crest_api
+      python_version: ${{ python_min }}.*
+  # the file-system flavour of the API: a tag and its metadata stored in a local directory, as
+  # Athena's trigger configuration (TrigConfStorage) and tests use it
+  - script:
+      # (the command line client: its --help exits with status 2, its arguments being required)
+      - test -x "${PREFIX}/bin/pycrest"
+      - python -c "import pycrest.cli.pycrest_cli"
+      - python test/crest_fs.py
+    requirements:
+      run:
+        - python ${{ python_min }}.*
+    files:
+      recipe:
+        - test/
+
+about:
+  homepage: https://gitlab.cern.ch/crest-db/crest-client
+  summary: Python client of the CREST conditions database (API, file-system storage, command line)
+  description: |
+    The python API and command-line client of CREST, the conditions database of the ATLAS
+    experiment at CERN: tags, IOVs and payloads on a CREST server or in a local directory.
+    Athena's trigger configuration reads the trigger menus and prescales through it.
+  # Declared in the package metadata (pyproject.toml); the repository has no licence file:
+  # see LICENSE-STATUS.md.
+  license: Apache-2.0
+  license_file: LICENSE-STATUS.md
+  repository: https://gitlab.cern.ch/crest-db/crest-client
+
+extra:
+  recipe-maintainers:
+    - ariostas

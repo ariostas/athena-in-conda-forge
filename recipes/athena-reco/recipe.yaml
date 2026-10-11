@@ -8,6 +8,10 @@ package:
 source:
   url: https://gitlab.cern.ch/atlas/athena/-/archive/release/${{ version }}/athena-release-${{ version }}.tar.gz
   sha256: e2df75b2fd966f97973e9ed89984222e4070be0d60ace0a4f3975e80e9ec1eba
+  patches:
+    # CaloRecGPU's configuration flags without CUDA too: the trigger's calorimeter
+    # configuration reads them whether or not the GPU clustering is used
+    - 0001-CaloRecGPU-python-configuration-without-CUDA.patch
 
 build:
   number: 0

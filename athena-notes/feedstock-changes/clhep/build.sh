@@ -17,4 +17,3 @@ if [[ "${CONDA_BUILD_CROSS_COMPILATION:-}" != "1" || "${CROSSCOMPILING_EMULATOR}
 make test
 fi
 make install
-

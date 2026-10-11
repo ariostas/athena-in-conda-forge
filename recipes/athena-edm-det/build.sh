@@ -25,7 +25,15 @@ export CC CXX
 # the class's header, and code that sees only the forward declaration (DATAVECTOR_BASE_FWD) links
 # to the copy in the class's library.
 CXXFLAGS=${CXXFLAGS//-fvisibility-inlines-hidden/}
-export CXXFLAGS
+# __FILE__ of the headers installed in the host prefix (the layers below, the externals) puts the
+# prefix into the libraries' read-only strings, and packaging rewrites it in place: the shorter
+# installed prefix, padded with NULs. The linker stores a string literal that is the tail of
+# another one inside it, and such a literal then becomes empty: a property name of
+# BJetThreeValueCheck, "c", lived at the end of ".../AthCommonDataStore.icc" and was lost. So the
+# prefix is mapped in __FILE__, as conda-forge's flags already do for the debug information.
+CFLAGS="${CFLAGS} -fmacro-prefix-map=${PREFIX}=/usr/local/src/conda-prefix"
+CXXFLAGS="${CXXFLAGS} -fmacro-prefix-map=${PREFIX}=/usr/local/src/conda-prefix"
+export CFLAGS CXXFLAGS
 
 # The build loads and runs what it builds and what the layers below built (genconf,
 # genCLIDDB, job options, python modules), and AtlasCMake sets no RPATH. ATLAS gets that

@@ -69,6 +69,14 @@ built. `KEEP_BUILD=1` keeps the build directories in `/work/output/bld`, for
   `build-local.sh` that way, exit code in `/work/logs/bg-build.rc`;
   `athena-notes/bg.sh <dir> <name> <command>` (`/work/tmp/bg.sh`, for athena-ref) runs a
   command in `<dir>`, output in `<name>.out`, exit code in `<name>.rc`.
+- When a recipe's test fails after a long build, fix and check it in the test environment
+  rattler-build leaves behind (`/work/output/test/test_<name>*/test_run_env`): install what is
+  missing there (`conda install -p ...`) and rerun its `test/conda_build.sh`, before rebuilding.
+  `conda run -p <env>` runs a command with the environment activated (the layers' setup.sh).
+- A failure only in the packaged binaries, not in the build tree's, points at packaging's
+  binary prefix replacement: compare the two, and relocate a build-tree library as packaging
+  does (`athena-notes/analysis/scripts/relocate.py`). The layers map the prefix out of
+  `__FILE__` for this reason (PLAN.md, M6).
 - GitLab sometimes answers the athena archive URL with an empty 200 response. rattler-build then
   fails the sha256 check. The fix is to seed its cache: put the tarball in
   `/work/output/src_cache/<key>_<file>`, the unpacked tree (without the top directory) in

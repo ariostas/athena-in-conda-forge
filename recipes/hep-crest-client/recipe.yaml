@@ -1,0 +1,53 @@
+context:
+  version: "6.1.0"
+
+package:
+  name: hep-crest-client
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/crest-db/pycrest-openapi/-/archive/hep_crest_client-${{ version }}/pycrest-openapi-hep_crest_client-${{ version }}.tar.gz
+  sha256: 0f88335b0b8ddc7e091de04c791c3cd5e6363ed96dded7c37c5eeefa74efb754
+  patches:
+    - 0001-No-upper-bound-on-urllib3.patch
+
+build:
+  number: 0
+  noarch: python
+  script: ${{ PYTHON }} -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python ${{ python_min }}.*
+    - pip
+    - setuptools
+  run:
+    - python >=${{ python_min }}
+    - urllib3 >=1.25.3
+    - python-dateutil
+    - pydantic >=2
+    - typing-extensions >=4.7.1
+
+tests:
+  - python:
+      imports:
+        - hep.crest.client
+        - hep.crest.client.api
+      python_version: ${{ python_min }}.*
+
+about:
+  homepage: https://gitlab.cern.ch/crest-db/pycrest-openapi
+  summary: Python client of the CREST conditions database server, generated from its OpenAPI description
+  description: |
+    The REST client of CREST, the conditions database of the ATLAS experiment at CERN,
+    generated with OpenAPI Generator. pycrest-client builds its API on it; Athena's trigger
+    configuration reads the trigger menus through them.
+  # Declared in the package metadata (setup.py, pyproject.toml); the repository has no
+  # licence file: see LICENSE-STATUS.md.
+  license: Apache-2.0
+  license_file: LICENSE-STATUS.md
+  repository: https://gitlab.cern.ch/crest-db/pycrest-openapi
+
+extra:
+  recipe-maintainers:
+    - ariostas

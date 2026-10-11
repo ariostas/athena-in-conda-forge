@@ -930,3 +930,109 @@ release, without CVMFS.
   Data analysis needs the geometry database, for the LHC period), the licences of CORAL, COOL,
   CrestApi and yampl; upstream the athena.py shebang, PathResolver's downloads and
   FlavorTagInference's optional Triton.
+
+### 2026-10-11: reco-tracking, reco and trigger (M6)
+
+**The layer order.** `layers.py` had sim (Geant4) before the reconstruction layers, which took
+46 (reco-tracking) and 156 (reco) packages from it. All of those were sim's non-Geant4 part
+(monitoring, the muon reconstruction interfaces, fitter utilities, digitization configuration),
+which it had absorbed. reco-tracking, reco and trigger now come before sim, take those packages
+themselves and forbid Geant4 and the generators (`NO_SIM`); sim waits for D5. Then, as for the
+earlier layers, the jobs each layer delivers were run in ATLAS's release with `cfgdeps.py`:
+- **reco-tracking** (241 packages): ATLAS's ID tracking test (`python -m
+  InDetConfig.TrackRecoConfig`) also configures `TrackToVertex` and `TrkParticleCreator`, and
+  imports python configuration from RecJobTransforms, DigitizationConfig, TrackOverlayConfig and
+  DerivationFrameworkInDet: explicit seeds. `TrkParticleCreator` and the ACTS track
+  reconstruction link four muon interface packages, which reco-tracking now allows.
+- **reco** (324 packages): `Reco_tf.py` from RDO to ESD and AOD also uses `MCTruthAlgs` (the
+  muon truth's track record filter) and `RunDependentSimComps` (pile-up helpers the
+  digitization flags import), and the trigger configuration flags (TriggerJobOpts) import
+  `TriggerMenuMT` and `TrigHLTMonitoring` even with the trigger off: seeds.
+- **trigger** (176 packages): the HLT on simulation (`python -m TriggerJobOpts.runHLT`, the
+  Dev menu) also needs `AnalysisTriggerAlgs` (the L1 result's xAOD conversion) and
+  `MuonByteStreamCnvTest` (the RDO-to-digit algorithms of the L1 muon simulation). Its other
+  imports from later layers are optional flag categories (`moduleExists`). Left out: the
+  GPU/FPGA code (vecmem, Xilinx HLS types) and the online packages (ByteStreamEmonSvc needs
+  the TDAQ release; TrigByteStreamCnvSvc and TrigDFEmulator tdaq-common's `df_ef_interface`,
+  which has no licence file; TrigServices, athenaHLT's services, tdaq-common's `webdaq`).
+- `UNDECLARED_EXT` in `layers.py` sends packages that need unpackaged externals the graph does
+  not show to the last layer: those above, and `ITkPixelByteStreamCnv` (Phase-II), which
+  includes `itksw-endec` (built by AthenaExternals) without declaring it.
+New externals: BLAS/LAPACK, FFTW, libtirpc (reco-tracking); none for reco and trigger.
+
+**Tests**, all on ATLAS's Run 3 RDO test file (CVMFS, read in place) through Frontier, outputs
+dumped with PyDumper and compared with ATLAS's release:
+- reco-tracking: ATLAS's ID tracking job on 10 events, its AOD output (track particles,
+  vertices, ...): **identical** (419,547 lines);
+- reco: `Reco_tf.py` (calorimeters, inner detector, muons, e/gamma, jets, taus, particle flow,
+  b-tagging, MET) on 5 events: ESD (1.73M lines) and AOD (406k lines) **identical**;
+- trigger: the HLT with the Dev menu (`Dev_pp_run3_v1_TriggerValidation_prescale`, as ATLAS's
+  `test_trig_mc_v1Dev_build`) on 5 events, RDO to RDO_TRIG: the L1 simulation and every HLT
+  chain; the chain counts (`TrigSignatureMoni`, 111 chains), which ATLAS's trigger tests check,
+  are **identical** to the release's;
+- the component checks: reco-tracking 1,318 components (2,268 configurables), reco 1,711
+  (3,552), trigger 1,093 (4,302).
+
+**Fixes on the way:**
+- **Prefix replacement and string tail merging (all layers).** `__FILE__` of headers in the
+  host prefix (`AthCommonDataStore.icc` and the like) puts the prefix in the libraries'
+  read-only strings, which packaging rewrites in place: a shorter prefix, padded with NULs.
+  GNU ld stores a string literal that is the tail of another one inside it, so such a literal
+  points into the rewritten string and becomes empty. The HLT failed on it:
+  `BJetThreeValueCheck`'s property name `"c"` lived at the end of `".../AthCommonDataStore.icc"`,
+  so the property could not be set (`SG::ExcBadVarName`), only in the packaged library. Found by
+  comparing the packaged library with the build tree's, and reproduced by relocating a
+  library as packaging does (`analysis/scripts/relocate.py`; `prefixstrings.py` counts the
+  prefixed strings of a layer). `-fno-merge-constants`
+  does not help: `arm_neon.h`'s `#pragma GCC push_options`/`target` restores the default. The
+  layers now map the prefix in `__FILE__` (`-fmacro-prefix-map=$PREFIX=/usr/local/src/conda-prefix`,
+  as conda-forge's flags do for debug information), which leaves no prefixed strings but a
+  handful; every layer was rebuilt with it. This can bite any conda package built against
+  headers in the prefix; worth raising with conda-forge.
+- **authentication.xml in the sources.** `PixelConditionsTools/share/` has one with credentials
+  (in ATLAS's public repository), and the install area carries the packages' sources: the guard
+  stopped the build. All layers now drop it from the sources they ship.
+- **chai's headers** go to `include/chai/` (as in the TDAQ release's externals): LArCalibUtils
+  asks for chai as a tdaq-common component (`find_package( tdaq-common COMPONENTS chai
+  chaicontainer )`), with tdaq-common's include directory. A find-module fix would not have
+  reached the layer: every project's configuration puts its own copy of the find modules first
+  again (AtlasCMake's configuration, loaded from each project), whatever the layer project does.
+- **clhep** (feedstock change, `athena-notes/feedstock-changes/clhep`): conda-forge builds it with
+  `-fvisibility-inlines-hidden`, which hides GenericFunctions' `clone()` (defined inline in its
+  `.cc` files): LArG4Validation did not link. Rebuilt without the flag (2.4.7.1, build 1).
+- **CaloRecGPU** installs nothing without CUDA, its configuration flags included, but the
+  trigger's calorimeter configuration reads `flags.CaloRecGPU` unconditionally: reco patch 0001
+  installs its python modules without CUDA too (upstreamable).
+- **Runtime dependencies**: `psutil` (PerfMon, which the transforms switch on), `procps-ng` and
+  `prmon` (PyJobTransforms), in athena-core; the CREST python client (`pycrest-client`, new
+  recipes with `hep-crest-client`, Apache 2.0 in their metadata but no licence file, like
+  CrestApi) for the trigger configuration.
+- Test jobs that fail the transform after Athena finished: without `ps`, Reco_tf.py's
+  post-processing crashed and left ESD/AOD files that could not be read back.
+
+**Cost** (`compile_cost.py`, `-j10`, with other jobs running):
+- reco-tracking: 1,296 compiles, 5.7 h summed wall; peak RSS median 0.95 GB, p90 2.0 GB, max
+  2.7 GB (the ACTS track reconstruction). Recipe 41 minutes, package 63 MB.
+- reco: 2,111 compiles, 8.5 h summed wall; peak RSS median 0.94 GB, p90 1.9 GB, max 3.0 GB
+  (TGC raw data monitoring). Recipe 66 minutes, package 110 MB.
+- trigger: 1,502 compiles, 4.3 h summed wall (built alone); peak RSS median 0.7 GB, p90 1.9 GB,
+  max 3.0 GB (the rates analysis, tau and e/gamma trigger monitoring). Recipe 38 minutes,
+  package 64 MB.
+All three `-j2` on a 7 GB runner; reco, at about 9 CPU-h, is the tightest layer for a 6-hour job.
+The rebuild of the whole chain with the prefix fix took 4.4 hours here (core 11 minutes, detdescr
+20, edm 32, edm-det 41, analysis 39, reco-tracking 35, reco 63, trigger 38), every layer passing
+its tests.
+
+**M6 is done**: `Reco_tf.py` reconstructs RDO into ESD and AOD, and the HLT runs on simulation,
+in a conda environment with results identical to ATLAS's release (with CVMFS for the test file
+and conditions payloads). The eight layers hold 1,632 of the release's 1,966 packages and 83% of
+its translation units.
+
+**Next:**
+- M7: sim (Geant4, D5), the rest (derivations, data quality, event display), an `athena`
+  metapackage and the developer workflow;
+- the unit tests of the M6 layers at build time (as for edm-det and analysis);
+- raise the prefix replacement/tail merging hazard with conda-forge, the clhep visibility change
+  with its feedstock, and the credentials in PixelConditionsTools' sources with ATLAS;
+- open: a default `FRONTIER_SERVER`, the geometry database and conditions payloads without CVMFS
+  (D6), licences (CORAL, COOL, CrestApi, the CREST python clients, yampl); upstream the patches.

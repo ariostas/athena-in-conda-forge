@@ -1,0 +1,20 @@
+CaloRecGPU's python configuration (its configuration flags, CaloRecGPU.CaloRecGPUFlags) without
+CUDA as well: the flags category exists only where the module is installed, and the trigger's
+calorimeter configuration (TrigCaloRecConfig) reads flags.CaloRecGPU.GlobalFlags.UseCaloRecGPU
+whether or not the GPU clustering is used, so the HLT cannot be configured without it.
+
+--- a/Calorimeter/CaloRecGPU/CMakeLists.txt
++++ b/Calorimeter/CaloRecGPU/CMakeLists.txt
+@@ -4,9 +4,11 @@
+ atlas_subdir( CaloRecGPU )
+ 
+ # The build of this package needs CUDA. If it's not available, don't try to do
+-# anything...
++# anything but install the python configuration, whose flags other packages
++# read even when the GPU code is not used.
+ if( NOT CMAKE_CUDA_COMPILER )
+   message( STATUS "CUDA not found, CaloRecGPU is not built" )
++  atlas_install_python_modules( python/*.py POST_BUILD_CMD ${ATLAS_FLAKE8} )
+   return()
+ endif()
+ 
