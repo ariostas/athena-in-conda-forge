@@ -17,8 +17,8 @@ function(tdaq_root_generate_dictionary name)
   set(out ${CMAKE_CURRENT_BINARY_DIR})
   add_custom_command(
     OUTPUT ${out}/${name}.cpp ${out}/lib${name}_rdict.pcm ${out}/lib${name}.rootmap
-    COMMAND ROOT::rootcling -f ${out}/${name}.cpp -s ${out}/lib${name}.so
-      -rml lib${name}.so -rmf ${out}/lib${name}.rootmap
+    COMMAND ROOT::rootcling -f ${out}/${name}.cpp -s ${out}/lib${name}${CMAKE_SHARED_LIBRARY_SUFFIX}
+      -rml lib${name}${CMAKE_SHARED_LIBRARY_SUFFIX} -rmf ${out}/lib${name}.rootmap
       -I${CMAKE_CURRENT_SOURCE_DIR} -I${ERS_INCLUDE_DIR} ${opts}
       ${ARG_UNPARSED_ARGUMENTS} ${ARG_LINKDEF}
     DEPENDS ${ARG_UNPARSED_ARGUMENTS} ${ARG_LINKDEF}

@@ -15,11 +15,12 @@ source:
     - patches/0002-AtlasLCG-accept-version-0-with-EXACT.patch
     - patches/0003-AtlasLCG-lcg_generate_env-with-Gaudi-from-its-CMake-config.patch
     - patches/0004-AtlasCMake-root-dictionaries-without-include-paths.patch
+    - patches/0005-AtlasCMake-macOS-support-with-conda-forge.patch
 
 build:
   number: 0
   skip:
-    - not linux
+    - win
   script:
     file: build.sh
 
@@ -33,6 +34,14 @@ requirements:
     - ninja
     # dSFMT's own Makefile
     - make
+    # AtlasCMake runs the build's tools through a bash that System Integrity Protection does
+    # not protect (patch 0005): conda-forge's
+    - if: osx
+      then: bash
+  run:
+    # (for every project built on this one)
+    - if: osx
+      then: bash
 
 tests:
   - package_contents:
@@ -57,6 +66,8 @@ tests:
         - ${{ stdlib('c') }}
         - cmake
         - ninja
+        - if: osx
+          then: bash
     files:
       recipe:
         - test/

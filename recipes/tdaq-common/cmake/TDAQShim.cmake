@@ -155,7 +155,13 @@ function(tdaq_add_library name)
   # The Boost.Python extensions: python imports them by their library names.
   if(name MATCHES "^(py|erspy$)")
     install(TARGETS ${name} LIBRARY DESTINATION ${TDAQ_PYTHON_DIR})
-    set_target_properties(${name} PROPERTIES INSTALL_RPATH "$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
+    if(APPLE)
+      # python imports only .so files, on macOS too; the prefix's lib/ is among the rpaths of
+      # conda-forge's linker flags already
+      set_target_properties(${name} PROPERTIES SUFFIX ".so" INSTALL_RPATH "@loader_path")
+    else()
+      set_target_properties(${name} PROPERTIES INSTALL_RPATH "$ORIGIN;${CMAKE_INSTALL_PREFIX}/lib")
+    endif()
   else()
     install(TARGETS ${name} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
       ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})

@@ -14,15 +14,23 @@ package:
 source:
   url: https://github.com/acts-project/acts/releases/download/v${{ version }}/acts-v${{ version }}.tar.gz
   sha256: 1b0484698715c38cf32055d0a2ff6ea50771d541b728dc58b2e9a086d4c858e9
+  patches:
+    # libc++ (macOS): CBOR decoded from unsigned chars, not std::byte
+    - patches/0001-Json-CBOR-from-unsigned-chars.patch
 
 build:
   number: 0
   skip:
     - win
   script:
+    # On macOS conda-forge's libc++ headers mark library features newer than the deployment
+    # target as unavailable (libc++ 20's markup of std::from_chars does not even compile); the
+    # environments have conda-forge's own, current libc++ at run time.
+    - if: osx
+      then: export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY"
     # The release archive ships the generated code (prebuilt-codegen), so no Python is needed.
     # ACTS_COMPILE_HEADERS compiles every public header on its own, as a check for ACTS's CI.
-    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_EXTENSIONS=OFF -DACTS_USE_SYSTEM_LIBS=ON -DACTS_CODEGEN_REQUIRE_PREBUILT=ON -DACTS_COMPILE_HEADERS=OFF -DACTS_BUILD_PLUGIN_JSON=ON -DACTS_BUILD_PLUGIN_GEOMODEL=ON -DACTS_BUILD_PLUGIN_ROOT=ON -DACTS_BUILD_FATRAS=ON
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_CXX_STANDARD=23 -DCMAKE_CXX_EXTENSIONS=OFF -DACTS_USE_SYSTEM_LIBS=ON -DACTS_CODEGEN_REQUIRE_PREBUILT=ON -DACTS_COMPILE_HEADERS=OFF -DACTS_BUILD_PLUGIN_JSON=ON -DACTS_BUILD_PLUGIN_GEOMODEL=ON -DACTS_BUILD_PLUGIN_ROOT=ON -DACTS_BUILD_FATRAS=ON
     - cmake --build build --parallel ${CPU_COUNT}
     - cmake --install build
 
@@ -68,7 +76,7 @@ tests:
       files:
         - lib/cmake/Acts/ActsConfig.cmake
   - script:
-      - cmake -S test -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_PREFIX_PATH=${PREFIX}
+      - cmake -S test -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_PREFIX_PATH=${PREFIX}
       - cmake --build build
       - ./build/acts_test
     files:

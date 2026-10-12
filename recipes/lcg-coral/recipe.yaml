@@ -12,11 +12,15 @@ source:
   patches:
     # options to leave out backends and parts that need unavailable externals
     - 0001-optional-backends.patch
+    # CMake 4 on macOS, and build hosts without man
+    - 0002-CMake-with-CMake-4-on-macOS-and-without-man.patch
+    # macOS: python extensions must not link libpython
+    - 0003-PyCoral-without-libpython-on-macOS.patch
 
 build:
   number: 1
   skip:
-    - not linux
+    - win
   script:
     file: build.sh
 

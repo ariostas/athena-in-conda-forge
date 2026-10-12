@@ -1,0 +1,38 @@
+MuCalDecode: the host's IPv4 address with getaddrinfo rather than gethostbyname_r (a GNU extension).
+
+diff --git a/src/CalibUti.cxx b/src/CalibUti.cxx
+index ae3cdeb..6f877f1 100644
+--- a/src/CalibUti.cxx
++++ b/src/CalibUti.cxx
+@@ -248,22 +248,21 @@ void  LVL2_MUON_CALIBRATION::IPfromChar(const char* str,uint32_t& val)
+ std::string LVL2_MUON_CALIBRATION::fill_ip()
+ {
+     char IP[INET6_ADDRSTRLEN];
+-    int  addr_type;
+ 
+     struct utsname myname;
+-    struct hostent *hostEntry = NULL;
+-    struct hostent hostData;
+-
+-    char buffer [2048];
+-    int errnum;
+ 
+     if(uname(&myname) < 0) return std::string();
+ 
+-    if (gethostbyname_r (myname.nodename, &hostData, buffer, sizeof (buffer),
+-			 &hostEntry, &errnum) == 0)
++    // getaddrinfo rather than gethostbyname_r, which is a GNU extension: the host's first
++    // IPv4 address, as gethostbyname_r gives it
++    struct addrinfo hints = {};
++    hints.ai_family = AF_INET;
++    struct addrinfo *result = NULL;
++    if (getaddrinfo (myname.nodename, NULL, &hints, &result) == 0 && result != NULL)
+     {
+-      addr_type = hostEntry->h_addrtype;
+-      inet_ntop (addr_type, *(hostEntry->h_addr_list), IP, sizeof (IP));
++      const struct sockaddr_in *address = (const struct sockaddr_in *) result->ai_addr;
++      inet_ntop (AF_INET, &address->sin_addr, IP, sizeof (IP));
++      freeaddrinfo (result);
+       return std::string (IP);
+     }
+     else

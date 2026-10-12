@@ -1,0 +1,38 @@
+ers on macOS:
+1. the time of an issue from Python in the system clock's own duration (microseconds on macOS,
+   where time_point does not convert from nanoseconds implicitly);
+2. the stream plugins (libErsBaseStreams.so, ...) through the rpaths first: dyld looks a bare
+   library name up neither there nor in LD_LIBRARY_PATH.
+
+diff --git a/python/erspy.cxx b/python/erspy.cxx
+index 43a2d04..4ee5cc0 100644
+--- a/python/erspy.cxx
++++ b/python/erspy.cxx
+@@ -161,7 +161,8 @@ namespace
+ 
+ 	double t = PyFloat_AsDouble( Py_RH( PyObject_GetAttrString(o, "time")));
+ 	std::chrono::system_clock::time_point
+-	    time(std::chrono::nanoseconds(static_cast<int64_t>(t*1000000000.)));
++	    time(std::chrono::duration_cast<std::chrono::system_clock::duration>(
++		std::chrono::nanoseconds(static_cast<int64_t>(t*1000000000.))));
+ 
+ 	Py_RH cause(PyObject_GetAttrString(o, "cause"));
+ 
+diff --git a/src/PluginManager.cxx b/src/PluginManager.cxx
+index 40b875a..963f458 100644
+--- a/src/PluginManager.cxx
++++ b/src/PluginManager.cxx
+@@ -24,6 +24,13 @@ namespace ers
+ #ifndef __rtems__
+ 	std::string library = "lib" + name + ".so" ;
+ 
++#ifdef __APPLE__
++	// macOS looks a bare library name up neither in the rpaths nor in LD_LIBRARY_PATH (and
++	// System Integrity Protection often drops DYLD_LIBRARY_PATH): first through the rpaths
++	// of this library, next to which the plugins are installed
++	handle_ = dlopen( ( "@rpath/" + library ).c_str(), RTLD_LAZY|RTLD_GLOBAL );
++	if ( !handle_ )
++#endif
+ 	handle_ = dlopen( library.c_str(), RTLD_LAZY|RTLD_GLOBAL );
+ 	char * error = dlerror();
+ 

@@ -1,0 +1,40 @@
+EventStorage:
+1. stat rather than stat64 (a glibc extension; stat is 64-bit on 64-bit Linux and on macOS);
+2. on macOS, the file readers (libfReadPlain.dylib, ...) through the rpaths: dyld looks a bare
+   library name up neither there nor in LD_LIBRARY_PATH.
+
+diff --git a/src/DataWriter.cxx b/src/DataWriter.cxx
+index 16a969f..59a3ea9 100644
+--- a/src/DataWriter.cxx
++++ b/src/DataWriter.cxx
+@@ -961,8 +961,8 @@ void DataWriter::impl::setGuid(const std::string& Guid) {
+ }
+ 
+ uint64_t DataWriter::impl::getFileSize(const std::string& fileNameCore) const {
+-  struct stat64 tmp;
+-  ::stat64(fileNameCore.c_str(), &tmp);
++  struct stat tmp;
++  ::stat(fileNameCore.c_str(), &tmp);
+   
+   return tmp.st_size;
+ }
+diff --git a/src/loadfRead.cxx b/src/loadfRead.cxx
+index dee25f3..e42340d 100644
+--- a/src/loadfRead.cxx
++++ b/src/loadfRead.cxx
+@@ -10,8 +10,15 @@ fRead * loadfRead(std::string libName){
+  
+   ::dlerror();
+  
++#ifdef __APPLE__
++  // macOS looks a bare library name up neither in the rpaths nor in LD_LIBRARY_PATH (and System
++  // Integrity Protection often drops DYLD_LIBRARY_PATH): through the rpaths of this library,
++  // next to which the readers are installed, as shared libraries
++  libName = "@rpath/lib" + libName + ".dylib";
++#else
+   libName += ".so";
+   libName = "lib" + libName;
++#endif
+ 
+   void * lib = ::dlopen(libName.c_str(), RTLD_NOW | RTLD_GLOBAL);
+ 

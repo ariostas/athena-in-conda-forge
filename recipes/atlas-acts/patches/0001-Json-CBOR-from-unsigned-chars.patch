@@ -1,0 +1,19 @@
+ACTS' JSON plugin with libc++: CBOR decoded from a range of unsigned chars. nlohmann::json reads
+a range of std::byte through std::char_traits<std::byte>, which libc++ (macOS) does not have.
+
+diff --git a/Plugins/Json/src/detail/JsonIo.cpp b/Plugins/Json/src/detail/JsonIo.cpp
+index 856148a..e14415b 100644
+--- a/Plugins/Json/src/detail/JsonIo.cpp
++++ b/Plugins/Json/src/detail/JsonIo.cpp
+@@ -191,7 +191,10 @@ nlohmann::json Acts::detail::decodeJson(std::span<const std::byte> data,
+     if (isText) {
+       return nlohmann::json::parse(asStringView(data));
+     }
+-    return nlohmann::json::from_cbor(data);
++    // (as unsigned chars: nlohmann::json reads a range of std::byte through
++    // std::char_traits<std::byte>, which libc++ does not have)
++    const auto* begin = reinterpret_cast<const unsigned char*>(data.data());
++    return nlohmann::json::from_cbor(begin, begin + data.size());
+   } catch (const nlohmann::json::exception& e) {
+     throw std::runtime_error(std::format(
+         "Failed to decode {} payload from '{}'{}: {}", isText ? "JSON" : "CBOR",

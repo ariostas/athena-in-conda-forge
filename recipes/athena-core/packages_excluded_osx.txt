@@ -1,0 +1,2 @@
+# Packages of this layer that are not built on macOS, and why.
+Control/Valkyrie  # Gaudi service running valgrind: no valgrind on macOS (conda-forge)

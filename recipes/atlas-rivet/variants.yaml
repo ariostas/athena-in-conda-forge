@@ -7,3 +7,14 @@ c_stdlib_version:
 MACOSX_DEPLOYMENT_TARGET:
   - if: osx
     then: "13.3"
+
+# On macOS, the compiler of conda-forge's ROOT 6.40 (clang 20), as the Athena layers that link
+# this. Elsewhere the global pinning's.
+c_compiler_version:
+  - if: osx
+    then: "20"
+    else: "15"
+cxx_compiler_version:
+  - if: osx
+    then: "20"
+    else: "15"

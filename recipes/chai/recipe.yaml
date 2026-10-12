@@ -14,12 +14,17 @@ build:
   skip:
     - win
   script:
+    # On macOS conda-forge's libc++ headers mark library features newer than the deployment
+    # target as unavailable (libc++ 20's markup of std::from_chars does not even compile); the
+    # environments have conda-forge's own, current libc++ at run time.
+    - if: osx
+      then: export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY"
     # Without the python bindings: they are used by a single Athena script, and would make the
     # package python-version specific. The tests need a CREST server. The headers go in
     # include/chai/, as in the TDAQ release's externals, where Athena packages also find them
     # as tdaq-common components (chai, chaicontainer); atlasexternals installs them one level
     # deeper (include/chai/chai/).
-    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_CXX_STANDARD=23 -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_CXX_STANDARD=23 -DCMAKE_INSTALL_LIBDIR=lib -DBUILD_PYTHON_BINDINGS=OFF -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF
     - cmake --build build --parallel ${CPU_COUNT}
     - cmake --install build
 
@@ -46,7 +51,7 @@ tests:
       files:
         - include/chai/Database.h
         - lib/cmake/chai/chaiConfig.cmake
-        - lib/chai/plugins/libchai_plugin_crest_fs.so
+        - lib/chai/plugins/libchai_plugin_crest_fs${{ ".dylib" if osx else ".so" }}
   - script:
       - cmake -S test -B build -G Ninja
       - cmake --build build

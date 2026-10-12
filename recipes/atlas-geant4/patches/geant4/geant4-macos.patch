@@ -1,0 +1,32 @@
+Geant4 10.6 on arm64 macOS with libc++:
+1. thread_local with Clang on any macOS architecture, not only x86_64 (Apple silicon fell
+   through to the branch for old GCC versions, whose __thread does not accept the dynamic
+   initialisers Geant4 uses). Later Geant4 versions use thread_local throughout;
+2. G4THitsMap.hh uses std::is_fundamental without including <type_traits>, which libstdc++
+   gets from other headers and libc++ does not.
+
+diff --git a/source/digits_hits/hits/include/G4THitsMap.hh b/source/digits_hits/hits/include/G4THitsMap.hh
+index fe5e930..a89b0ed 100644
+--- a/source/digits_hits/hits/include/G4THitsMap.hh
++++ b/source/digits_hits/hits/include/G4THitsMap.hh
+@@ -32,6 +32,7 @@
+ #include "globals.hh"
+ 
+ #include <map>
++#include <type_traits>
+ #include <unordered_map>
+ 
+ // class description:
+diff --git a/source/global/management/include/tls.hh b/source/global/management/include/tls.hh
+index fb53ac6..9558872 100644
+--- a/source/global/management/include/tls.hh
++++ b/source/global/management/include/tls.hh
+@@ -38,7 +38,7 @@
+ #define G4_TLS
+ 
+ #if defined (G4MULTITHREADED)
+-  #if ( defined(__MACH__) && defined(__clang__) && defined(__x86_64__) ) || \
++  #if ( defined(__MACH__) && defined(__clang__) ) || \
+       ( defined(__linux__) && defined(__clang__) )
+     #  define G4ThreadLocalStatic static thread_local
+     #  define G4ThreadLocal thread_local

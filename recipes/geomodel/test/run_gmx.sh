@@ -6,7 +6,11 @@ work=$(mktemp -d)
 cp test/HelloWorld.gmx "${work}/"
 cp "${PREFIX}/share/GeoModelXml/geomodel.dtd" "${work}/"
 cd "${work}"
-GMX_FILES=HelloWorld.gmx gmcat "${PREFIX}/lib/libGMXPlugin.so" -o hello.db
+# (the plugin is a shared library: .dylib on macOS)
+for plugin in "${PREFIX}/lib/libGMXPlugin.so" "${PREFIX}/lib/libGMXPlugin.dylib"; do
+  [ -f "${plugin}" ] && break
+done
+GMX_FILES=HelloWorld.gmx gmcat "${plugin}" -o hello.db
 gmcat hello.db -o copy.db
 for db in hello.db copy.db; do
   sqlite3 "${db}" "select name from LogVols" | tee names.txt

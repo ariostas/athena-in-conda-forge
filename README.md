@@ -18,8 +18,9 @@ CMSSW.
 
 > **Status: proof of concept.** All of Athena but 30 packages builds in ten layers that pass their
 > tests on linux-aarch64, from the framework to simulation and derivations, with an `athena`
-> metapackage and a developer workflow; linux-64 and osx-arm64 have not been tried.
-> Nothing has been submitted to conda-forge yet.
+> metapackage and a developer workflow. On linux-64 and osx-arm64 (M8, in progress) every
+> external builds and passes its tests, and on osx-arm64 so does the first layer: `athena.py`
+> runs on a Mac. Nothing has been submitted to conda-forge yet.
 
 The reference release is Athena [`release/25.0.73`](https://gitlab.cern.ch/atlas/athena/-/tree/release/25.0.73).
 
@@ -72,23 +73,23 @@ The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
 
 | Package | Recipe | linux-aarch64 | linux-64 | osx-arm64 |
 |---|---|---|---|---|
-| `boost-mpi3` (C++ wrapper for MPI-3, with ATLAS's patch) | [recipes/boost-mpi3](recipes/boost-mpi3) | ✅ | · | · |
-| `yampl` (message passing library, for AthenaMP) | [recipes/yampl](recipes/yampl) | ✅ | · | · |
-| `frontier-client` (Frontier database caching client) | [recipes/frontier-client](recipes/frontier-client) | ✅ | · | · |
-| `lcg-coral` (LCG relational abstraction layer) | [recipes/lcg-coral](recipes/lcg-coral) | ✅ | · | · |
-| `lcg-cool` (LCG conditions database) | [recipes/lcg-cool](recipes/lcg-cool) | ✅ | · | · |
-| `crestapi` (CREST conditions database client) | [recipes/crestapi](recipes/crestapi) | ✅ | · | · |
-| `chai` (conditions access for CREST and COOL) | [recipes/chai](recipes/chai) | ✅ | · | · |
-| `hep-crest-client`, `pycrest-client` (CREST python client, for the trigger configuration) | [recipes/hep-crest-client](recipes/hep-crest-client), [recipes/pycrest-client](recipes/pycrest-client) | ✅ | · | · |
-| `tdaq-common` (event format, event storage, error reporting) | [recipes/tdaq-common](recipes/tdaq-common) | ✅ | · | · |
-| `tdaq-dqm-core` (tdaq-common's data quality monitoring framework, for the data quality algorithms) | [recipes/tdaq-dqm-core](recipes/tdaq-dqm-core) | ✅ | · | · |
-| `atlas-gaudi` (Gaudi, ATLAS's fork v40r4.002) | [recipes/atlas-gaudi](recipes/atlas-gaudi) | ✅ | · | · |
-| `athena-externals` (the base project: AtlasCMake, AtlasLCG, find modules) | [recipes/athena-externals](recipes/athena-externals) | ✅ | · | · |
-| `geomodel-core`, `geomodel-tools` (GeoModel 6.29.0, detector geometry toolkit) | [recipes/geomodel](recipes/geomodel) | ✅ | · | · |
-| `atlas-acts` (ACTS 47.7.0 with the plugins ATLAS uses) | [recipes/atlas-acts](recipes/atlas-acts) | ✅ | · | · |
-| `atlas-geant4` (ATLAS's Geant4 10.6.3 fork with VecGeom 1.1.21, as AthenaExternals builds them) | [recipes/atlas-geant4](recipes/atlas-geant4) | ✅ | · | · |
-| `atlas-rivet` (conda-forge's Rivet 4.1.4 recipe, on FastJet 3.5.1 build 5) | [recipes/atlas-rivet](recipes/atlas-rivet) | ✅ | · | · |
-| `athena-core` (framework, StoreGate, configuration, POOL I/O, conditions, ByteStream) | [recipes/athena-core](recipes/athena-core) | ✅ | · | · |
+| `boost-mpi3` (C++ wrapper for MPI-3, with ATLAS's patch) | [recipes/boost-mpi3](recipes/boost-mpi3) | ✅ | ✅ | ✅ |
+| `yampl` (message passing library, for AthenaMP) | [recipes/yampl](recipes/yampl) | ✅ | ✅ | — |
+| `frontier-client` (Frontier database caching client) | [recipes/frontier-client](recipes/frontier-client) | ✅ | ✅ | ✅ |
+| `lcg-coral` (LCG relational abstraction layer) | [recipes/lcg-coral](recipes/lcg-coral) | ✅ | ✅ | ✅ |
+| `lcg-cool` (LCG conditions database) | [recipes/lcg-cool](recipes/lcg-cool) | ✅ | ✅ | ✅ |
+| `crestapi` (CREST conditions database client) | [recipes/crestapi](recipes/crestapi) | ✅ | ✅ | ✅ |
+| `chai` (conditions access for CREST and COOL) | [recipes/chai](recipes/chai) | ✅ | ✅ | ✅ |
+| `hep-crest-client`, `pycrest-client` (CREST python client, for the trigger configuration) | [recipes/hep-crest-client](recipes/hep-crest-client), [recipes/pycrest-client](recipes/pycrest-client) | ✅ | ✅ | ✅ |
+| `tdaq-common` (event format, event storage, error reporting) | [recipes/tdaq-common](recipes/tdaq-common) | ✅ | ✅ | ✅ |
+| `tdaq-dqm-core` (tdaq-common's data quality monitoring framework, for the data quality algorithms) | [recipes/tdaq-dqm-core](recipes/tdaq-dqm-core) | ✅ | ✅ | ✅ |
+| `atlas-gaudi` (Gaudi, ATLAS's fork v40r4.002) | [recipes/atlas-gaudi](recipes/atlas-gaudi) | ✅ | ✅ | ✅ |
+| `athena-externals` (the base project: AtlasCMake, AtlasLCG, find modules) | [recipes/athena-externals](recipes/athena-externals) | ✅ | ✅ | ✅ |
+| `geomodel-core`, `geomodel-tools` (GeoModel 6.29.0, detector geometry toolkit) | [recipes/geomodel](recipes/geomodel) | ✅ | ✅ | ✅ |
+| `atlas-acts` (ACTS 47.7.0 with the plugins ATLAS uses) | [recipes/atlas-acts](recipes/atlas-acts) | ✅ | ✅ | ✅ |
+| `atlas-geant4` (ATLAS's Geant4 10.6.3 fork with VecGeom 1.1.21, as AthenaExternals builds them) | [recipes/atlas-geant4](recipes/atlas-geant4) | ✅ | ✅ | ✅ |
+| `atlas-rivet` (conda-forge's Rivet 4.1.4 recipe, on FastJet 3.5.1 build 5) | [recipes/atlas-rivet](recipes/atlas-rivet) | ✅ | ✅ | ✅ |
+| `athena-core` (framework, StoreGate, configuration, POOL I/O, conditions, ByteStream) | [recipes/athena-core](recipes/athena-core) | ✅ | · | ✅ |
 | `athena-detdescr` (identifiers, GeoModel geometry, ACTS geometry, magnetic field) | [recipes/athena-detdescr](recipes/athena-detdescr) | ✅ | · | · |
 | `athena-edm` (xAOD and trigger event data model: AOD/DAOD I/O) | [recipes/athena-edm](recipes/athena-edm) | ✅ | · | · |
 | `athena-edm-det` (detector event data: HITS/RDO/ESD I/O) | [recipes/athena-edm-det](recipes/athena-edm-det) | ✅ | · | · |
@@ -100,10 +101,11 @@ The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
 | `athena-rest` (the project `Athena`: derivations, data quality, event display, the rest) | [recipes/athena-rest](recipes/athena-rest) | ✅ | · | · |
 | `athena` (all the layers) | [recipes/athena](recipes/athena) | ✅ | · | · |
 | `athena-devel` (compilers and externals for building Athena packages against the release) | [recipes/athena-devel](recipes/athena-devel) | ✅ | · | · |
-| `clhep` (existing feedstock: built without `-fvisibility-inlines-hidden`, ATLAS's RandGaussZiggurat fix) | [athena-notes/feedstock-changes/clhep](athena-notes/feedstock-changes/clhep) | ✅ | · | · |
+| `clhep` (existing feedstock: built without `-fvisibility-inlines-hidden`, ATLAS's RandGaussZiggurat fix) | [athena-notes/feedstock-changes/clhep](athena-notes/feedstock-changes/clhep) | ✅ | ✅ | ✅ |
 
-✅ = builds locally with rattler-build (natively in Docker on an Apple-silicon Mac) and passes
-the recipe tests. · = not tried yet.
+✅ = builds locally with rattler-build and passes the recipe tests: linux-aarch64 natively in
+Docker on an Apple-silicon Mac, linux-64 in Docker under Rosetta (conda-forge's CI image),
+osx-arm64 natively. · = not done yet. — = not available on that platform.
 
 All recipes are version 25.0.73 of the Athena release or the version of the external that
 AthenaExternals 25.0.73 uses. Only python 3.13 is built locally.
@@ -478,8 +480,45 @@ so that a work area can relink it with its own changes.
   scripts are planned (D6).
 - The install areas carry the packages' sources (`src/`), as on CVMFS; to be weighed against
   package size.
-- Every project's `cmake/modules/` has both `FindNumPy.cmake` and `Findnumpy.cmake`, which differ
-  only by case: a problem on macOS's case-insensitive file systems (osx-arm64).
+- **macOS (osx-arm64)** needs a handful of things that Linux does not (details in PLAN.md, M8):
+  - Libraries find each other through rpaths: dyld ignores `LD_LIBRARY_PATH`, and System
+    Integrity Protection drops `DYLD_LIBRARY_PATH` from every script started through a system
+    shell or `/usr/bin/env` (`athena.py` among them). AtlasCMake sets rpaths (athena-externals
+    patch 0005), `setup.sh` also fills `GAUDI_PLUGIN_PATH` and `ROOT_LIBRARY_PATH` there, and
+    the libraries that load plugins by bare name (CORAL, ers, EventStorage, Gaudi's python)
+    look them up through their rpaths or the environment's prefix.
+  - conda-forge's python has the interpreter built in, so a library that links libpython runs
+    against a second, uninitialised copy of it inside python (macOS binds symbols per library).
+    Gaudi's and Athena's libraries look Python's symbols up in the process instead, and every
+    executable loads libpython.
+  - Clang 20, the compiler of conda-forge's ROOT 6.40 there, with `-D_LIBCPP_DISABLE_AVAILABILITY`:
+    conda-forge's libc++ 20 headers mark `std::from_chars` with an attribute that does not
+    compile (to be reported to conda-forge). AtlasCMake builds C++23 with it (ATLAS switches at
+    clang 22), as ROOT is a C++23 build.
+  - **ROOT's interpreter only works with the macOS 11.0 SDK**: conda-forge's ROOT 6.40 ships C++
+    modules built against it, and with newer SDKs (13.3 to 27) cling fails on the mach headers
+    that `boost/thread` includes. The local builds use that SDK (`CONDA_BUILD_SYSROOT`), and
+    users would need it in `SDKROOT`: to be reported to conda-forge's root feedstock.
+  - Athena needed about twenty small source changes for libc++ and macOS (athena-core patches
+    0005 and 0006: missing includes, C++20 removals that libstdc++ keeps, `<malloc.h>`,
+    `prctl`, `fenv_t` on Apple silicon, `std::vector<bool>`'s proxy, ...). yampl (AthenaMP's
+    event service) and valgrind are Linux only, and the packages that need them are left out
+    or built without them (`packages_excluded_osx.txt` per layer).
+  - Copies of system binaries are killed on current macOS: AtlasCMake's private copy of
+    `/bin/bash` (now a link to conda-forge's bash), and the copy of `/usr/bin/env` that CORAL
+    and COOL install (removed).
+  - Every project's `cmake/modules/` has both `FindNumPy.cmake` and `Findnumpy.cmake`, and
+    AtlasLCG's `FindVDT.cmake` hides ROOT's `FindVdt.cmake` on the case-insensitive file
+    system: athena-externals defines the `VDT::VDT` target that ROOT looks for.
+- **The tests' references are per platform**: ATLAS's own release writes different floating point
+  numbers on x86_64 and aarch64 (dumps of ESD, AOD, derivations, tracking, CP n-tuples; the
+  DAOD reading and trigger counts agree). The linux-64 references come from ATLAS's x86_64
+  release, run under Rosetta here. There is no ATLAS release for macOS: there the dumps are
+  written but not compared.
+- Under Rosetta, ATLAS's x86_64 release itself reports floating point exceptions (e.g. in the
+  muon geometry's initialisation), which it does not on aarch64, and which ATLAS's own FPE
+  checks on x86_64 machines would catch: most likely an emulation artifact (not checked on
+  real x86_64 hardware). It fails the tests' FPE log checks locally.
 
 ## Roadmap
 

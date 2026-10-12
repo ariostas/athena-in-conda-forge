@@ -1,0 +1,24 @@
+PyCoral on macOS: a python extension module, linked without libpython (-undefined
+dynamic_lookup). The interpreter may have libpython built in (conda-forge's has), and with
+macOS's two-level namespace the module then runs against an uninitialised second copy of it
+(segmentation fault on import).
+
+diff --git a/src/PyCoral/CMakeLists.txt b/src/PyCoral/CMakeLists.txt
+index 5f47fc3..9d37403 100644
+--- a/src/PyCoral/CMakeLists.txt
++++ b/src/PyCoral/CMakeLists.txt
+@@ -7,7 +7,14 @@ endif()
+ include_directories(${PYTHON_INCLUDE_DIRS})
+ 
+ include(CORALModule)
++if(APPLE)
++  # A python extension module: on macOS it must not link libpython, which the interpreter may
++  # have built in (conda-forge's does), or it runs against an uninitialised second copy.
++  CORALModule(LIBS lcg_CoralCommon HEADERS)
++  target_link_options(lcg_PyCoral PRIVATE -undefined dynamic_lookup)
++else()
+   CORALModule(LIBS lcg_CoralCommon ${PYTHON_LIBRARIES} HEADERS)
++endif()
+ 
+ # Copy and install python modules into the build and install areas
+ include(CORALConfigPython)

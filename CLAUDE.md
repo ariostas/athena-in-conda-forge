@@ -64,6 +64,9 @@ built. `KEEP_BUILD=1` keeps the build directories in `/work/output/bld`, for
 `athena-notes/analysis/scripts/compile_cost.py` (compile time and memory of a layer; it runs
 ninja, so put the build's `build_env/bin` first in `PATH`).
 
+- Builds use at most 5 threads, so that the laptop stays usable: `build-local.sh` sets
+  `CPU_COUNT=5` unless given, and the containers are capped with `docker update --cpus 5`
+  (recreated containers need it again). Use `ninja -j5` for manual runs.
 - The image is Ubuntu-based: `/bin/sh` is dash, and CMake installs shared libraries without
   the execute bit unless `CMAKE_INSTALL_SO_NO_EXE=0`. conda-forge's CI is AlmaLinux.
 - Scripts that `source` conda activation must do so with `set +eu` (bash errors out inside
@@ -97,6 +100,46 @@ ninja, so put the build's `build_env/bin` first in `PATH`).
   environment setup; a truncated copy (closing the parenthesis) reruns any part of it. For
   tests without CVMFS or network, as on conda-forge's CI, run them in a throwaway container:
   `docker run --rm --network none -v athena-work:/work condaforge/miniforge3:latest ...`.
+
+### linux-64 (M8)
+
+- `athena-dev-amd64`: `quay.io/condaforge/linux-anvil-x86_64:alma9` (conda-forge's CI image),
+  `--platform linux/amd64` (Rosetta, about 2.6x slower), run as `-u root`, the repo at `/repo`,
+  `/cvmfs`, and its own volume `athena-work-amd64` at `/work` (tools, pinning, output, logs as
+  in athena-dev). `CONFIG=linux64 /work/bg-build.sh <recipe> ...` builds detached;
+  `/work/chain*.sh` run the whole stack. `TEST=skip` builds without the recipe tests.
+- `athena-ref-amd64`: `almalinux:9`, `--platform linux/amd64`, with `athena-work-amd64` and
+  `/cvmfs`: ATLAS's x86_64 release, for the x86_64 references
+  (`/work/tmp/cvmfs-athena.sh` picks the architecture). Besides the EL9 packages listed above it
+  needs `libpciaccess` (the x86_64 release links it). `/work/tmp/refs.sh` runs the layers'
+  reference-checked tests in it.
+- conda-forge's CI image has no `man`: CORAL and COOL needed a patch for that.
+
+### osx-arm64 (M8), natively
+
+- Under `_work/`: rattler-build in `_work/osx-tools`, the pinning (a copy of the containers')
+  and `extra_variants.yaml` in `_work/osx-work`, which is `WORK` for `build-local.sh`.
+  `CONDA_BUILD_SYSROOT` there is the MacOSX 11.0 SDK in `_work/sdks` (from
+  github.com/phracker/MacOSX-SDKs, as conda-forge's CI uses): ROOT's interpreter fails on the
+  mach headers of newer SDKs (README). Tests that run ROOT outside rattler-build need
+  `SDKROOT` set to it.
+  `_work/osx-try2.sh <recipe> ...` builds each recipe in turn and goes on after a failure, with
+  a clean `PATH` (some Makefiles break on the spaces in the host's).
+- A failed build leaves its tree in `_work/osx-work/output/bld`: `source build_env.sh` in its
+  `work/` and `ninja -k 0` in its build directory lists every compile error at once.
+- What macOS changes (see PLAN.md, M8):
+  - dyld ignores `LD_LIBRARY_PATH`, and System Integrity Protection drops `DYLD_*` from the
+    environment of every system executable (`/bin/bash`, `/usr/bin/env`, so every script with
+    an `env` shebang). Libraries find each other through rpaths, and code that `dlopen`s a bare
+    library name needs `@rpath/` (CORAL, ers, Gaudi's python).
+  - Current macOS kills copies of system binaries (AtlasCMake copied `/bin/bash`):
+    athena-externals requires conda-forge's bash there.
+  - The ROOT-based recipes use clang 20, the compiler of conda-forge's ROOT 6.40
+    (`variants.yaml`), and C++ code needs `-D_LIBCPP_DISABLE_AVAILABILITY`: conda-forge's
+    libc++ 20 headers mark `std::from_chars` with an attribute that does not compile.
+  - CMake scans C++20 sources for modules, which needs clang-scan-deps: off everywhere.
+  - Python imports only `.so` extensions, also on macOS; CMake's MODULE libraries are `.so`.
+  - Use `sed -i.orig` (then remove the copy): GNU and BSD sed agree on no other `-i` form.
 
 ## Conventions
 

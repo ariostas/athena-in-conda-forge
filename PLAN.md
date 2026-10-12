@@ -351,8 +351,9 @@ CP tools on DAOD_PHYSLITE (e.g. ATLAS Open Data).
 ### M7: sim (D5), rest, the `athena` metapackage and the developer workflow
 A user's `Projects/WorkDir` build on top of the conda release, like `cmssw-devel`.
 
-### M8: osx-arm64, in parallel from M3 onward
-Gaudi on osx-arm64, AtlasCMake Apple fixes, RPATHs, libc++ fixes in Athena.
+### M8: linux-64 and osx-arm64
+Gaudi on osx-arm64, AtlasCMake Apple fixes, RPATHs, libc++ fixes in Athena; linux-64 with
+references from ATLAS's x86_64 release.
 
 ### M9: upstreaming and hand-off
 AtlasCMake patches to atlasexternals, Athena patches to athena, coordination with cburr,
@@ -1198,3 +1199,78 @@ area against them. The simulation runs but is not identical to ATLAS's.
 - open: a default `FRONTIER_SERVER`, the geometry database, conditions payloads and ReleaseData
   without CVMFS (D6), licences (CORAL, COOL, CrestApi, the CREST python clients, yampl);
   upstream the patches.
+
+### 2026-10-12: M8 begins: linux-64 and osx-arm64
+
+**Setup.** linux-64 builds in `athena-dev-amd64`, conda-forge's CI image under Rosetta, and
+ATLAS's x86_64 release runs in `athena-ref-amd64` for references. osx-arm64 builds natively
+under `_work/` (CLAUDE.md). Builds use at most 5 threads (the laptop stays usable), so the
+emulated linux-64 builds are slow: Geant4 took an hour, Rivet three and a half.
+
+**linux-64**: every external builds and passes its tests; the layers are building. The one
+problem so far is libunwind's `unwind.h` (gperftools depends on libunwind on x86_64 only),
+which shadows GCC's and has no `_Unwind_Ptr` (athena-core patch 0006, CxxUtils).
+
+**The tests' references are per platform.** ATLAS's own x86_64 release, run on the tests' jobs,
+does not reproduce the aarch64 references: tracking, ESD (edm-det), ESD/AOD (reco), DAOD_PHYS
+and DAOD_PHYSLITE (rest) and the CP n-tuples differ in floating point digits, with the same
+line counts. Reading a DAOD (edm) and the HLT counts (trigger) agree. The sha256 files and the
+Open Data dump are now `<name>.<platform>.*`; the linux-64 ones come from ATLAS's x86_64
+release (`athena-notes/refs.sh`). A platform without references (osx-arm64: ATLAS has no
+release there) runs the jobs and says it cannot compare. Under Rosetta ATLAS's x86_64
+release reports FPEs (e.g. AGDDtoGeoSvc's initialisation) that it does not on aarch64;
+presumably an emulation artifact, so the reference runs skip the FPE log check (not checked
+on real x86_64 hardware). The x86_64 simulation reference run lacked the Geant4 data sets:
+the sim test's tolerances may make the aarch64 summary usable as is (to be seen).
+
+**osx-arm64**: every external except yampl (vmsplice, futexes: Linux only) builds and passes
+its tests, and so does athena-core: `athena.py` runs HelloWorld, serial and multi-threaded,
+conditions, ByteStream and GroupData work, and every component has its configurable. What it
+took:
+- Compilers: clang 20, ROOT 6.40's (`variants.yaml`), with `-D_LIBCPP_DISABLE_AVAILABILITY`
+  (conda-forge's libc++ 20 headers mark `std::from_chars` with an attribute that does not
+  compile; libc++ 21's mark the time zone database unavailable even in inline code). AtlasCMake
+  defaults to C++20 below clang 22, while ROOT's interface makes its users C++23: half the
+  targets were each; patch 0005 makes it C++23. CMake's C++ module scanning needs
+  clang-scan-deps: off everywhere.
+- SDK: the local builds use the macOS 11.0 SDK. conda-forge's ROOT 6.40 ships C++ modules
+  built against it, and cling then fails on the mach headers of any newer SDK (13.3 to 27),
+  which `boost/thread` includes (dqm_core's dictionary, and Athena's). A user with only a
+  current SDK hits the same: to be reported to the root feedstock.
+- Library lookup: dyld ignores `LD_LIBRARY_PATH`, and SIP drops `DYLD_*` from every script
+  started through `/bin/bash` or `/usr/bin/env`. AtlasCMake sets rpaths (to this layer's lib/,
+  the layers' below and the prefix's; rattler-build makes them relative), `setup.sh` also
+  sets `GAUDI_PLUGIN_PATH` and `ROOT_LIBRARY_PATH` on macOS, and the code that `dlopen`s bare
+  names looks through `@rpath/` (CORAL, ers, EventStorage) or the prefix (Gaudi's python).
+  AtlasCMake's private copy of `/bin/bash` is killed by current macOS (copies of system
+  binaries are): it now links conda-forge's bash. CORAL and COOL install a copy of
+  `/usr/bin/env` into bin/, which would shadow the system's and is killed: removed.
+- libpython: conda-forge's python has the interpreter built in. A library linking
+  libpython3.13.dylib then runs, inside python, against a second, uninitialised interpreter
+  (macOS binds each symbol to a library), which crashed PyCoral and Gaudi::Application. The
+  libraries look Python's symbols up in the process (`-undefined dynamic_lookup`; Gaudi's
+  `Python::Module`, AtlasLCG's FindPython), and every executable loads libpython with
+  `-needed_library` (conda-forge's `-dead_strip_dylibs` drops it otherwise). An experiment
+  confirmed it: such a library works from python and from a C program, a libpython-linked
+  one crashes in python.
+- Case-insensitive file system: AtlasLCG's `FindVDT.cmake` answered ROOT's
+  `find_dependency(Vdt)`, and ROOT was then not found; athena-externals defines `VDT::VDT`.
+- Externals: tdaq-common (stat64, gethostbyname_r, semtimedop in circ, `uint`, a chrono
+  conversion; python extensions as `.so`), CORAL/COOL (CMake 4 refuses the CMP0026 policy of
+  their Darwin branch; `std::auto_ptr` and `binary_function` on request from libc++), Gaudi (a
+  missing include; libraries found from python without `DYLD_LIBRARY_PATH`), ACTS (CBOR from
+  `std::byte`, which libc++ cannot read through `char_traits`), Geant4 10.6 (`thread_local`
+  with clang on arm64; a missing include; no fat LTO objects), GeoModel and chai (tests'
+  library suffixes). GNU-only shell (`sed -i`, `paste` without `-`) is gone from the scripts.
+- athena-core (patches 0005, 0006): yampl, valgrind and bfd optional; Valkyrie left out
+  (`packages_excluded_osx.txt`); `<bit>` before classes that include a header inside their
+  bodies; `std::invoke_result_t` for `result_of_t`; `fenv_t` on Apple silicon; `<malloc.h>`,
+  `prctl`, `TEMP_FAILURE_RETRY`, `getservbyport_r`, `struct msgbuf`, `std::beta` (libc++ has
+  no special functions); `std::vector<bool>`'s proxy handed to CORAL; libc++ helper templates
+  matched by a dictionary's selection patterns; libc++'s `create_directories` returning false
+  for a path ending with `/`; no `LD_PRELOAD` in `athena_preload.sh`; AtlasCMake's
+  `.components` files from the library's real name (`.dylib` for shared libraries).
+
+**To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
+these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's
+patches), so it is to be rebuilt; report the libc++ and ROOT SDK issues to conda-forge.

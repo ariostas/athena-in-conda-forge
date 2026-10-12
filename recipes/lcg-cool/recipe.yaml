@@ -12,11 +12,13 @@ source:
   patches:
     # empty environment values (no man, no Qt) break COOL's environment scripts generator
     - 0001-empty-environment-values.patch
+    # macOS: CMake 4 refuses the policy that COOL's Darwin library naming relied on
+    - 0002-Darwin-library-names-without-CMP0026.patch
 
 build:
   number: 0
   skip:
-    - not linux
+    - win
   script:
     file: build.sh
 

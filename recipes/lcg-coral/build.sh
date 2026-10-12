@@ -1,6 +1,13 @@
 #!/bin/bash
 set -euxo pipefail
 
+# On macOS conda-forge's libc++ headers mark library features newer than the deployment target
+# as unavailable (libc++ 20's markup of std::from_chars does not even compile); the environments
+# have conda-forge's own, current libc++ at run time.
+if [[ "${target_platform}" == osx-* ]]; then
+  export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY"
+fi
+
 # CORAL wants a platform tag a priori; it only uses it to name things and to pick compiler
 # flags (by matching "gcc"/"clang" in it).
 case "${target_platform}" in
@@ -10,10 +17,16 @@ case "${target_platform}" in
   *) echo "Unsupported platform ${target_platform}"; exit 1 ;;
 esac
 
+# The packages' tests are compiled even when they are not run, and use std::auto_ptr, which
+# libc++ (macOS) only has on request in C++17 and later.
+if [[ "${target_platform}" == osx-* ]]; then
+  export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR"
+fi
+
 # Without Oracle (not redistributable), MySQL (not used by ATLAS or CMS), the CORAL server
 # (needs Sun RPC) and the tests (they need database accounts). CORAL's Find modules also
 # require the command-line tools of its dependencies, which it does not use.
-cmake -S . -B build -G Ninja ${CMAKE_ARGS} \
+cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
   -DCMAKE_PREFIX_PATH="${PREFIX}" \
@@ -42,10 +55,16 @@ cmake --install build
 # liblcg_PyCoral), so both go into site-packages.
 mkdir -p "${SP_DIR}"
 mv "${PREFIX}/python/coral.py" "${SP_DIR}/"
-mv "${PREFIX}/lib/liblcg_PyCoral${SHLIB_EXT}" "${SP_DIR}/"
+# (On macOS CORAL names its libraries .so, with a .dylib link: python wants the .so.)
+mv "${PREFIX}/lib/liblcg_PyCoral.so" "${SP_DIR}/"
+rm -f "${PREFIX}/lib/liblcg_PyCoral.dylib"
 rmdir "${PREFIX}/python"
 rm -rf "${PREFIX}/CoralTest"
 rm -f "${PREFIX}"/bin/coral*Wrapper.sh "${PREFIX}"/bin/igprof-navigator-index.php \
   "${PREFIX}"/bin/valgrind*.supp
 # CORAL's own environment scripts for its build area
 rm -f "${PREFIX}"/{cc-run,cc-sh,env.sh,env.csh,setup.sh,setup.csh}
+# On macOS the build copies /usr/bin/env into bin/ (for its own environment scripts, around
+# System Integrity Protection). Current macOS kills copies of system binaries, and this one
+# would shadow the system's env in the environment.
+rm -f "${PREFIX}/bin/env"

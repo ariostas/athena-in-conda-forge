@@ -2,16 +2,23 @@
 # Analyses with ATLAS's CP algorithms (CPRun.py and a YAML configuration), each n-tuple dumped
 # as text (dump_ntuple.py) and checked against the one ATLAS's own release writes:
 # - the Open Data file (2015 data, DAOD_PHYSLITE, CC0) with opendata_data15.yaml; the
-#   reference dump is opendata_data15.dump.xz. The calibration files (GroupData) come from
-#   CVMFS if it is mounted, otherwise from ATLAS's web server: this needs no CVMFS;
+#   reference dump is opendata_data15.<platform>.dump.xz. The calibration files (GroupData)
+#   come from CVMFS if it is mounted, otherwise from ATLAS's web server: this needs no CVMFS;
 # - with CVMFS, two of ATLAS's own CP algorithm tests (AnalysisAlgorithmsConfig), on its MC
 #   test files (licence unclear, read in place): TestCPRunFullSim (DAOD_PHYS, every object
 #   with its systematic variations, scale factors and truth; its dump's sha256 sum is in
-#   cp_dumps.sha256) and TestCPRunPhysliteLikePhyslite (DAOD_PHYSLITE, 4 threads, no n-tuple:
-#   it must run without errors).
+#   cp_dumps.<platform>.sha256) and TestCPRunPhysliteLikePhyslite (DAOD_PHYSLITE, 4 threads,
+#   no n-tuple: it must run without errors).
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
+# The references are per platform: ATLAS's release itself writes different floating point
+# numbers on x86_64 and aarch64. ATLAS has no release for macOS to compare with.
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64)  platform=linux-64 ;;
+  Linux-aarch64) platform=linux-aarch64 ;;
+  *)             platform=$(uname -s)-$(uname -m) ;;
+esac
 # The configuration looks the LHC period of the input's geometry tag up in the geometry
 # database: through ATLAS's public Frontier server.
 export FRONTIER_SERVER=${FRONTIER_SERVER:-"(serverurl=http://atlasfrontier-ai.cern.ch:8000/atlr)"}
@@ -47,7 +54,8 @@ dump() {
 
 cprun opendata -i "${opendata}" -t "${here}/opendata_data15.yaml"
 dump opendata
-python - "${here}/opendata_data15.dump.xz" cp/opendata.txt <<'PY'
+if [ -f "${here}/opendata_data15.${platform}.dump.xz" ]; then
+python - "${here}/opendata_data15.${platform}.dump.xz" cp/opendata.txt <<'PY'
 import difflib, lzma, sys
 ref = lzma.open(sys.argv[1], "rt").read().splitlines()
 out = open(sys.argv[2]).read().splitlines()
@@ -58,6 +66,9 @@ if out != ref:
     sys.exit(f"{sys.argv[2]} differs from the reference dump")
 print(f"{sys.argv[2]}: {len(out)} lines, identical to the reference")
 PY
+else
+  echo "no reference dump for ${platform}: cp/opendata.txt is not compared"
+fi
 
 # ATLAS's test files (Asg_Test: ASG_TEST_FILE_MC, ASG_TEST_FILE_LITE_RUN3_MC)
 if [ ! -f "${ASG_TEST_FILE_MC}" ]; then
@@ -70,4 +81,8 @@ dump fullsim
 cprun physlite -i "${ASG_TEST_FILE_LITE_RUN3_MC}" \
   -t AnalysisAlgorithmsConfig/test_configuration_physlite_like.yaml -e 1000 --test-mt-dependencies 4
 grep "accepted 1000 out of 1000 events" cp/physlite/log
-(cd cp && sha256sum -c "${here}/cp_dumps.sha256")
+if [ ! -f "${here}/cp_dumps.${platform}.sha256" ]; then
+  echo "no references for ${platform}: the dumps are not compared"
+  exit 0
+fi
+(cd cp && sha256sum -c "${here}/cp_dumps.${platform}.sha256")

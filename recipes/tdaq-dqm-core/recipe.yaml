@@ -19,12 +19,17 @@ source:
 build:
   number: 0
   skip:
-    - not linux
+    - win
   script:
+    # On macOS conda-forge's libc++ headers mark library features newer than the deployment
+    # target as unavailable (libc++ 20's markup of std::from_chars does not even compile); the
+    # environments have conda-forge's own, current libc++ at run time.
+    - if: osx
+      then: export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY"
     # The package's own CMakeLists.txt, on the replacement for the tdaq build system of the
     # tdaq-common recipe (cmake/TDAQShim.cmake) and its ROOT functions (TDAQRootShim.cmake).
     - cp ${RECIPE_DIR}/cmake/CMakeLists.txt ${RECIPE_DIR}/cmake/TDAQShim.cmake ${RECIPE_DIR}/cmake/TDAQRootShim.cmake .
-    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DPython_EXECUTABLE=${PYTHON} -DTDAQ_PYTHON_DIR=${SP_DIR}
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DPython_EXECUTABLE=${PYTHON} -DTDAQ_PYTHON_DIR=${SP_DIR}
     - cmake --build build --parallel ${CPU_COUNT}
     - cmake --install build
 

@@ -1,14 +1,24 @@
 #!/bin/bash
 set -euxo pipefail
 
+# On macOS conda-forge's libc++ headers mark library features newer than the deployment target
+# as unavailable (libc++ 20's markup of std::from_chars does not even compile); the environments
+# have conda-forge's own, current libc++ at run time.
+if [[ "${target_platform}" == osx-* ]]; then
+  export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY"
+fi
+
 # Link-time optimization, as ATLAS builds both (Projects/Athena/build_externals.sh:
 # ATLAS_GEANT4_USE_LTO, ATLAS_VECGEOM_USE_LTO): AtlasGeant4 links them with LTO, which inlines
 # across Geant4's sources and can change floating point results (contractions into fused
 # multiply-adds), so this is the build closest to ATLAS's (the simulation still differs from
 # ATLAS's release: see athena-sim). Fat objects: the libraries also hold regular code, for
-# consumers that link without LTO.
-export CFLAGS="${CFLAGS} -flto=auto -ffat-lto-objects"
-export CXXFLAGS="${CXXFLAGS} -flto=auto -ffat-lto-objects"
+# consumers that link without LTO. Not on macOS: clang has no fat LTO objects there, and
+# ATLAS's release has no macOS build to match.
+if [[ "${target_platform}" == linux-* ]]; then
+  export CFLAGS="${CFLAGS} -flto=auto -ffat-lto-objects"
+  export CXXFLAGS="${CXXFLAGS} -flto=auto -ffat-lto-objects"
+fi
 
 # VecGeom first (atlasexternals' External/VecGeom): static, scalar backend, GDML.
 cmake -S vecgeom -B build-vecgeom -G Ninja ${CMAKE_ARGS} \
@@ -26,9 +36,11 @@ cmake --build build-vecgeom --parallel "${CPU_COUNT}"
 cmake --install build-vecgeom
 
 # ATLAS names its multithreaded build "atlasmt" (External/Geant4's patch command).
-sed -i 's/geant4.10.6.patch03.atlas15/geant4.10.6.patch03.atlasmt15/g' \
-  geant4/source/global/management/include/G4Version.hh \
-  geant4/source/run/src/G4RunManagerKernel.cc
+for file in geant4/source/global/management/include/G4Version.hh \
+    geant4/source/run/src/G4RunManagerKernel.cc; do
+  sed -i.orig 's/geant4.10.6.patch03.atlas15/geant4.10.6.patch03.atlasmt15/g' "${file}"
+  rm "${file}.orig"
+done
 
 # Geant4 with the options of atlasexternals' External/Geant4. The data sets are separate
 # conda-forge packages (geant4-data-*), as for conda-forge's geant4. zlib: conda-forge's,

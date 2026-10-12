@@ -20,11 +20,17 @@ source:
     # PathResolver's HTTP downloads (GroupData without CVMFS): an HTTP error is a failed
     # download, not a file with the error page in it, and a failed download leaves no file
     - 0004-PathResolver-no-error-pages-or-empty-files-from-failed-downloads.patch
+    # yampl (the event service), valgrind (TimeoutAlg) and bfd (AthenaAuditors) optional, for
+    # macOS
+    - 0005-optional-yampl-valgrind-and-bfd.patch
+    # libc++ and macOS (Apple silicon): missing includes, removed C++20 traits, the FP exception
+    # helpers, Linux-only calls
+    - 0006-libc++-and-macOS.patch
 
 build:
   number: 0
   skip:
-    - not linux
+    - win
     # the confdb2 files of Gaudi need dbm.sqlite3
     - match(python, "<3.13")
   script:
@@ -47,7 +53,9 @@ requirements:
     - crestapi
     - chai
     - tdaq-common
-    - yampl
+    # AthenaMP's event service (Linux only)
+    - if: linux
+      then: yampl
     - boost-mpi3
     - openmpi
     - python
@@ -83,8 +91,9 @@ requirements:
     - libprotobuf
     # PerfMonGPerfTools
     - gperftools
-    # headers only (AthenaServices)
-    - valgrind
+    # headers only (AthenaServices; not on macOS)
+    - if: linux
+      then: valgrind
     - libcurl
     - vdt
     # the build draws the python import graph of the packages (apydep)
@@ -98,11 +107,15 @@ requirements:
     - distro
     # PerfMonComps' monitoring service, which the job transforms switch on (perfmon fastmonmt)
     - psutil
-    # the job transforms (PyJobTransforms) run ps, and prmon for their memory monitoring
-    - procps-ng
-    - prmon
-    # athena.py finds its preload script and python with "which" (not in minimal EL9 images)
-    - which
+    - if: linux
+      then:
+        # the job transforms (PyJobTransforms) run ps, and prmon for their memory monitoring
+        # (macOS has its own ps, and no prmon)
+        - procps-ng
+        - prmon
+        # athena.py finds its preload script and python with "which" (not in minimal EL9
+        # images; macOS has it)
+        - which
 
 tests:
   - script:
@@ -118,6 +131,11 @@ tests:
       - bash test/run_groupdata.sh
       # every component of the layer has its configurable
       - python test/check_confdb.py "${AthenaCore_DIR}/lib/AthenaCore.components"
+    requirements:
+      run:
+        # sha256sum (macOS has only shasum)
+        - if: osx
+          then: coreutils
     files:
       recipe:
         - test/

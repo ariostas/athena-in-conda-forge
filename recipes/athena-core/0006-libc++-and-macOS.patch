@@ -1,0 +1,331 @@
+Athena with libc++ and on macOS (Apple silicon), and with libunwind's unwind.h:
+- CxxUtils: feenableexcept()/fedisableexcept() for arm64 macOS (the FPCR trap enable bits;
+  the existing implementation is for Intel Macs); xmalloc.cxx needs no <malloc.h>, which
+  macOS does not have;
+- EventContainers: <bit> included before the classes that include deleter.h inside their
+  bodies (libstdc++ had always pulled it in earlier);
+- AthCommonDataStore.h: std::invoke_result_t, as std::result_of_t is gone from C++20 (libc++
+  removes it; libstdc++ still has it);
+- ArenaBlockAlignDetail.h: <type_traits> for std::alignment_of;
+- AthenaInterprocess: prctl(PR_SET_PDEATHSIG) on Linux only; AthenaMPTools: glibc's
+  TEMP_FAILURE_RETRY where it is missing;
+- AtlasCLHEP_RandomGenerators: the beta function from lgamma with libc++, which has no
+  special mathematical functions;
+- xAODRootAccess: getservbyport where there is no getservbyport_r (macOS);
+- PerfMonComps: mallinfo2 only on Linux (it already returned 0 elsewhere);
+- IOVDbTestAlg: msgrcv takes the message buffer as a void pointer (no struct msgbuf on macOS);
+- IOVDbTPCnv: an element of std::vector<bool> passed to CORAL as a bool (libc++'s reference
+  proxy overloads operator&);
+- AthenaPoolUtilities: libc++'s helper templates excluded from the dictionary, which the
+  iterator patterns of selection.xml match as well;
+- athena_preload.sh preloads nothing on macOS, which has no LD_PRELOAD;
+- CxxUtils' UnwindBacktrace: uintptr_t rather than GCC's _Unwind_Ptr and _Unwind_Word, which
+  the unwind.h of libunwind does not define (on linux-64, gperftools brings it into the
+  environment, ahead of GCC's);
+- PathResolver: a directory it creates counts as created when it exists afterwards (libc++'s
+  create_directories returns false for a path ending with a separator).
+
+--- a/Control/CxxUtils/Root/excepts.cxx
++++ b/Control/CxxUtils/Root/excepts.cxx
+@@ -23,11 +23,20 @@
+                 old_excepts;  // previous masks
+ 
+    if ( fegetenv (&fenv) ) return -1;
++#if defined(__aarch64__)
++   // Apple silicon: the trap enable bits of FPCR (the exception flags shifted by 8). The
++   // hardware may not implement trapping, as on most aarch64 machines.
++   old_excepts = (fenv.__fpcr >> 8) & FE_ALL_EXCEPT;
++
++   // unmask
++   fenv.__fpcr |= new_excepts << 8;
++#else
+    old_excepts = fenv.__control & FE_ALL_EXCEPT;
+ 
+    // unmask
+    fenv.__control &= ~new_excepts;
+    fenv.__mxcsr   &= ~(new_excepts << 7);
++#endif
+ 
+    return ( fesetenv (&fenv) ? -1 : old_excepts );
+ }
+@@ -40,11 +49,18 @@
+                 old_excepts;  // all previous masks
+ 
+    if ( fegetenv (&fenv) ) return -1;
++#if defined(__aarch64__)
++   old_excepts = (fenv.__fpcr >> 8) & FE_ALL_EXCEPT;
++
++   // mask
++   fenv.__fpcr &= ~(static_cast<unsigned long long>(new_excepts) << 8);
++#else
+    old_excepts = fenv.__control & FE_ALL_EXCEPT;
+ 
+    // mask
+    fenv.__control |= new_excepts;
+    fenv.__mxcsr   |= new_excepts << 7;
++#endif
+ 
+    return ( fesetenv (&fenv) ? -1 : old_excepts );
+ }
+--- a/Control/CxxUtils/Root/xmalloc.cxx
++++ b/Control/CxxUtils/Root/xmalloc.cxx
+@@ -10,7 +10,7 @@
+ 
+ 
+ #include "CxxUtils/xmalloc.h"
+-#include <malloc.h>
++#include <cstdlib>
+ #include <new>
+ 
+ 
+--- a/Control/CxxUtils/Root/UnwindBacktrace.cxx
++++ b/Control/CxxUtils/Root/UnwindBacktrace.cxx
+@@ -18,6 +18,7 @@
+ #include "CxxUtils/checker_macros.h"
+ #include <atomic>
+ #include <unwind.h>
++#include <cstdint>
+ #include <stdio.h>
+ #include <malloc.h>
+ 
+@@ -206,7 +207,7 @@
+  * register it with gcc.  Only do this once, however.  Return true
+  * if we did a fixup, false if we didn't (because we already did one).
+  */
+-bool tryUnwindFixup (_Unwind_Ptr addr)
++bool tryUnwindFixup (uintptr_t addr)
+ {
+   // Only allow going past this point once.
+   static std::atomic<int> fixed = 0;
+@@ -270,7 +271,7 @@
+ {
+   static constexpr unsigned MAX_DEPTH = 128;
+   unsigned naddr = 0;
+-  _Unwind_Ptr addrs[MAX_DEPTH] = {0};
++  uintptr_t addrs[MAX_DEPTH] = {0};
+   bool sawBad = false;
+ };
+ 
+@@ -286,12 +287,12 @@
+ {
+   // Record this IP.
+   auto& data = *reinterpret_cast<UnwindBacktraceData*> (data_in);
+-  _Unwind_Ptr ip = _Unwind_GetIP (ctx);
++  uintptr_t ip = _Unwind_GetIP (ctx);
+   data.addrs[data.naddr++] = ip;
+ 
+   if (ip == 0 && !data.sawBad) {
+     // Is this the end of the stack, or a bad frame?  Try to guess.
+-    _Unwind_Word cfa = _Unwind_GetCFA (ctx);
++    uintptr_t cfa = _Unwind_GetCFA (ctx);
+     if (cfa) {
+       void* x = *reinterpret_cast<void**>(cfa);
+       if (x) {
+--- a/Event/EventContainers/EventContainers/I_InternalIDC.h
++++ b/Event/EventContainers/EventContainers/I_InternalIDC.h
+@@ -5,6 +5,7 @@
+ #ifndef EVENTCONTAINERS_I_INTERNALIDC_H
+ #define EVENTCONTAINERS_I_INTERNALIDC_H
+ 
++#include <bit> // (deleter.h, included inside a class below, needs it)
+ #include "Identifier/IdentifierHash.h"
+ #include "GaudiKernel/StatusCode.h"
+ #include <memory>
+--- a/Event/EventContainers/EventContainers/IdentifiableCacheBase.h
++++ b/Event/EventContainers/EventContainers/IdentifiableCacheBase.h
+@@ -8,6 +8,7 @@
+ #define EVENTCONTAINERS_IDENTIFIABLECACHEBASE_H
+ 
+ 
++#include <bit> // (deleter.h, included inside a class below, needs it)
+ #include "Identifier/IdentifierHash.h"
+ #include <memory>
+ #include <mutex>
+--- a/Event/EventContainers/EventContainers/IdentifiableContainerBase.h
++++ b/Event/EventContainers/EventContainers/IdentifiableContainerBase.h
+@@ -5,6 +5,7 @@
+ 
+ #ifndef EVENTCONTAINERS_IDENTIFIABLECONTAINERBASE_H
+ #define EVENTCONTAINERS_IDENTIFIABLECONTAINERBASE_H
++#include <bit> // (deleter.h, included inside a class below, needs it)
+ #include "EventContainers/I_InternalIDC.h"
+ #include "CxxUtils/checker_macros.h"
+ 
+--- a/Control/AthenaBaseComps/AthenaBaseComps/AthCommonDataStore.h
++++ b/Control/AthenaBaseComps/AthenaBaseComps/AthCommonDataStore.h
+@@ -373,7 +373,7 @@
+   // a VarHandleKeyArray.
+   using PBASE::renounce;
+   template <class T>
+-  std::enable_if_t<std::is_void_v<std::result_of_t<decltype(&T::renounce)(T)> > &&
++  std::enable_if_t<std::is_void_v<std::invoke_result_t<decltype(&T::renounce), T> > &&
+                    !std::is_base_of_v<SG::VarHandleKeyArray, T> &&
+                    std::is_base_of_v<Gaudi::DataHandle, T>,
+                    void>
+--- a/Control/AthAllocators/AthAllocators/ArenaBlockAlignDetail.h
++++ b/Control/AthAllocators/AthAllocators/ArenaBlockAlignDetail.h
+@@ -18,6 +18,7 @@
+ #define ATLALLOCATORS__ARENABLOCKALIGNDETAIL
+ 
+ #include <cstddef>
++#include <type_traits>
+ namespace SG {
+ namespace ArenaBlockAlignDetail {
+ 
+--- a/Control/AthenaInterprocess/src/Process.cxx
++++ b/Control/AthenaInterprocess/src/Process.cxx
+@@ -6,7 +6,9 @@
+ 
+ #include <boost/interprocess/ipc/message_queue.hpp>
+ 
++#ifdef __linux__
+ #include <sys/prctl.h>
++#endif
+ #include <dlfcn.h>
+ #include <signal.h>
+ 
+@@ -23,8 +25,10 @@
+    std::cerr.flush();
+ 
+    pid_t pid = fork();
++#ifdef __linux__
+    if ( pid == 0 )
+       prctl( PR_SET_PDEATHSIG, SIGHUP );          // Linux only
++#endif
+ 
+    return Process(pid);
+ }
+--- a/Control/AthenaMPTools/src/AthenaMPToolBase.cxx
++++ b/Control/AthenaMPTools/src/AthenaMPToolBase.cxx
+@@ -22,6 +22,15 @@
+ 
+ #include <iterator>
+ #include <filesystem>
++
++#ifndef TEMP_FAILURE_RETRY
++// glibc's (macOS does not have it): retry while interrupted by a signal
++#define TEMP_FAILURE_RETRY(expression) \
++  ({ long int _result; \
++     do _result = (long int) (expression); \
++     while (_result == -1L && errno == EINTR); \
++     _result; })
++#endif
+ 
+ namespace AthenaMPToolBase_d {
+   std::atomic<bool> sig_done = false;
+--- a/Simulation/Tools/AtlasCLHEP_RandomGenerators/src/RandBinomialFixedP.cxx
++++ b/Simulation/Tools/AtlasCLHEP_RandomGenerators/src/RandBinomialFixedP.cxx
+@@ -17,7 +17,12 @@
+ }
+ 
+ inline double binom(int n, int k) { 
++#ifdef _LIBCPP_VERSION
++  // (libc++ has no special mathematical functions: B(x,y) = Γ(x)Γ(y)/Γ(x+y))
++  return 1/((n+1)*std::exp(std::lgamma(n-k+1)+std::lgamma(k+1)-std::lgamma(n+2)));
++#else
+   return 1/((n+1)*std::beta(n-k+1,k+1)); 
++#endif
+ }
+ 
+ void RandBinomialFixedP::initLookupTable(long Nmaxlookup, double p) {
+--- a/Control/xAODRootAccess/Root/TSocket.cxx
++++ b/Control/xAODRootAccess/Root/TSocket.cxx
+@@ -54,10 +54,15 @@
+ 
+   // "Translate" the port number:
+   short sport = 0;
++#ifdef __APPLE__
++  // (no getservbyport_r on macOS)
++  struct servent* sp = getservbyport(htons(port), "tcp");
++#else
+   struct servent sp_buf;
+   struct servent* sp;
+   char buf[1024];  // needs to be large enough for all strings in servent
+   getservbyport_r(htons(port), "tcp", &sp_buf, buf, sizeof(buf), &sp);
++#endif
+   if (sp) {
+     sport = sp->s_port;
+   } else {
+--- a/Control/PerformanceMonitoring/PerfMonComps/src/PerfMonMTUtils.h
++++ b/Control/PerformanceMonitoring/PerfMonComps/src/PerfMonMTUtils.h
+@@ -17,7 +17,9 @@
+ // STL includes
+ #include <dlfcn.h>     // for dlsym
+ #include <fcntl.h>     // for open function
++#ifdef __linux
+ #include <malloc.h>    // for mallinfo function
++#endif
+ #include <sys/stat.h>  // to check whether /proc/* exists in the machine
+ 
+ #include <chrono>
+@@ -420,7 +422,9 @@
+ // gperftools 2.18 (LCG_110) no longer exports the public mallinfo2 symbol, so
+ // mallinfo2() no longer returns tcmalloc's numbers. Call tc_mallinfo2 directly:
+ // a weak symbol resolved to the preloaded libtcmalloc, or nullptr otherwise.
++#ifdef __linux
+ extern "C" [[gnu::weak]] struct mallinfo2 tc_mallinfo2(void);
++#endif
+ 
+ /*
+  * Get Malloc (from SemiDetMisc.h)
+--- a/AtlasTest/DatabaseTest/IOVDbTestAlg/src/IOVDbTestAlg.cxx
++++ b/AtlasTest/DatabaseTest/IOVDbTestAlg/src/IOVDbTestAlg.cxx
+@@ -61,7 +61,7 @@
+     printf("Recieving a message ...\n");
+ 	
+     qbuf.mtype = 123;
+-    msgrcv(msgqueue_id, reinterpret_cast< msgbuf *>(&qbuf), 80, 123, 0);
++    msgrcv(msgqueue_id, &qbuf, 80, 123, 0);
+     
+     printf("Type: %ld Text: %s\n", qbuf.mtype, qbuf.mtext);
+ 	
+--- a/Database/IOVDbTPCnv/src/IOVPayloadContainerCnv_p1.cxx
++++ b/Database/IOVDbTPCnv/src/IOVPayloadContainerCnv_p1.cxx
+@@ -604,7 +604,7 @@
+     // for all possible types
+     switch (index.typeIndex()) {
+         case IOVPayloadContainer_p1::ATTR_BOOL:
+-            attrList[name].setValue(persObj->m_bool[objIndex + offset]);
++            attrList[name].setValue(static_cast<bool>(persObj->m_bool[objIndex + offset]));
+             break;
+         case IOVPayloadContainer_p1::ATTR_CHAR:                
+             attrList[name].setValue(persObj->m_char[objIndex + offset]);
+--- a/Database/AthenaPOOL/AthenaPoolUtilities/AthenaPoolUtilities/selection.xml
++++ b/Database/AthenaPOOL/AthenaPoolUtilities/AthenaPoolUtilities/selection.xml
+@@ -45,6 +45,9 @@
+     <class pattern="*iterator<const*AttributeList*::iterator_category"/>
+     <class pattern="*iterator_category*"/>
+     <class pattern="*iterator_traits*"/>
++    <!-- libc++'s helper templates, which the iterator patterns above match too -->
++    <class pattern="*conditional<*"/>
++    <class pattern="*__pointer_traits*"/>
+   </exclusion>
+ 
+   <class name="TPIntegerVectorStorage_p2" />
+--- a/Control/AthenaCommon/share/athena_preload.sh
++++ b/Control/AthenaCommon/share/athena_preload.sh
+@@ -16,6 +16,12 @@
+ #
+ # This script is used internally in athena.py. Other applications may use it e.g.:
+ #   USETCMALLOC=1 source athena_preload.sh && mycommand
++
++# macOS has no LD_PRELOAD (and System Integrity Protection drops DYLD_INSERT_LIBRARIES from
++# the environment of the scripts that would pass it on): nothing to preload there.
++if [ "$(uname -s)" = "Darwin" ]; then
++    return 0
++fi
+ 
+ # Helper to prepend to LD_LIBRARY
+ ld_preload()
+--- a/Tools/PathResolver/Root/PathResolver.cxx
++++ b/Tools/PathResolver/Root/PathResolver.cxx
+@@ -187,7 +187,8 @@
+ 
+       if (!is_directory(targetDir)) {
+         if (msgLvl(MSG::DEBUG)) msg(MSG::DEBUG) << "Creating directory " << targetDir  << endmsg;
+-        if(!fs::create_directories(targetDir)) {
++        // (libc++ returns false for a path ending with a separator even when it created it)
++        if(!fs::create_directories(targetDir) && !is_directory(targetDir)) {
+           msg(MSG::ERROR) << "Unable to create directories to write file to " << targetDir << endmsg;
+           return false;
+         }

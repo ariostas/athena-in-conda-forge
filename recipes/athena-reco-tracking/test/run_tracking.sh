@@ -41,4 +41,15 @@ cd tracking
 run log_reco "${here}/track_reco.py" "${RDO}" tracking.pool.root 10
 run log_dump "${here}/pool_rw.py" tracking.pool.root dump.txt
 echo "tracking: $(wc -l < dump.txt) lines dumped"
-sha256sum -c "${here}/tracking_dumps.sha256"
+# The references are per platform: ATLAS's release itself writes different floating point
+# numbers on x86_64 and aarch64. ATLAS has no release for macOS to compare with.
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64)  platform=linux-64 ;;
+  Linux-aarch64) platform=linux-aarch64 ;;
+  *)             platform=$(uname -s)-$(uname -m) ;;
+esac
+if [ ! -f "${here}/tracking_dumps.${platform}.sha256" ]; then
+  echo "no references for ${platform}: the dumps are not compared"
+  exit 0
+fi
+sha256sum -c "${here}/tracking_dumps.${platform}.sha256"

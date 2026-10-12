@@ -44,3 +44,38 @@ if( NOT ROOT_PYTHON_PATH )
    unset( _prefix )
    unset( _rootpy )
 endif()
+
+# On macOS conda-forge's libc++ headers mark library features newer than the deployment target
+# as unavailable (std::from_chars for floating point, the time zone database, ...), some even
+# in inline code that <chrono> and <format> bring in. The environments have conda-forge's own,
+# current libc++ at run time.
+if( APPLE )
+   add_compile_definitions( _LIBCPP_DISABLE_AVAILABILITY )
+endif()
+
+# On macOS (a case-insensitive file system), ROOT's find_dependency(Vdt) finds AtlasLCG's
+# FindVDT.cmake instead of ROOT's FindVdt.cmake. That one creates no VDT::VDT target, and ROOT
+# is then not found. ROOT skips the search when the target exists: the one its module creates.
+if( APPLE AND NOT TARGET VDT::VDT )
+   find_library( _conda_vdt_library NAMES vdt )
+   find_path( _conda_vdt_include NAMES vdt/vdtMath.h )
+   mark_as_advanced( _conda_vdt_library _conda_vdt_include )
+   if( _conda_vdt_library AND _conda_vdt_include )
+      add_library( VDT::VDT SHARED IMPORTED )
+      set_target_properties( VDT::VDT PROPERTIES
+         IMPORTED_LOCATION "${_conda_vdt_library}"
+         INTERFACE_INCLUDE_DIRECTORIES "${_conda_vdt_include}" )
+   endif()
+endif()
+
+# On macOS the libraries that use Python (Gaudi's, and Athena's through AtlasLCG's FindPython)
+# look its symbols up in the process instead of linking libpython: conda-forge's python has the
+# interpreter built in, and a library linking libpython would run against a second,
+# uninitialised copy of it. So every executable loads libpython, also one that uses none of its
+# symbols itself (conda-forge's -dead_strip_dylibs would drop it otherwise).
+if( APPLE )
+   find_package( Python COMPONENTS Development QUIET )
+   if( TARGET Python::Python )
+      add_link_options( "$<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:LINKER:-needed_library,$<TARGET_LINKER_FILE:Python::Python>>" )
+   endif()
+endif()

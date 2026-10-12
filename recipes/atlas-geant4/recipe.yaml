@@ -23,6 +23,8 @@ source:
       - patches/geant4/geant4-nosymlink.patch
       - patches/geant4/geant4-cpp23.patch
       - patches/geant4/geant4-fsqrt.patch
+      # macOS: thread_local with Clang on arm64, an include that libc++ needs
+      - patches/geant4/geant4-macos.patch
   - url: https://gitlab.cern.ch/VecGeom/VecGeom/-/archive/v${{ vecgeom_version }}/VecGeom-v${{ vecgeom_version }}.tar.gz
     sha256: bbae40766e08798549fcf86b1cb6a1ab0032124b9a0b4153eab198220d5cae62
     target_directory: vecgeom

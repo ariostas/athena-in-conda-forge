@@ -13,19 +13,32 @@ source:
     # from conda-forge's gaudi feedstock: look for .components files next to
     # libGaudiPluginService when GAUDI_PLUGIN_PATH is not set
     - patches/0001-fix-scan-default-plugin-path-in-Registry-initialize.patch
+    # macOS: an #include that libc++ needs, libraries found without DYLD_LIBRARY_PATH from
+    # python, and Python's symbols looked up in the process
+    - patches/0002-macOS-support-with-conda-forge.patch
 
 build:
   number: 0
   skip:
-    - not linux
+    - win
     # conda-forge's python lacks gdbm, so the confdb2 files need dbm.sqlite3 (3.13+)
     - match(python, "<3.13")
   script:
+    # On macOS conda-forge's libc++ headers mark library features newer than the deployment
+    # target as unavailable (libc++ 20's markup of std::from_chars does not even compile); the
+    # environments have conda-forge's own, current libc++ at run time.
+    - if: osx
+      then: export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY"
+    # On macOS the executables load libpython even when they use none of its symbols themselves
+    # (conda-forge's -dead_strip_dylibs would drop it): the libraries they link look Python's
+    # symbols up in the process (patch 0002).
+    - if: osx
+      then: export GAUDI_EXE_LINKER_FLAGS="-Wl,-needed_library,${PREFIX}/lib/libpython${PY_VER}.dylib"
     # The options of conda-forge's gaudi recipe. The test suite is not built: it takes
     # longer than Gaudi itself and conda-forge's gaudi feedstock runs it on the same sources.
-    # librt by name: GaudiKernel's exported target would otherwise carry the absolute path of
-    # the build environment's sysroot.
-    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_CXX_STANDARD=23 -DBUILD_SHARED_LIBS=ON -DBUILD_TESTING=OFF -DGAUDI_INSTALL_PYTHONDIR=${SP_DIR} -DGAUDI_DEFAULT_PLUGIN_PATH=${PREFIX}/lib -DPython_EXECUTABLE=${PYTHON} -DGAUDI_USE_DOXYGEN=OFF -Drt_LIBRARY=rt
+    # librt by name (Linux only): GaudiKernel's exported target would otherwise carry the
+    # absolute path of the build environment's sysroot.
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_CXX_STANDARD=23 -DBUILD_SHARED_LIBS=ON -DBUILD_TESTING=OFF -DGAUDI_INSTALL_PYTHONDIR=${SP_DIR} -DGAUDI_DEFAULT_PLUGIN_PATH=${PREFIX}/lib -DPython_EXECUTABLE=${PYTHON} -DGAUDI_USE_DOXYGEN=OFF ${{ "-Drt_LIBRARY=rt" if linux else "" }} -DCMAKE_EXE_LINKER_FLAGS_INIT="${GAUDI_EXE_LINKER_FLAGS:-}"
     - cmake --build build --parallel ${CPU_COUNT}
     - cmake --install build
 

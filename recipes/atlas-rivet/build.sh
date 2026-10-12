@@ -39,7 +39,8 @@ make clean
 # activation's bare name (e.g. x86_64-conda-linux-gnu-c++), which the
 # minimally activated compilers resolve from PATH in end user environments.
 for script in "${PREFIX}/bin/rivet-build" "${PREFIX}/bin/rivet-config"; do
-    sed -i -E 's@(^|[[:space:]"])-f[a-z-]+-prefix-map=[^ "]*@\1@g' "${script}"
+    sed -i.orig -E 's@(^|[[:space:]"])-f[a-z-]+-prefix-map=[^ "]*@\1@g' "${script}"
+    rm "${script}.orig"
     if grep -E 'prefix-map=' "${script}" \
         || grep -F -e "${BUILD_PREFIX}" -e "${SRC_DIR}" "${script}"; then
         echo "ERROR: build machine paths leaked into ${script}" >&2

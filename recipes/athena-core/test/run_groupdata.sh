@@ -28,7 +28,7 @@ fi
 # the web server only
 mkdir -p groupdata
 cd groupdata
-CALIBPATH=$(tr ':' '\n' <<< "${CALIBPATH}" | grep -v '^/cvmfs/' | paste -sd:)
+CALIBPATH=$(tr ':' '\n' <<< "${CALIBPATH}" | grep -v '^/cvmfs/' | paste -sd: -)
 export CALIBPATH
 found=$(find_calib "${GRL}")
 # downloaded to the working directory

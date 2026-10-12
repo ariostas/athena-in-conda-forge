@@ -1,6 +1,16 @@
 #!/bin/bash
 set -euxo pipefail
 
+# On macOS conda-forge's libc++ headers mark library features newer than the deployment target
+# as unavailable (libc++ 20's markup of std::from_chars does not even compile); the environments
+# have conda-forge's own, current libc++ at run time.
+# COOL also still uses std::auto_ptr and std::binary_function, which libc++ only has on request
+# in C++17 and later.
+if [[ "${target_platform}" == osx-* ]]; then
+  export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY \
+    -D_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR -D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION"
+fi
+
 # COOL wants a platform tag a priori, like CORAL (see lcg-coral).
 case "${target_platform}" in
   linux-64)      BINARY_TAG=x86_64-conda-gcc-opt ;;
@@ -12,7 +22,7 @@ esac
 # COOL's Find modules require the command-line tools of its dependencies, which it does not
 # use, and CORAL's python module in the LCG layout (lcg-coral has it in site-packages). PyCool
 # is built on ROOT's cppyy; the build only compiles its headers against ROOT's.
-cmake -S . -B build -G Ninja ${CMAKE_ARGS} \
+cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
   -DCMAKE_PREFIX_PATH="${PREFIX}" \
@@ -40,3 +50,7 @@ rmdir "${PREFIX}/python"
 rm -rf "${PREFIX}/examples" "${PREFIX}/CoolTest" "${PREFIX}/tests" "${PREFIX}/bin/sql"
 rm -f "${PREFIX}/bin/coolExecuteSql.csh" "${PREFIX}/bin/coolSqlplus.sh"
 rm -f "${PREFIX}"/{cc-run,cc-sh,env.sh,env.csh,setup.sh,setup.csh}
+# On macOS the build copies /usr/bin/env into bin/ (for its own environment scripts, around
+# System Integrity Protection). Current macOS kills copies of system binaries, and this one
+# would shadow the system's env in the environment.
+rm -f "${PREFIX}/bin/env"

@@ -14,10 +14,15 @@ build:
   skip:
     - win
   script:
+    # On macOS conda-forge's libc++ headers mark library features newer than the deployment
+    # target as unavailable (libc++ 20's markup of std::from_chars does not even compile); the
+    # environments have conda-forge's own, current libc++ at run time.
+    - if: osx
+      then: export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY"
     # As ATLAS installs it (atlasexternals' External/CrestApi): the headers under
     # include/CrestApi/CrestApi, found through the CrestApi::CrestApiLib target. The tests
     # download googletest at configure time, so they are not built.
-    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_CXX_STANDARD=23 -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_INCLUDEDIR=include/CrestApi -DCRESTAPI_BUILD_EXAMPLES=FALSE -DBUILD_TESTING=FALSE
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DCMAKE_CXX_STANDARD=23 -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_INCLUDEDIR=include/CrestApi -DCRESTAPI_BUILD_EXAMPLES=FALSE -DBUILD_TESTING=FALSE
     - cmake --build build --parallel ${CPU_COUNT}
     - cmake --install build
 

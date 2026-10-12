@@ -1,0 +1,50 @@
+circ on macOS: IPPROTO_TCP rather than SOL_TCP (Linux's name for it), and a replacement for
+semtimedop (Linux only) that retries the semaphore operation without blocking until the
+timeout expires.
+
+diff --git a/circ/Circ_private.h b/circ/Circ_private.h
+index 999c6de..ac6412f 100755
+--- a/circ/Circ_private.h
++++ b/circ/Circ_private.h
+@@ -129,6 +129,28 @@ extern int CircSemTimeout;
+ #  else
+    extern struct sembuf waitop[1], clrop[1];
+ #  endif
++#  ifdef __APPLE__
++/* macOS has no semtimedop: retry the operation without blocking until the timeout expires */
++#   include <time.h>
++static inline int circ_semtimedop (int id, struct sembuf *ops, size_t nops,
++                                   const struct timespec *tout)
++{
++  const struct timespec step = {0, 1000000}; /* 1 ms */
++  long long left = (long long) tout->tv_sec * 1000 + tout->tv_nsec / 1000000;
++  for (;;)
++  {
++    short flags = ops[0].sem_flg;
++    int rc;
++    ops[0].sem_flg |= IPC_NOWAIT;
++    rc = semop (id, ops, nops);
++    ops[0].sem_flg = flags;
++    if (rc == 0 || errno != EAGAIN || (flags & IPC_NOWAIT)) return rc;
++    if (left-- <= 0) return -1;
++    nanosleep (&step, NULL);
++  }
++}
++#   define semtimedop circ_semtimedop
++#  endif
+ #  define SETSEMA(id,where,return_code) \
+           { \
+ 	    int SETSEMA_repeat; \
+diff --git a/src/Circservice.c b/src/Circservice.c
+index 5cb3a0a..7551e75 100644
+--- a/src/Circservice.c
++++ b/src/Circservice.c
+@@ -1059,7 +1059,7 @@ int CircClientOpenConnection (char *server, unsigned short port)
+     return -1;
+   }
+ 
+-  if (setsockopt (s, SOL_TCP, TCP_NODELAY, &option, sizeof (option)) < 0)
++  if (setsockopt (s, IPPROTO_TCP, TCP_NODELAY, &option, sizeof (option)) < 0)
+   {
+     ErrorSetSystem (CIRC_ERR_SOCKET, "CircClientOpenConnection", "Couldn't set TCP_NODELAY");
+     close (s);

@@ -13,6 +13,8 @@ source:
   - url: https://gitlab.cern.ch/atlas-tdaq-software/ers/-/archive/82d5bc686d5bc797f5b4c5823610cbfe0e1297ba/ers-82d5bc686d5bc797f5b4c5823610cbfe0e1297ba.tar.gz
     sha256: 8ac046637bce262ea24dea02c88093a40b824073856029a6e37c54de63209fce
     target_directory: ers
+    patches:
+      - patches/ers-0001-macOS.patch
   - url: https://gitlab.cern.ch/atlas-tdaq-software/compression/-/archive/398f711d6a6b0cf29286a11352d9c848882ef710/compression-398f711d6a6b0cf29286a11352d9c848882ef710.tar.gz
     sha256: 07f6c999e506bf65795467c461c43bc5918cb83467c7e1ab1ada3176f4c93229
     target_directory: compression
@@ -22,28 +24,41 @@ source:
   - url: https://gitlab.cern.ch/atlas-tdaq-software/EventStorage/-/archive/895d4a9c58cd20927ebdea6c3fd68829e996cf43/EventStorage-895d4a9c58cd20927ebdea6c3fd68829e996cf43.tar.gz
     sha256: 13476b19c84186e29f006dc968273275d21cfa1a0d11dc5c36af713721044797
     target_directory: EventStorage
+    patches:
+      - patches/EventStorage-0001-macOS.patch
   - url: https://gitlab.cern.ch/atlas-tdaq-software/CTPfragment/-/archive/5788cecb053653014720a15e2dbfb39046648065/CTPfragment-5788cecb053653014720a15e2dbfb39046648065.tar.gz
     sha256: 25658ad66d185c28c7ea8d5e2b4437ff92382d14c7ae568f9697e888fda8619d
     target_directory: CTPfragment
   - url: https://gitlab.cern.ch/atlas-tdaq-software/hltinterface/-/archive/ed98b7ad3c18d208c2e04bb55dbd3e2e39dc24cb/hltinterface-ed98b7ad3c18d208c2e04bb55dbd3e2e39dc24cb.tar.gz
     sha256: b38c343f57bcfd5bfae3a7b8bc69f7d7d8bf2f21a65fe40e05bd337516ffb0f1
     target_directory: hltinterface
+    patches:
+      - patches/hltinterface-0001-size_t-not-uint.patch
   - url: https://gitlab.cern.ch/atlas-tdaq-software/MuCalDecode/-/archive/632544ca2baf73e123f4492e7b56eea9cfd17eeb/MuCalDecode-632544ca2baf73e123f4492e7b56eea9cfd17eeb.tar.gz
     sha256: 114c20c6afe6d1643b63a05a04b3f93bfcea868d8fefbcd31c17c0470095ab9e
     target_directory: MuCalDecode
+    patches:
+      - patches/MuCalDecode-0001-getaddrinfo.patch
   - url: https://gitlab.cern.ch/atlas-tdaq-software/circ/-/archive/a9792232bd13ad4ef941976075c80b51f2e7d77c/circ-a9792232bd13ad4ef941976075c80b51f2e7d77c.tar.gz
     sha256: e8581567db81e99c96c0e28119496c2ca13ea58711b26ffe1c82a99d3d64aa7a
     target_directory: circ
+    patches:
+      - patches/circ-0001-macOS.patch
 
 build:
   number: 0
   skip:
-    - not linux
+    - win
   script:
+    # On macOS conda-forge's libc++ headers mark library features newer than the deployment
+    # target as unavailable (libc++ 20's markup of std::from_chars does not even compile); the
+    # environments have conda-forge's own, current libc++ at run time.
+    - if: osx
+      then: export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY"
     # The packages' own CMakeLists.txt, on a replacement for the tdaq build system (cmake_tdaq,
     # built around LCG releases): see cmake/TDAQShim.cmake.
     - cp ${RECIPE_DIR}/cmake/CMakeLists.txt ${RECIPE_DIR}/cmake/TDAQShim.cmake .
-    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DPython_EXECUTABLE=${PYTHON} -DTDAQ_PYTHON_DIR=${SP_DIR}
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DPython_EXECUTABLE=${PYTHON} -DTDAQ_PYTHON_DIR=${SP_DIR}
     - cmake --build build --parallel ${CPU_COUNT}
     - cmake --install build
 
@@ -72,7 +87,6 @@ tests:
   - package_contents:
       lib:
         - ers
-        - ErsBaseStreams
         - compression
         - eformat
         - eformat_write
@@ -85,6 +99,9 @@ tests:
         - hltinterface
         - MuCalDecode
         - circ_proc
+      files:
+        # ers' stream plugin (a module: .so on macOS too)
+        - lib/libErsBaseStreams.so
       include:
         - eformat/eformat.h
         - EventStorage/DataReader.h

@@ -1,0 +1,135 @@
+Packages of the core layer with externals that are not available everywhere (macOS: yampl is
+Linux only, and conda-forge has no valgrind or binutils' libbfd there):
+- AthenaServices and AthenaMPTools: the event service's event loop manager
+  (AthenaMtesEventLoopMgr) and event range tools (EvtRangeScatterer, EvtRangeProcessor) are
+  left out when yampl is not found;
+- TimeoutAlg checks whether it runs on valgrind only when valgrind's header exists;
+- AthenaAuditors links bfd only when found: only the FPE auditor of x86_64 Linux uses it;
+- AthenaMPTools links librt (part of the C library elsewhere) on Linux only.
+
+--- a/Control/AthenaServices/CMakeLists.txt
++++ b/Control/AthenaServices/CMakeLists.txt
+@@ -14,10 +14,25 @@
+ find_package( UUID )
+ find_package( yampl )
+ find_package( valgrind ) # Note that there is no VALGRIND_LIBRARIES variable.
++if( NOT VALGRIND_FOUND )
++   # (no valgrind, e.g. on macOS: TimeoutAlg does without its header)
++   set( VALGRIND_INCLUDE_DIRS )
++endif()
+ 
+-# Component(s) in the package:
++# Component(s) in the package. The event service's event loop manager needs yampl, which is
++# Linux only.
++set( _sources src/*.h src/*.cxx src/components/*.cxx )
++set( _definitions )
++if( NOT YAMPL_FOUND )
++   file( GLOB _sources src/*.h src/*.cxx src/components/*.cxx )
++   list( FILTER _sources EXCLUDE REGEX "AthenaMtesEventLoopMgr" )
++   set( _definitions DEFINITIONS -DATHENASERVICES_NO_YAMPL )
++   set( YAMPL_INCLUDE_DIRS )
++   set( YAMPL_LIBRARIES )
++endif()
+ atlas_add_component( AthenaServices
+-   src/*.h src/*.cxx src/components/*.cxx
++   ${_sources}
++   ${_definitions}
+    INCLUDE_DIRS  ${Python_INCLUDE_DIRS}
+    ${CLHEP_INCLUDE_DIRS} ${ROOT_INCLUDE_DIRS} ${TBB_INCLUDE_DIRS} ${UUID_INCLUDE_DIRS} ${YAMPL_INCLUDE_DIRS}
+    ${VALGRIND_INCLUDE_DIRS} ${EIGEN_INCLUDE_DIRS}
+--- a/Control/AthenaServices/src/TimeoutAlg.cxx
++++ b/Control/AthenaServices/src/TimeoutAlg.cxx
+@@ -15,7 +15,12 @@
+ #include "GaudiKernel/ServiceHandle.h"
+ 
+ #include <format>
+-#include "valgrind/valgrind.h"
++#if __has_include("valgrind/valgrind.h")
++#  include "valgrind/valgrind.h"
++#else
++// (no valgrind, e.g. on macOS)
++#  define RUNNING_ON_VALGRIND 0
++#endif
+ 
+ 
+ StatusCode TimeoutAlg::initialize()
+--- a/Control/AthenaServices/src/components/AthenaServices_entries.cxx
++++ b/Control/AthenaServices/src/components/AthenaServices_entries.cxx
+@@ -23,7 +23,9 @@
+ #include "../MetaDataSvc.h"
+ #include "../OutputStreamSequencerSvc.h"
+ #include "../AthenaHiveEventLoopMgr.h"
++#ifndef ATHENASERVICES_NO_YAMPL
+ #include "../AthenaMtesEventLoopMgr.h"
++#endif
+ #include "../AthIncFirerAlg.h"
+ #include "../ConditionsCleanerSvc.h"
+ #include "../DelayedConditionsCleanerSvc.h"
+@@ -40,7 +42,9 @@
+ DECLARE_COMPONENT( MultipleEventLoopMgr )
+ DECLARE_COMPONENT( AthenaEventLoopMgr )
+ DECLARE_COMPONENT( AthenaHiveEventLoopMgr )
++#ifndef ATHENASERVICES_NO_YAMPL
+ DECLARE_COMPONENT( AthenaMtesEventLoopMgr )
++#endif
+ DECLARE_COMPONENT( PyAthenaEventLoopMgr )
+ DECLARE_COMPONENT( MPIHiveEventLoopMgr )
+ DECLARE_COMPONENT( MPIClusterSvc )
+--- a/Control/AthenaMPTools/CMakeLists.txt
++++ b/Control/AthenaMPTools/CMakeLists.txt
+@@ -14,9 +14,19 @@
+                    LINK_LIBRARIES AthenaInterprocess GaudiKernel )
+ 
+ # Component(s) in the package:
++# The event service's event range tools need yampl, which is Linux only.
++set( _sources src/*.cxx src/components/*.cxx )
++set( _definitions )
++if( NOT YAMPL_FOUND )
++   file( GLOB _sources src/*.cxx src/components/*.cxx )
++   list( FILTER _sources EXCLUDE REGEX "EvtRange(Scatterer|Processor)" )
++   set( _definitions DEFINITIONS -DATHENAMPTOOLS_NO_YAMPL )
++   set( YAMPL_INCLUDE_DIRS )
++   set( YAMPL_LIBRARIES )
++endif()
+ atlas_add_component( AthenaMPTools
+-                     src/*.cxx
+-                     src/components/*.cxx
++                     ${_sources}
++                     ${_definitions}
+                      INCLUDE_DIRS ${Boost_INCLUDE_DIRS} ${YAMPL_INCLUDE_DIRS}
+-                     LINK_LIBRARIES ${Boost_LIBRARIES} ${YAMPL_LIBRARIES} AthenaMPToolsLib AthenaInterprocess GaudiKernel AthenaBaseComps AthenaKernel rt pthread CxxUtils )
++                     LINK_LIBRARIES ${Boost_LIBRARIES} ${YAMPL_LIBRARIES} AthenaMPToolsLib AthenaInterprocess GaudiKernel AthenaBaseComps AthenaKernel $<$<PLATFORM_ID:Linux>:rt> pthread CxxUtils )
+ 
+--- a/Control/AthenaMPTools/src/components/AthenaMPTools_entries.cxx
++++ b/Control/AthenaMPTools/src/components/AthenaMPTools_entries.cxx
+@@ -1,14 +1,18 @@
+ #include "../SharedEvtQueueProvider.h"
+ #include "../SharedEvtQueueConsumer.h"
+ #include "../SharedWriterTool.h"
++#ifndef ATHENAMPTOOLS_NO_YAMPL
+ #include "../EvtRangeScatterer.h"
+ #include "../EvtRangeProcessor.h"
++#endif
+ #include "../SharedHiveEvtQueueConsumer.h"
+ 
+ DECLARE_COMPONENT( SharedEvtQueueProvider )
+ DECLARE_COMPONENT( SharedEvtQueueConsumer )
+ DECLARE_COMPONENT( SharedWriterTool )
++#ifndef ATHENAMPTOOLS_NO_YAMPL
+ DECLARE_COMPONENT( EvtRangeScatterer )
+ DECLARE_COMPONENT( EvtRangeProcessor )
++#endif
+ DECLARE_COMPONENT( SharedHiveEvtQueueConsumer )
+ 
+--- a/Control/AthenaAuditors/CMakeLists.txt
++++ b/Control/AthenaAuditors/CMakeLists.txt
+@@ -6,6 +6,9 @@
+ # External dependencies:
+ find_package( gdb COMPONENTS bfd iberty sframe )
+ find_package( ZLIB )
++# (bfd only for the FPE auditor of x86_64 Linux: leave out what is not found, e.g. on macOS)
++list( FILTER GDB_INCLUDE_DIRS EXCLUDE REGEX "NOTFOUND" )
++list( FILTER GDB_LIBRARIES EXCLUDE REGEX "NOTFOUND" )
+ 
+ # Component(s) in the package:
+ atlas_add_component( AthenaAuditors

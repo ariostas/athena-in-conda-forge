@@ -1,12 +1,17 @@
 #!/bin/bash
 # Build the Athena recipes locally, inside a conda-forge style container.
 #
-# usage: [WORK=<dir>] [KEEP_BUILD=1] build-local.sh <ci-config> [recipe ...]
+# usage: [WORK=<dir>] [KEEP_BUILD=1] [TEST=skip] build-local.sh <ci-config> [recipe ...]
 #   e.g. build-local.sh linux_aarch64   (in the athena-dev container, repo mounted at /repo)
+#        build-local.sh linux64         (in the athena-dev-amd64 container)
+#        WORK=_work/osx-work build-local.sh osx_arm64  (natively on macOS)
 # ci-config is one of the files in .ci_support (without .yaml). WORK (default /work) must contain
 # conda_build_config.yaml (the conda-forge global pinning). Packages are written to $WORK/output,
 # which is also used as a channel, so recipes must be given in dependency order. KEEP_BUILD=1
-# keeps the build directories (in $WORK/output/bld), e.g. to look at the ninja log.
+# keeps the build directories (in $WORK/output/bld), e.g. to look at the ninja log. TEST=skip
+# builds without running the recipes' tests (run them later with `rattler-build test`).
+# CPU_COUNT (default 5) is the build's parallelism, so that a laptop stays usable meanwhile; it
+# also sets CMAKE_BUILD_PARALLEL_LEVEL, for the recipes that run `cmake --build` without -j.
 # Adapted from ../cmssw-in-conda-forge/cmssw-notes/build-local.sh.
 set -euo pipefail
 
@@ -20,6 +25,9 @@ if [ ${#RECIPES[@]} -eq 0 ]; then
            recipes/atlas-rivet)
 fi
 
+export CPU_COUNT=${CPU_COUNT:-5}
+export CMAKE_BUILD_PARALLEL_LEVEL=${CMAKE_BUILD_PARALLEL_LEVEL:-${CPU_COUNT}}
+
 WORK=$(mkdir -p "${WORK:-/work}" && cd "${WORK:-/work}" && pwd)
 # Two runs would share the output directory and the per-recipe logs.
 exec 9>"${WORK}/.build-local.lock"
@@ -27,7 +35,8 @@ if command -v flock >/dev/null && ! flock -n 9; then
   echo "another build-local.sh is running in ${WORK}; wait for it or kill it" >&2
   exit 1
 fi
-cd "$(dirname "$0")/.."
+# REPO: the repository (default: this script's), for a copy of this script run from elsewhere
+cd "${REPO:-$(dirname "$0")/..}"
 OUT=${WORK}/output
 mkdir -p "${OUT}" "${WORK}/logs"
 # use the local output directory as an additional channel
@@ -37,7 +46,14 @@ printf 'python:\n  - 3.13.* *_cp313\nis_python_min:\n  - false\n' > "${WORK}/loc
 
 # Rebuilding a recipe without bumping its build number reuses the already extracted package
 # from rattler's cache, so drop the cached copies of what we are about to rebuild.
-PKG_CACHE=${RATTLER_CACHE_DIR:-${XDG_CACHE_HOME:-${HOME}/.cache}/rattler/cache}/pkgs
+# (On macOS it is in ~/Library/Caches.)
+if [ -n "${RATTLER_CACHE_DIR:-}" ]; then
+  PKG_CACHE=${RATTLER_CACHE_DIR}/pkgs
+elif [ -d "${HOME}/Library/Caches/rattler/cache" ]; then
+  PKG_CACHE=${HOME}/Library/Caches/rattler/cache/pkgs
+else
+  PKG_CACHE=${XDG_CACHE_HOME:-${HOME}/.cache}/rattler/cache/pkgs
+fi
 
 for recipe in "${RECIPES[@]}"; do
   name=$(basename "${recipe}")
@@ -50,8 +66,11 @@ for recipe in "${RECIPES[@]}"; do
   # explicit -m disables the auto-discovery of the recipe's variants.yaml, add it last so it wins
   recipe_variants=()
   [ -f "${recipe}/variants.yaml" ] && recipe_variants+=(-m "${recipe}/variants.yaml")
+  # $WORK/extra_variants.yaml: machine-specific settings, e.g. CONDA_BUILD_SYSROOT on macOS
+  [ -f "${WORK}/extra_variants.yaml" ] && recipe_variants+=(-m "${WORK}/extra_variants.yaml")
   keep=()
   [ "${KEEP_BUILD:-0}" = 1 ] && keep+=(--keep-build)
+  [ "${TEST:-}" = skip ] && keep+=(--test skip)
   if rattler-build build --recipe "${recipe}" --output-dir "${OUT}" ${keep[@]+"${keep[@]}"} \
       -m "${WORK}/${CONFIG}_local.yaml" -m "${WORK}/conda_build_config.yaml" \
       -m "${WORK}/local_variants.yaml" ${recipe_variants[@]+"${recipe_variants[@]}"} \

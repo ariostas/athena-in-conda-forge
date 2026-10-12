@@ -14,7 +14,7 @@ source:
 build:
   number: 0
   skip:
-    - not linux
+    - win
   # A metapackage: what it pulls in is the point.
   script:
     - echo "nothing to build"
@@ -72,7 +72,8 @@ requirements:
     - davix
     - libprotobuf
     - gperftools
-    - valgrind
+    - if: linux
+      then: valgrind
     - libcurl
     - vdt
     - libxml2
@@ -106,7 +107,8 @@ requirements:
     - chai
     - tdaq-common
     - tdaq-dqm-core
-    - yampl
+    - if: linux
+      then: yampl
     - boost-mpi3
     - openmpi
     - qt-main 5.*

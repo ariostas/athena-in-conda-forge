@@ -16,7 +16,7 @@ source:
 build:
   number: 0
   skip:
-    - not linux
+    - win
     - match(python, "<3.13")
   script:
     file: build.sh
@@ -71,7 +71,8 @@ requirements:
     - crestapi
     - chai
     - tdaq-common
-    - yampl
+    - if: linux
+      then: yampl
     - boost-mpi3
     - openmpi
     - python
@@ -108,7 +109,8 @@ requirements:
     # PerfMonGPerfTools
     - gperftools
     # headers only (AthenaServices)
-    - valgrind
+    - if: linux
+      then: valgrind
     - libcurl
     - vdt
     # the build draws the python import graph of the packages (apydep)
@@ -125,6 +127,11 @@ tests:
       - bash test/run_reco.sh
       # every component of the layer has its configurable
       - python test/check_confdb.py "${AthenaReco_DIR}/lib/AthenaReco.components"
+    requirements:
+      run:
+        # sha256sum (macOS has only shasum)
+        - if: osx
+          then: coreutils
     files:
       recipe:
         - test/

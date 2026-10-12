@@ -1,0 +1,22 @@
+hltinterface: size_t rather than uint (a glibc typedef) for vector indices.
+
+diff --git a/src/ContainerFactory.cxx b/src/ContainerFactory.cxx
+index f825d75..a897f71 100644
+--- a/src/ContainerFactory.cxx
++++ b/src/ContainerFactory.cxx
+@@ -110,13 +110,13 @@ namespace hltinterface{
+     //copy int vectors
+     fnames=orig->getFieldNames(hltinterface::GenericHLTContainer::INTVEC);
+     auto fprops=orig->getFieldProperties(hltinterface::GenericHLTContainer::INTVEC);
+-    for(uint i=0;i<fnames.size();i++){
++    for(size_t i=0;i<fnames.size();i++){
+       n->addIntVector(fnames.at(i),fprops.at(i));
+     }
+     //copy float vectors
+     fnames=orig->getFieldNames(hltinterface::GenericHLTContainer::FLOATVEC);
+     fprops=orig->getFieldProperties(hltinterface::GenericHLTContainer::FLOATVEC);
+-    for(uint i=0;i<fnames.size();i++){
++    for(size_t i=0;i<fnames.size();i++){
+       n->addFloatVector(fnames.at(i),fprops.at(i));
+     }
+ 

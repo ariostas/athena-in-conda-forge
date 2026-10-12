@@ -1,9 +1,16 @@
 #!/bin/bash
 set -euxo pipefail
 
+# On macOS conda-forge's libc++ headers mark library features newer than the deployment target
+# as unavailable (some, such as the time zone database, even from inline code that <chrono>
+# brings in). The environments have conda-forge's own, current libc++ at run time.
+if [[ "${target_platform}" == osx-* ]]; then
+  export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY"
+fi
+
 # GeoModel's CMake turns warnings into errors (CMAKE_COMPILE_WARNING_AS_ERROR), which a newer
 # compiler than upstream's CI can trip.
-cmake -S . -B build -G Ninja ${CMAKE_ARGS} \
+cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="${PREFIX}" \
   -DCMAKE_INSTALL_LIBDIR=lib \

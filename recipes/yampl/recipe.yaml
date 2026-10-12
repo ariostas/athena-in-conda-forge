@@ -15,6 +15,7 @@ build:
   number: 0
   skip:
     - not linux
+    # vmsplice, futexes and glibc's TEMP_FAILURE_RETRY: Linux only
   script:
     # the bundled ZeroMQ is replaced by conda-forge's (see the patch)
     - rm -rf zeromq

@@ -98,7 +98,7 @@ outputs:
             - lib/cmake/GeoModelIO/GeoModelIOConfig.cmake
       # a small geometry written to SQLite and read back, built through the CMake configuration
       - script:
-          - cmake -S test -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_PREFIX_PATH=${PREFIX}
+          - cmake -S test -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DCMAKE_PREFIX_PATH=${PREFIX}
           - cmake --build build
           - ./build/write_read geometry.db
         files:

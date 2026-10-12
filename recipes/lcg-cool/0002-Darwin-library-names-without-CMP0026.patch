@@ -1,0 +1,49 @@
+COOL on macOS: its Darwin library naming (.so, with a .dylib link) without reading the LOCATION
+property, which needs the CMP0026 OLD policy that CMake 4 no longer allows (as CORAL's).
+
+diff --git a/cmake/CORALModule.cmake b/cmake/CORALModule.cmake
+index c8ba72d..63999ee 100644
+--- a/cmake/CORALModule.cmake
++++ b/cmake/CORALModule.cmake
+@@ -33,15 +33,13 @@ macro(CORALModule)
+     install(TARGETS lcg_${package} DESTINATION lib)
+ 
+     IF(CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin") # See CORALCOOL-2819
+-      cmake_policy(SET CMP0026 OLD) # Disable CMP0026 warning
++      # (the file name without reading the LOCATION property: CMake 4 no longer allows CMP0026 OLD)
+       set_target_properties(lcg_${package} PROPERTIES SUFFIX ".so") # DEFAULT!
+-      get_property(lcg_${package}_loc TARGET lcg_${package} PROPERTY LOCATION)
+-      get_filename_component(lcg_${package}_we ${lcg_${package}_loc} NAME_WE)
+       add_custom_command(
+         TARGET lcg_${package} POST_BUILD
+-        COMMAND ln -sf $<TARGET_FILE_NAME:lcg_${package}> $<TARGET_FILE_DIR:lcg_${package}>/${lcg_${package}_we}.dylib
++        COMMAND ln -sf $<TARGET_FILE_NAME:lcg_${package}> $<TARGET_FILE_DIR:lcg_${package}>/liblcg_${package}.dylib
+       )
+-      install(PROGRAMS $<TARGET_FILE_DIR:lcg_${package}>/${lcg_${package}_we}.dylib DESTINATION lib)
++      install(PROGRAMS $<TARGET_FILE_DIR:lcg_${package}>/liblcg_${package}.dylib DESTINATION lib)
+     ENDIF()
+ 
+     include(CORALConfigScripts)
+diff --git a/cmake/CORALSharedLib.cmake b/cmake/CORALSharedLib.cmake
+index ccf7ac0..c7911b9 100644
+--- a/cmake/CORALSharedLib.cmake
++++ b/cmake/CORALSharedLib.cmake
+@@ -33,15 +33,13 @@ macro(CORALSharedLib)
+     install(TARGETS lcg_${package} DESTINATION lib)
+ 
+     IF(CMAKE_HOST_SYSTEM_NAME MATCHES "Darwin") # See CORALCOOL-2819 and -2887
+-      cmake_policy(SET CMP0026 OLD) # Disable CMP0026 warning
++      # (the file name without reading the LOCATION property: CMake 4 no longer allows CMP0026 OLD)
+       set_target_properties(lcg_${package} PROPERTIES SUFFIX ".so") # DEFAULT!
+-      get_property(lcg_${package}_loc TARGET lcg_${package} PROPERTY LOCATION)
+-      get_filename_component(lcg_${package}_we ${lcg_${package}_loc} NAME_WE)
+       add_custom_command(
+         TARGET lcg_${package} POST_BUILD
+-        COMMAND ln -sf $<TARGET_FILE_NAME:lcg_${package}> $<TARGET_FILE_DIR:lcg_${package}>/${lcg_${package}_we}.dylib
++        COMMAND ln -sf $<TARGET_FILE_NAME:lcg_${package}> $<TARGET_FILE_DIR:lcg_${package}>/liblcg_${package}.dylib
+       )
+-      install(PROGRAMS $<TARGET_FILE_DIR:lcg_${package}>/${lcg_${package}_we}.dylib DESTINATION lib)
++      install(PROGRAMS $<TARGET_FILE_DIR:lcg_${package}>/liblcg_${package}.dylib DESTINATION lib)
+     ENDIF()
+ 
+     include(CORALConfigScripts)

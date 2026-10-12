@@ -38,3 +38,15 @@ MACOSX_DEPLOYMENT_TARGET:
 # keeps it from being mixed with Eigen 5 builds.
 eigen_abi_devel:
   - "3.4.0.100"
+
+# On macOS, the compiler of conda-forge's ROOT 6.40 (clang 20): an environment with ROOT and a
+# compiler (a test, a user's work area) cannot hold another libcxx-devel than ROOT's, and cling
+# then parses the same libc++ headers as the compiled code saw. Elsewhere the global pinning's.
+c_compiler_version:
+  - if: osx
+    then: "20"
+    else: "15"
+cxx_compiler_version:
+  - if: osx
+    then: "20"
+    else: "15"

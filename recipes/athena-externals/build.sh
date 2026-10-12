@@ -8,24 +8,34 @@ set -euxo pipefail
 # the Athena layers expect for their base projects:
 #   ${PREFIX}/opt/athena/AthenaExternals/<version>/InstallArea/<platform>
 case "${target_platform}" in
-  linux-64)      ARCH=x86_64 ;;
-  linux-aarch64) ARCH=aarch64 ;;
+  linux-64)      ARCH=x86_64  COMPILER=gcc ;;
+  linux-aarch64) ARCH=aarch64 COMPILER=gcc ;;
+  osx-arm64)     ARCH=arm64   COMPILER=clang ;;
   *) echo "Unsupported platform ${target_platform}"; exit 1 ;;
 esac
 # The name AtlasCMake would choose itself, with the "cf" OS name of patch 0001.
-PLATFORM=${ARCH}-cf-gcc$(${CXX} -dumpversion | cut -d. -f1)-opt
+PLATFORM=${ARCH}-cf-${COMPILER}$(${CXX} -dumpversion | cut -d. -f1)-opt
 INSTALL=${PREFIX}/opt/athena/AthenaExternals/${PKG_VERSION}/InstallArea/${PLATFORM}
 
 # Of the externals, only dSFMT: a small library that ATLAS keeps in atlasexternals (its sources
 # are there), static, for AtlasCLHEP_RandomGenerators.
 printf -- '+ External/dSFMT\n- .*\n' > package_filters.txt
+# On macOS the libraries find each other through rpaths (AtlasCMake patch 0005).
+RPATH_ARGS=()
+if [[ "${target_platform}" == osx-* ]]; then
+  RPATH_ARGS=(-DCMAKE_INSTALL_RPATH="${INSTALL}/lib;${PREFIX}/lib")
+fi
+# CMAKE_DISABLE_FIND_PACKAGE_Python: the project needs no Python, and with one found (e.g.
+# macOS's /usr/bin/python3) setup.sh sets PYTHONHOME to it for every project built on this one.
 cmake -S Projects/AthenaExternals -B build -G Ninja ${CMAKE_ARGS} \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="${INSTALL}" \
   -DCMAKE_PROJECT_VERSION="${PKG_VERSION}" \
   -DATLAS_FORCE_PLATFORM="${PLATFORM}" \
   -DLCG_VERSION_NUMBER=0 -DLCG_VERSION_POSTFIX="" \
-  -DATLAS_PACKAGE_FILTER_FILE="${PWD}/package_filters.txt"
+  -DATLAS_PACKAGE_FILTER_FILE="${PWD}/package_filters.txt" \
+  -DCMAKE_DISABLE_FIND_PACKAGE_Python=ON \
+  ${RPATH_ARGS[@]+"${RPATH_ARGS[@]}"}
 cmake --build build
 cmake --install build
 

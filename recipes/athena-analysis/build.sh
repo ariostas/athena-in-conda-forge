@@ -8,11 +8,12 @@ LAYER=AthenaAnalysis
 BASE=AthenaEDMDet
 
 case "${target_platform}" in
-  linux-64)      ARCH=x86_64 ;;
-  linux-aarch64) ARCH=aarch64 ;;
+  linux-64)      ARCH=x86_64  COMPILER=gcc ;;
+  linux-aarch64) ARCH=aarch64 COMPILER=gcc ;;
+  osx-arm64)     ARCH=arm64   COMPILER=clang ;;
   *) echo "Unsupported platform ${target_platform}"; exit 1 ;;
 esac
-PLATFORM=${ARCH}-cf-gcc$(${CXX} -dumpversion | cut -d. -f1)-opt
+PLATFORM=${ARCH}-cf-${COMPILER}$(${CXX} -dumpversion | cut -d. -f1)-opt
 ROOT=${PREFIX}/opt/athena
 INSTALL=${ROOT}/${LAYER}/${PKG_VERSION}/InstallArea/${PLATFORM}
 
@@ -43,9 +44,27 @@ set +ux
 source "${ROOT}/${BASE}/${PKG_VERSION}/InstallArea/${PLATFORM}/setup.sh"
 set -ux
 # ...without the host prefix's (glibc 2.17) sysroot, which root_base's compiler activation adds.
-CMAKE_PREFIXES=$(tr ':' '\n' <<< "${CMAKE_PREFIX_PATH}" | grep -v -- "-conda-linux-gnu/sysroot" | paste -sd';')
+CMAKE_PREFIXES=$(tr ':' '\n' <<< "${CMAKE_PREFIX_PATH}" | grep -v -- "-conda-linux-gnu/sysroot" | paste -sd';' -)
 
-sed -e '/^#/d' -e '/^$/d' -e 's/^/+ /' "${RECIPE_DIR}/packages.txt" > package_filters.txt
+# On macOS the libraries find each other through rpaths (athena-externals' AtlasCMake patch
+# 0005): this layer's lib/, the layers' below it and the prefix's.
+RPATH_ARGS=()
+if [[ "${target_platform}" == osx-* ]]; then
+  rpath="${INSTALL}/lib"
+  for dir in "${ROOT}"/*/"${PKG_VERSION}"/InstallArea/"${PLATFORM}"/lib; do
+    rpath="${rpath};${dir}"
+  done
+  RPATH_ARGS=(-DCMAKE_INSTALL_RPATH="${rpath};${PREFIX}/lib")
+fi
+
+# The packages that cannot be built on macOS (packages_excluded_osx.txt, with the reasons) come
+# first, as exclusions: the first matching line decides.
+: > package_filters.txt
+if [[ "${target_platform}" == osx-* ]] && [ -f "${RECIPE_DIR}/packages_excluded_osx.txt" ]; then
+  sed -e 's/#.*//' -e '/^ *$/d' -e 's/ *$//' -e 's/^/- /' \
+    "${RECIPE_DIR}/packages_excluded_osx.txt" > package_filters.txt
+fi
+sed -e '/^#/d' -e '/^$/d' -e 's/^/+ /' "${RECIPE_DIR}/packages.txt" >> package_filters.txt
 echo "- .*" >> package_filters.txt
 # The layer project goes where ATLAS keeps its projects: some packages find the athena source
 # tree as ${CMAKE_SOURCE_DIR}/../../.
@@ -68,7 +87,8 @@ cmake -S Projects/CondaLayer -B build -G Ninja ${CMAKE_ARGS} \
   -DPython_EXECUTABLE="${PYTHON}" \
   -DCMAKE_INSTALL_SO_NO_EXE=0 \
   -DATLAS_EXTERNAL="${SRC_DIR}/no-atlas-external" \
-  -DATLAS_ALWAYS_BUILD_TESTS=OFF
+  -DATLAS_ALWAYS_BUILD_TESTS=OFF \
+  ${RPATH_ARGS[@]+"${RPATH_ARGS[@]}"}
 cmake --build build --parallel "${CPU_COUNT}"
 
 # The unit tests of the packages in unit_tests.txt, which need no input files: built (each
@@ -84,8 +104,8 @@ if [ -f "${RECIPE_DIR}/unit_tests.txt" ]; then
   # onnxruntime prints a warning, which ends up in the logs that tests compare with references.
   export ATLAS_CTEST_LOG_IGNORE_PATTERN2="onnxruntime cpuid_info warning"
   ctest --test-dir build --output-on-failure --parallel "${CPU_COUNT}" \
-    --label-regex "^($(paste -sd'|' <<< "${tested}"))$" \
-    --exclude-regex "^($(paste -sd'|' <<< "${excluded}"))$"
+    --label-regex "^($(paste -sd'|' - << "${tested}"))$" \
+    --exclude-regex "^($(paste -sd'|' - << "${excluded}"))$"
 fi
 
 cmake --install build

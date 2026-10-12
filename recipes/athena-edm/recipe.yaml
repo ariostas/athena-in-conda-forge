@@ -17,7 +17,7 @@ source:
 build:
   number: 0
   skip:
-    - not linux
+    - win
     - match(python, "<3.13")
   script:
     file: build.sh
@@ -48,7 +48,8 @@ requirements:
     - crestapi
     - chai
     - tdaq-common
-    - yampl
+    - if: linux
+      then: yampl
     - boost-mpi3
     - openmpi
     - python
@@ -85,7 +86,8 @@ requirements:
     # PerfMonGPerfTools
     - gperftools
     # headers only (AthenaServices)
-    - valgrind
+    - if: linux
+      then: valgrind
     - libcurl
     - vdt
     # the build draws the python import graph of the packages (apydep)

@@ -8,8 +8,9 @@ set -euo pipefail
 mkdir -p ws/athena/Projects ws/athena/Control/AthenaExamples
 cp -r Projects/WorkDir ws/athena/Projects/
 cp -r Control/AthenaExamples/AthExHelloWorld ws/athena/Control/AthenaExamples/
-sed -i 's/my message to the world/my message from a conda work area/' \
+sed -i.orig 's/my message to the world/my message from a conda work area/' \
   ws/athena/Control/AthenaExamples/AthExHelloWorld/src/HelloTool.cxx
+rm ws/athena/Control/AthenaExamples/AthExHelloWorld/src/HelloTool.cxx.orig
 
 cd ws
 if ! cmake -S athena/Projects/WorkDir -B build > cmake.log 2>&1; then

@@ -4,3 +4,21 @@
 # keeps it from being mixed with Eigen 5 builds.
 eigen_abi_devel:
   - "3.4.0.100"
+
+# On macOS, as the Athena layers that link it: std::format's floating point support needs
+# macOS 13.3, and the compiler of conda-forge's ROOT 6.40 (clang 20).
+c_stdlib_version:
+  - if: osx
+    then: "13.3"
+    else: "2.17"
+MACOSX_DEPLOYMENT_TARGET:
+  - if: osx
+    then: "13.3"
+c_compiler_version:
+  - if: osx
+    then: "20"
+    else: "15"
+cxx_compiler_version:
+  - if: osx
+    then: "20"
+    else: "15"

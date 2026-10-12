@@ -1,0 +1,18 @@
+# The compilers of the Athena layers built on this project (whose platform name records the
+# compiler's major version): on macOS the compiler of conda-forge's ROOT 6.40 (clang 20), with
+# the deployment target the layers need; elsewhere the global pinning's.
+c_compiler_version:
+  - if: osx
+    then: "20"
+    else: "15"
+cxx_compiler_version:
+  - if: osx
+    then: "20"
+    else: "15"
+c_stdlib_version:
+  - if: osx
+    then: "13.3"
+    else: "2.17"
+MACOSX_DEPLOYMENT_TARGET:
+  - if: osx
+    then: "13.3"

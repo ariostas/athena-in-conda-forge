@@ -1,0 +1,188 @@
+AtlasCMake and AtlasLCG on macOS with a (non-Apple) Clang, e.g. conda-forge's:
+1. no GNU ld options (--as-needed, --no-undefined, -z max-page-size, --hash-style): Apple's
+   linker knows none of them, whichever Clang drives it (only AppleClang was excluded);
+2. rpaths, when CMAKE_INSTALL_RPATH is given: System Integrity Protection drops
+   DYLD_LIBRARY_PATH from the environment of every system executable (/bin/bash,
+   /usr/bin/env), so libraries cannot rely on it to find each other. Nothing changes elsewhere;
+3. no scanning for C++ modules by default (CMake does it from C++20 on): ATLAS code has none,
+   and with Clang the scan needs clang-scan-deps;
+4. the build's private bash: a link to a bash outside the system directories when there is one
+   (conda-forge's), which SIP does not protect either. Current macOS versions kill the copy of
+   /bin/bash that AtlasCMake makes;
+5. libpython linked into executables only: a library that links it, loaded into a python
+   interpreter with libpython built in (conda-forge's), runs against a second, uninitialised
+   copy of it (two-level namespace). Libraries look the symbols up at run time instead;
+6. setup.sh also puts the project's lib/ into GAUDI_PLUGIN_PATH and ROOT_LIBRARY_PATH on macOS,
+   where Gaudi's plugin service and ROOT find libraries without DYLD_LIBRARY_PATH (point 2).
+7. C++23 by default on macOS with Clang 20 and 21 too (ATLAS switches at Clang 22):
+   conda-forge's ROOT is a C++23 build with Clang 20 there, and its interface would otherwise
+   compile part of a project as C++23 and the rest as C++20.
+8. the .components file of a library from the library's own file name: a shared library (the
+   T/P converter factories) has another suffix than a module on macOS (.dylib, not .so).
+
+diff --git a/Build/AtlasCMake/modules/AtlasCompilerSettings.cmake b/Build/AtlasCMake/modules/AtlasCompilerSettings.cmake
+index 33cb2f3..97dcd37 100644
+--- a/Build/AtlasCMake/modules/AtlasCompilerSettings.cmake
++++ b/Build/AtlasCMake/modules/AtlasCompilerSettings.cmake
+@@ -29,7 +29,11 @@ function( atlas_set_compiler_defaults )
+             ( "${CMAKE_CXX_COMPILER_VERSION}" VERSION_GREATER_EQUAL "15" ) ) OR
+          ( ( ( "${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang" ) OR
+                ( "${CMAKE_CXX_COMPILER_ID}" MATCHES "LLVM" ) ) AND
+-            ( "${CMAKE_CXX_COMPILER_VERSION}" VERSION_GREATER_EQUAL "22" ) ) )
++            ( "${CMAKE_CXX_COMPILER_VERSION}" VERSION_GREATER_EQUAL "22" ) ) OR
++         # On macOS (libc++) from Clang 20 on: conda-forge's ROOT for Athena is a
++         # C++23 build with Clang 20, and everything has to use the same standard.
++         ( APPLE AND ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" ) AND
++            ( "${CMAKE_CXX_COMPILER_VERSION}" VERSION_GREATER_EQUAL "20" ) ) )
+       # Use C++23 for the above compilers.
+       set( CMAKE_CXX_STANDARD_DEFAULT 23 )
+    endif()
+@@ -193,9 +197,10 @@ endif()
+ 
+ # Make all the following settings only for GCC and Clang.
+ # Note that Apple's Clang compiler ("AppleClang") is excluded, as it
+-# interestingly doesn't support *any* of these linker options.
+-if( ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" ) OR
+-    ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" ) )
++# interestingly doesn't support *any* of these linker options. Neither does
++# Apple's linker with any other Clang (e.g. conda-forge's).
++if( ( ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" ) OR
++      ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" ) ) AND NOT APPLE )
+ 
+    # By default use the --as-needed option for everything. Remember that this
+    # behaviour can be turned off in individual packages using
+diff --git a/Build/AtlasCMake/modules/AtlasFunctions.cmake b/Build/AtlasCMake/modules/AtlasFunctions.cmake
+index 42948f3..8f05db5 100644
+--- a/Build/AtlasCMake/modules/AtlasFunctions.cmake
++++ b/Build/AtlasCMake/modules/AtlasFunctions.cmake
+@@ -79,13 +79,31 @@ function( atlas_project )
+    set_property( GLOBAL PROPERTY ATLAS_EXPORTED_TARGETS "" )
+    set_property( GLOBAL PROPERTY ATLAS_EXPORTED_PACKAGES "" )
+ 
+-   # Do not set any rpath values on any of the files.
+-   set( CMAKE_SKIP_RPATH ON )
+-   set( CMAKE_SKIP_RPATH ON PARENT_SCOPE )
+-   set( CMAKE_SKIP_BUILD_RPATH ON )
+-   set( CMAKE_SKIP_BUILD_RPATH ON PARENT_SCOPE )
+-   set( CMAKE_SKIP_INSTALL_RPATH ON )
+-   set( CMAKE_SKIP_INSTALL_RPATH ON PARENT_SCOPE )
++   # Do not set any rpath values on any of the files. Except on macOS, where
++   # System Integrity Protection drops DYLD_LIBRARY_PATH from the environment of
++   # any system executable (/bin/bash, /usr/bin/env, ...), so the libraries
++   # find each other through the rpaths given in CMAKE_INSTALL_RPATH (e.g. the
++   # lib/ directories of the project and its base projects). The build-tree
++   # binaries get them as well: what their build-time jobs need beyond that comes
++   # from atlas_build_run.sh, which runs a private copy of bash.
++   # No scanning of the sources for C++ modules, which ATLAS code does not use:
++   # with Clang the scan needs clang-scan-deps.
++   if( NOT DEFINED CMAKE_CXX_SCAN_FOR_MODULES )
++      set( CMAKE_CXX_SCAN_FOR_MODULES OFF )
++      set( CMAKE_CXX_SCAN_FOR_MODULES OFF PARENT_SCOPE )
++   endif()
++
++   if( APPLE AND CMAKE_INSTALL_RPATH )
++      set( CMAKE_BUILD_WITH_INSTALL_RPATH ON )
++      set( CMAKE_BUILD_WITH_INSTALL_RPATH ON PARENT_SCOPE )
++   else()
++      set( CMAKE_SKIP_RPATH ON )
++      set( CMAKE_SKIP_RPATH ON PARENT_SCOPE )
++      set( CMAKE_SKIP_BUILD_RPATH ON )
++      set( CMAKE_SKIP_BUILD_RPATH ON PARENT_SCOPE )
++      set( CMAKE_SKIP_INSTALL_RPATH ON )
++      set( CMAKE_SKIP_INSTALL_RPATH ON PARENT_SCOPE )
++   endif()
+ 
+    # Make sure that the linker commands see the runtime environment of the
+    # current project. To make sure that private dependencies on libraries could
+@@ -574,7 +592,16 @@ function( atlas_project )
+       message( WARNING "BASH not found. The build will fail." )
+    endif()
+ 
+-   if( APPLE )
++   if( APPLE AND NOT _bash_executable MATCHES "^/(usr/)?bin/" )
++      # A bash outside the system directories (e.g. conda-forge's) is not
++      # protected by System Integrity Protection, and it keeps DYLD_LIBRARY_PATH.
++      # Current macOS versions kill copies of the system's bash, so this is the
++      # one to use: linked from where the copy would be.
++      file( MAKE_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}" )
++      file( CREATE_LINK "${_bash_executable}"
++         "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bash" SYMBOLIC )
++      set( BASH_EXECUTABLE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/bash" )
++   elseif( APPLE )
+       # Copy bash into the build directory.
+       file( COPY "${_bash_executable}"
+          DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}" )
+diff --git a/Build/AtlasCMake/modules/AtlasLibraryFunctions.cmake b/Build/AtlasCMake/modules/AtlasLibraryFunctions.cmake
+index 4e762a6..a7b6e88 100644
+--- a/Build/AtlasCMake/modules/AtlasLibraryFunctions.cmake
++++ b/Build/AtlasCMake/modules/AtlasLibraryFunctions.cmake
+@@ -837,8 +837,9 @@ function( atlas_generate_componentslist libName )
+    set( _componentsfile "${_componentsfile}${CMAKE_SHARED_MODULE_PREFIX}" )
+    set( _componentsfile "${_componentsfile}${libName}" )
+    set( _componentsfile "${_componentsfile}${ATLAS_COMPONENTS_EXTENSION}" )
+-   set( _fullLibName "${CMAKE_SHARED_MODULE_PREFIX}${libName}" )
+-   set( _fullLibName "${_fullLibName}${CMAKE_SHARED_MODULE_SUFFIX}" )
++   # (the library's own file name: a shared library rather than a module, e.g.
++   # the T/P converter factories, has another suffix on macOS)
++   set( _fullLibName "$<TARGET_FILE_NAME:${libName}>" )
+    if( Gaudi_FOUND )
+       add_custom_command( OUTPUT ${_componentsfile}
+          COMMAND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/atlas_build_run.sh
+diff --git a/Build/AtlasCMake/modules/scripts/setup.sh.in b/Build/AtlasCMake/modules/scripts/setup.sh.in
+index dc9a629..b1cec64 100644
+--- a/Build/AtlasCMake/modules/scripts/setup.sh.in
++++ b/Build/AtlasCMake/modules/scripts/setup.sh.in
+@@ -135,6 +135,14 @@ if [ "x${ENV_VAR_VALUE}" = "x" ]; then
+         # Set up the library path(s):
+         export LD_LIBRARY_PATH=${@CMAKE_PROJECT_NAME@_DIR}/lib:${LD_LIBRARY_PATH}
+         export DYLD_LIBRARY_PATH=${@CMAKE_PROJECT_NAME@_DIR}/lib:${DYLD_LIBRARY_PATH}
++        # On macOS System Integrity Protection drops DYLD_LIBRARY_PATH from the
++        # environment of every script started through a system shell or
++        # /usr/bin/env: Gaudi's plugin service and ROOT look for libraries in
++        # these as well.
++        if [ "$(uname -s)" = "Darwin" ]; then
++            export GAUDI_PLUGIN_PATH=${@CMAKE_PROJECT_NAME@_DIR}/lib:${GAUDI_PLUGIN_PATH}
++            export ROOT_LIBRARY_PATH=${@CMAKE_PROJECT_NAME@_DIR}/lib:${ROOT_LIBRARY_PATH}
++        fi
+ 
+         # Set up the python path(s):
+         export PYTHONPATH=${@CMAKE_PROJECT_NAME@_DIR}/lib:${PYTHONPATH}
+@@ -165,6 +173,10 @@ if [ "x${ENV_VAR_VALUE}" = "x" ]; then
+             remove_duplicates PATH
+             remove_duplicates LD_LIBRARY_PATH
+             remove_duplicates DYLD_LIBRARY_PATH
++            if [ "$(uname -s)" = "Darwin" ]; then
++                remove_duplicates GAUDI_PLUGIN_PATH
++                remove_duplicates ROOT_LIBRARY_PATH
++            fi
+             remove_duplicates PYTHONPATH
+             remove_duplicates JOBOPTSEARCHPATH
+             remove_duplicates DATAPATH
+diff --git a/Build/AtlasLCG/modules/FindPython.cmake b/Build/AtlasLCG/modules/FindPython.cmake
+index 4d7254b..0265c79 100644
+--- a/Build/AtlasLCG/modules/FindPython.cmake
++++ b/Build/AtlasLCG/modules/FindPython.cmake
+@@ -28,6 +28,23 @@ endif()
+ 
+ lcg_wrap_find_module( Python )
+ 
++# On macOS, link libpython only into executables. A library or module that links it, loaded into
++# an interpreter that has libpython built in (conda-forge's python does), runs against a second,
++# uninitialised copy of it, as macOS resolves symbols by library (two-level namespace). They
++# look the symbols up in the process at run time instead, as python extension modules do.
++if( APPLE AND Python_LIBRARIES AND NOT Python_LIBRARIES MATCHES "dynamic_lookup" )
++   set( _isExe "$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>" )
++   set( _libraries )
++   foreach( _lib ${Python_LIBRARIES} )
++      list( APPEND _libraries "$<${_isExe}:${_lib}>" )
++   endforeach()
++   list( APPEND _libraries "$<$<NOT:${_isExe}>:-Wl,-undefined,dynamic_lookup>" )
++   set( Python_LIBRARIES ${_libraries} )
++   unset( _isExe )
++   unset( _libraries )
++   unset( _lib )
++endif()
++
+ # Cache some additional variables.
+ if ( Python_FOUND )
+    set( Python_VERSION_MAJOR "${Python_VERSION_MAJOR}" CACHE INTERNAL

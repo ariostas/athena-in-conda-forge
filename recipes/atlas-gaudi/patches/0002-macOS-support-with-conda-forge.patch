@@ -1,0 +1,143 @@
+Gaudi on macOS with conda-forge:
+1. LinkManager.h uses std::default_sentinel without including <iterator>, which libstdc++
+   gets from other headers and libc++ does not;
+2. GaudiPluginService.cpluginsvc and Gaudi.Application load libGaudiPluginService.dylib and
+   libGaudiKernel.dylib through DYLD_LIBRARY_PATH alone, and System Integrity Protection drops
+   it from every script started through /usr/bin/env (genconfuser.py during the build,
+   gaudirun.py): look in LD_LIBRARY_PATH and in the python installation's prefix as well;
+3. the libraries look Python's symbols up in the process (Python::Module) rather than link
+   libpython (Python::Python): conda-forge's python has the interpreter built in, and with
+   macOS's two-level namespace a library linking libpython runs against a second,
+   uninitialised copy of it inside python. Executables load libpython instead (see the recipe).
+
+diff --git a/Gaudi/python/Gaudi/__init__.py b/Gaudi/python/Gaudi/__init__.py
+index d0e17a8..d3442e9 100644
+--- a/Gaudi/python/Gaudi/__init__.py
++++ b/Gaudi/python/Gaudi/__init__.py
+@@ -94,17 +94,23 @@ class Application(object):
+             #       API must be protected acquiring the GIL
+             #
+             if sys.platform == "darwin":
+-                # DYLD_LIBRARY_PATH cannot be used for dlopen on macos
+-                _libpaths = os.environ.get("DYLD_LIBRARY_PATH")
+-                if not _libpaths:
+-                    print("WARNING: DYLD_LIBRARY_PATH is empty!")
+-                for _path in _libpaths.split(":"):
++                # DYLD_LIBRARY_PATH cannot be used for dlopen on macos, and System Integrity
++                # Protection drops it from the environment of any script started through
++                # /usr/bin/env: look in it, in LD_LIBRARY_PATH and in this python
++                # installation's prefix
++                _libpaths = os.environ.get("DYLD_LIBRARY_PATH", "").split(":")
++                _libpaths += os.environ.get("LD_LIBRARY_PATH", "").split(":")
++                _libpaths.append(os.path.join(sys.prefix, "lib"))
++                for _path in _libpaths:
+                     _lib = os.path.join(_path, "libGaudiKernel.dylib")
+-                    if os.path.isfile(_lib):
++                    if _path and os.path.isfile(_lib):
+                         gkl = _GaudiKernelLib = ctypes.CDLL(
+                             _lib,
+                             mode=ctypes.RTLD_GLOBAL,
+                         )
++                        break
++                else:
++                    raise ImportError("libGaudiKernel.dylib not found")
+             else:
+                 gkl = _GaudiKernelLib = ctypes.CDLL(
+                     "libGaudiKernel.so",
+diff --git a/GaudiCoreSvc/CMakeLists.txt b/GaudiCoreSvc/CMakeLists.txt
+index fe1dc07..25c000a 100644
+--- a/GaudiCoreSvc/CMakeLists.txt
++++ b/GaudiCoreSvc/CMakeLists.txt
+@@ -62,7 +62,7 @@ gaudi_add_module(GaudiCoreSvc
+                  LINK
+                    GaudiKernel
+                    ROOT::RIO
+-                   Python::Python
++                   $<IF:$<PLATFORM_ID:Darwin>,Python::Module,Python::Python>
+                    Boost::headers
+                    Boost::filesystem
+                    Boost::python
+diff --git a/GaudiKernel/CMakeLists.txt b/GaudiKernel/CMakeLists.txt
+index c5c278b..12de03c 100644
+--- a/GaudiKernel/CMakeLists.txt
++++ b/GaudiKernel/CMakeLists.txt
+@@ -191,7 +191,7 @@ gaudi_add_library(GaudiKernel
+            nlohmann_json::nlohmann_json
+            Rangev3::rangev3
+            ${GAUDI_ATOMIC_LIBS}
+-    PRIVATE Python::Python
++    PRIVATE $<IF:$<PLATFORM_ID:Darwin>,Python::Module,Python::Python>
+             GaudiCommonParsers
+ )
+ gaudi_generate_version_header_file(GaudiKernel)
+diff --git a/GaudiKernel/include/GaudiKernel/LinkManager.h b/GaudiKernel/include/GaudiKernel/LinkManager.h
+index ee211c6..8a3a55a 100644
+--- a/GaudiKernel/include/GaudiKernel/LinkManager.h
++++ b/GaudiKernel/include/GaudiKernel/LinkManager.h
+@@ -11,6 +11,7 @@
+ #pragma once
+ 
+ #include <GaudiKernel/Kernel.h>
++#include <iterator>
+ #include <memory>
+ #include <string>
+ #include <vector>
+diff --git a/GaudiMP/CMakeLists.txt b/GaudiMP/CMakeLists.txt
+index 8f6dd40..e9675a4 100644
+--- a/GaudiMP/CMakeLists.txt
++++ b/GaudiMP/CMakeLists.txt
+@@ -15,7 +15,7 @@ gaudi_add_library(GaudiMPLib
+                   SOURCES src/Lib/TESSerializer.cpp
+                   LINK
+                      PUBLIC GaudiKernel
+-                            Python::Python
++                            $<IF:$<PLATFORM_ID:Darwin>,Python::Module,Python::Python>
+                             ROOT::Net
+                             ROOT::RIO
+                             ROOT::Thread)
+@@ -27,7 +27,7 @@ gaudi_add_module(GaudiMP
+                      src/component/RecordOutputStream.cpp
+                      src/component/ReplayOutputStream.cpp
+                  LINK GaudiMPLib
+-                      Python::Python
++                      $<IF:$<PLATFORM_ID:Darwin>,Python::Module,Python::Python>
+                       ROOT::Net
+                       ROOT::RIO
+                       ROOT::Thread)
+diff --git a/GaudiPluginService/python/GaudiPluginService/cpluginsvc.py b/GaudiPluginService/python/GaudiPluginService/cpluginsvc.py
+index 4de1367..cff3d51 100644
+--- a/GaudiPluginService/python/GaudiPluginService/cpluginsvc.py
++++ b/GaudiPluginService/python/GaudiPluginService/cpluginsvc.py
+@@ -53,6 +53,19 @@ def _get_filename():
+         "Windows": "libGaudiPluginService.dll",
+         "Linux": "libGaudiPluginService.so",
+     }[name]
++    if name == "Darwin":
++        # dyld does not look in LD_LIBRARY_PATH, and System Integrity Protection drops
++        # DYLD_LIBRARY_PATH from the environment of any script started through /usr/bin/env:
++        # look for the library in both, and in this python installation's prefix
++        import os
++        import sys
++
++        dirs = os.environ.get("DYLD_LIBRARY_PATH", "").split(":")
++        dirs += os.environ.get("LD_LIBRARY_PATH", "").split(":")
++        dirs.append(os.path.join(sys.prefix, "lib"))
++        for d in dirs:
++            if d and os.path.isfile(os.path.join(d, fname)):
++                return os.path.join(d, fname)
+     return fname
+ 
+ 
+diff --git a/GaudiPython/CMakeLists.txt b/GaudiPython/CMakeLists.txt
+index c245a37..9349b63 100644
+--- a/GaudiPython/CMakeLists.txt
++++ b/GaudiPython/CMakeLists.txt
+@@ -17,7 +17,7 @@ gaudi_add_library(GaudiPythonLib
+                           src/Lib/Helpers.cpp
+                   LINK
+                     PUBLIC Gaudi::GaudiKernel
+-                           Python::Python)
++                           $<IF:$<PLATFORM_ID:Darwin>,Python::Module,Python::Python>)
+ 
+ # Build the plugin
+ gaudi_add_module(GaudiPython
