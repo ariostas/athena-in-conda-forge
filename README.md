@@ -19,7 +19,7 @@ CMSSW.
 > **Status: proof of concept.** All of Athena but 30 packages builds in ten layers that pass their
 > tests on linux-aarch64, from the framework to simulation and derivations, with an `athena`
 > metapackage and a developer workflow. On linux-64 and osx-arm64 (M8, in progress) every
-> external builds and passes its tests, and on osx-arm64 so does the first layer: `athena.py`
+> external builds and passes its tests, and so does the first layer, athena-core: `athena.py`
 > runs on a Mac. Nothing has been submitted to conda-forge yet.
 
 The reference release is Athena [`release/25.0.73`](https://gitlab.cern.ch/atlas/athena/-/tree/release/25.0.73).
@@ -89,8 +89,8 @@ The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
 | `atlas-acts` (ACTS 47.7.0 with the plugins ATLAS uses) | [recipes/atlas-acts](recipes/atlas-acts) | ✅ | ✅ | ✅ |
 | `atlas-geant4` (ATLAS's Geant4 10.6.3 fork with VecGeom 1.1.21, as AthenaExternals builds them) | [recipes/atlas-geant4](recipes/atlas-geant4) | ✅ | ✅ | ✅ |
 | `atlas-rivet` (conda-forge's Rivet 4.1.4 recipe, on FastJet 3.5.1 build 5) | [recipes/atlas-rivet](recipes/atlas-rivet) | ✅ | ✅ | ✅ |
-| `athena-core` (framework, StoreGate, configuration, POOL I/O, conditions, ByteStream) | [recipes/athena-core](recipes/athena-core) | ✅ | · | ✅ |
-| `athena-detdescr` (identifiers, GeoModel geometry, ACTS geometry, magnetic field) | [recipes/athena-detdescr](recipes/athena-detdescr) | ✅ | · | · |
+| `athena-core` (framework, StoreGate, configuration, POOL I/O, conditions, ByteStream) | [recipes/athena-core](recipes/athena-core) | ✅ | ✅ | ✅ |
+| `athena-detdescr` (identifiers, GeoModel geometry, ACTS geometry, magnetic field) | [recipes/athena-detdescr](recipes/athena-detdescr) | ✅ | · | ✅ |
 | `athena-edm` (xAOD and trigger event data model: AOD/DAOD I/O) | [recipes/athena-edm](recipes/athena-edm) | ✅ | · | · |
 | `athena-edm-det` (detector event data: HITS/RDO/ESD I/O) | [recipes/athena-edm-det](recipes/athena-edm-det) | ✅ | · | · |
 | `athena-analysis` (CP tools and algorithms, trigger decision tool) | [recipes/athena-analysis](recipes/athena-analysis) | ✅ | · | · |

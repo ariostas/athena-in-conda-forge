@@ -4,7 +4,8 @@ Linux only, and conda-forge has no valgrind or binutils' libbfd there):
   (AthenaMtesEventLoopMgr) and event range tools (EvtRangeScatterer, EvtRangeProcessor) are
   left out when yampl is not found;
 - TimeoutAlg checks whether it runs on valgrind only when valgrind's header exists;
-- AthenaAuditors links bfd only when found: only the FPE auditor of x86_64 Linux uses it;
+- AthenaAuditors: the FPE auditor of x86_64 Linux uses bfd (and libiberty) only when they are
+  found, and is the portable one otherwise (conda-forge's binutils has no libiberty);
 - AthenaMPTools links librt (part of the C library elsewhere) on Linux only.
 
 --- a/Control/AthenaServices/CMakeLists.txt
@@ -123,13 +124,36 @@ Linux only, and conda-forge has no valgrind or binutils' libbfd there):
  
 --- a/Control/AthenaAuditors/CMakeLists.txt
 +++ b/Control/AthenaAuditors/CMakeLists.txt
-@@ -6,6 +6,9 @@
+@@ -6,11 +6,20 @@
  # External dependencies:
  find_package( gdb COMPONENTS bfd iberty sframe )
  find_package( ZLIB )
-+# (bfd only for the FPE auditor of x86_64 Linux: leave out what is not found, e.g. on macOS)
-+list( FILTER GDB_INCLUDE_DIRS EXCLUDE REGEX "NOTFOUND" )
-+list( FILTER GDB_LIBRARIES EXCLUDE REGEX "NOTFOUND" )
++# bfd (with libiberty) only for the FPE auditor of x86_64 Linux. Without all of it (conda-forge's
++# binutils has no libiberty; macOS has none of it) that auditor is the portable one.
++set( _definitions )
++if( NOT "${GDB_LIBRARIES}" MATCHES "libbfd" OR NOT "${GDB_LIBRARIES}" MATCHES "libiberty" OR
++    NOT GDB_INCLUDE_DIRS OR "${GDB_INCLUDE_DIRS}" MATCHES "NOTFOUND" )
++   set( GDB_INCLUDE_DIRS )
++   set( GDB_LIBRARIES )
++   set( _definitions ATHENAAUDITORS_NO_BFD )
++endif()
  
  # Component(s) in the package:
  atlas_add_component( AthenaAuditors
+    src/*.h src/*.cxx src/components/*.cxx
+-   DEFINITIONS PACKAGE=AthenaAuditors  # needed by bfd.h
++   DEFINITIONS PACKAGE=AthenaAuditors ${_definitions}  # PACKAGE: needed by bfd.h
+    INCLUDE_DIRS ${GDB_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS}
+    # zstd may be needed by libbfd
+    LINK_LIBRARIES ${GDB_LIBRARIES} ${ZLIB_LIBRARIES} zstd AthenaBaseComps CxxUtils GaudiKernel )
+--- a/Control/AthenaAuditors/src/FPEAuditor.cxx
++++ b/Control/AthenaAuditors/src/FPEAuditor.cxx
+@@ -44,7 +44,7 @@
+ }
+ 
+ 
+-#if defined(__linux__) && ( defined(__i386__) || defined(__x86_64__) )
++#if defined(__linux__) && ( defined(__i386__) || defined(__x86_64__) ) && !defined(ATHENAAUDITORS_NO_BFD)
+ # include "FPEAudit_linux.icc"
+ #else
+ # include "FPEAudit_dummy.icc"

@@ -1,0 +1,715 @@
+The detector description layer with libc++ and on macOS:
+- TrkParametersBase: CxxUtils::sincos (ATLAS's portable one) rather than sincos(), a GNU
+  extension;
+- includes that libstdc++ brings in through other headers and libc++ does not (<sstream>,
+  <iterator>, <vector>, <iomanip>, <ostream>), and none of libstdc++'s own
+  <ext/alloc_traits.h>;
+- MdtCalibData: the Legendre polynomials by their recurrence with libc++, which has no special
+  mathematical functions (std::legendre);
+- ITkPixelOnlineId: hashed through its own conversion (to unsigned long), not to uint64_t,
+  which is unsigned long long on macOS;
+- MuonStation: std::setiosflags qualified (libstdc++ finds it by argument-dependent lookup);
+- ActsGeometry's ExtrapolationTool: prepareOptions<>() defined before its uses, in lambdas that
+  std::visit instantiates (clang emitted none of its instantiations otherwise);
+- TRT_GeoModel: GeoModel's GeoGenfun::ArrayFunction rather than its own copy of the class (an
+  ODR violation: on macOS the copy's RTTI differs from GeoModel's, and GeoModel's writer could
+  not persistify the TRT's straw functions).
+
+--- a/Tracking/TrkEvent/TrkParametersBase/TrkParametersBase/ParametersT.icc
++++ b/Tracking/TrkEvent/TrkParametersBase/TrkParametersBase/ParametersT.icc
+@@ -9,6 +9,7 @@
+ // Trk
+ #include "TrkEventPrimitives/ParamDefs.h"
+ #include "CxxUtils/trapping_fp.h"
++#include "CxxUtils/sincos.h"
+ #include "CxxUtils/inline_hints.h"
+ #include <cmath>
+ // STD
+@@ -51,9 +52,10 @@
+   this->m_parameters << loc1, loc2, phi, theta, qop;
+ 
+   // now calculate the momentum
+-  double sinPhi, cosPhi, cosTheta, sinTheta;
+-  sincos(phi, &sinPhi, &cosPhi);
+-  sincos(theta, &sinTheta, &cosTheta);
++  // (CxxUtils::sincos: sincos() is a GNU extension)
++  const CxxUtils::sincos scPhi(phi), scTheta(theta);
++  double sinPhi = scPhi.sn, cosPhi = scPhi.cs;
++  double sinTheta = scTheta.sn, cosTheta = scTheta.cs;
+   this->m_momentum =
+       Amg::Vector3D(p * cosPhi * sinTheta, p * sinPhi * sinTheta, p * cosTheta);
+   this->m_associatedSurface->localToGlobal(this->localPosition(),
+@@ -160,9 +162,10 @@
+     p = InvalidParam::INVALID_P;
+     qop = InvalidParam::INVALID_QOP;
+   }
+-  double sinPhi, cosPhi, cosTheta, sinTheta;
+-  sincos(phi, &sinPhi, &cosPhi);
+-  sincos(theta, &sinTheta, &cosTheta);
++  // (CxxUtils::sincos: sincos() is a GNU extension)
++  const CxxUtils::sincos scPhi(phi), scTheta(theta);
++  double sinPhi = scPhi.sn, cosPhi = scPhi.cs;
++  double sinTheta = scTheta.sn, cosTheta = scTheta.cs;
+   this->m_momentum =
+       Amg::Vector3D(p * cosPhi * sinTheta, p * sinPhi * sinTheta, p * cosTheta);
+ 
+@@ -295,9 +298,10 @@
+       this->m_chargeDef = sgn(this->m_parameters[Trk::qOverP]);
+       p = std::abs(1. / this->m_parameters[Trk::qOverP]);
+     }
+-    double sinPhi, cosPhi, cosTheta, sinTheta;
+-    sincos(phi, &sinPhi, &cosPhi);
+-    sincos(theta, &sinTheta, &cosTheta);
++    // (CxxUtils::sincos: sincos() is a GNU extension)
++    const CxxUtils::sincos scPhi(phi), scTheta(theta);
++    double sinPhi = scPhi.sn, cosPhi = scPhi.cs;
++    double sinTheta = scTheta.sn, cosTheta = scTheta.cs;
+     this->m_momentum = Amg::Vector3D(p * cosPhi * sinTheta,
+                                      p * sinPhi * sinTheta, p * cosTheta);
+   }
+--- a/Tracking/Acts/ActsInterop/ActsInterop/TableUtils.h
++++ b/Tracking/Acts/ActsInterop/ActsInterop/TableUtils.h
+@@ -14,6 +14,7 @@
+ #include <vector>
+ #include <utility>
+ #include <limits>
++#include <sstream>
+ 
+ class MsgStream;
+ 
+--- a/InnerDetector/InDetDetDescr/ITkPixelCabling/ITkPixelCabling/ITkPixelOnlineId.h
++++ b/InnerDetector/InDetDetDescr/ITkPixelCabling/ITkPixelCabling/ITkPixelOnlineId.h
+@@ -95,7 +95,7 @@
+   template<>
+   struct hash<ITkPixelOnlineId>{
+     size_t operator()(const ITkPixelOnlineId& id) const{
+-      return static_cast<size_t>((uint64_t)id);
++      return static_cast<size_t>(static_cast<unsigned long int>(id));
+     }
+   };
+ }
+--- a/TileCalorimeter/TileCalib/TileCalibBlobObjs/src/TileBchStatus.cxx
++++ b/TileCalorimeter/TileCalib/TileCalibBlobObjs/src/TileBchStatus.cxx
+@@ -4,6 +4,7 @@
+ 
+ #include "TileCalibBlobObjs/TileBchStatus.h"
+ #include <algorithm>
++#include <iterator>
+ 
+ //=== static memebers
+ TileBchStatus::LockedPrbSet TileBchStatus::s_refBad ATLAS_THREAD_SAFE;
+--- a/MuonSpectrometer/MuonConditions/MuonCondCabling/RPC_CondCabling/src/CablingObject.cxx
++++ b/MuonSpectrometer/MuonConditions/MuonCondCabling/RPC_CondCabling/src/CablingObject.cxx
+@@ -5,6 +5,7 @@
+ #include "RPC_CondCabling/CablingObject.h"
+ 
+ #include <iomanip>
++#include <sstream>
+ 
+ CablingObject::CablingObject(const CablingObject::cablingParameters& params, const std::string& obj_name) :
+     BaseObject(Logic, obj_name), m_number{params.number}, m_station{params.station}, m_sector_type{params.sectorType} {}
+--- a/MuonSpectrometer/MuonCalib/MdtCalib/MdtCalibData/src/BFieldCorFunc.cxx
++++ b/MuonSpectrometer/MuonCalib/MdtCalib/MdtCalibData/src/BFieldCorFunc.cxx
+@@ -11,6 +11,25 @@
+ #include "MuonCalibMath/LegendrePolynomial.h"
+ #include "GeoModelKernel/throwExcept.h"
+ #include "cmath"
++
++namespace {
++/// The Legendre polynomial P_n(x): std::legendre, or its recurrence where the standard library
++/// has no special mathematical functions (libc++)
++double legendreP(unsigned int n, double x) {
++#ifdef _LIBCPP_VERSION
++  double p0 = 1., p1 = x;
++  if (n == 0) return p0;
++  for (unsigned int k = 1; k < n; ++k) {
++    const double p2 = ((2 * k + 1) * x * p1 - k * p0) / (k + 1);
++    p0 = p1;
++    p1 = p2;
++  }
++  return p1;
++#else
++  return std::legendre(n, x);
++#endif
++}
++}
+ 
+ using namespace MuonCalib;
+ 
+@@ -210,7 +229,7 @@
+     while (t_max - t_min > precision) {
+         integ = 0.0;
+         for (int k = 0; k < m_alpha.rows(); k++) {
+-            integ += m_alpha[k] * std::legendre(k, 2 * (0.5 * (t_min + t_max) - tmean) / tlength);
++            integ += m_alpha[k] * legendreP(k, 2 * (0.5 * (t_min + t_max) - tmean) / tlength);
+         }
+         if (0.5 * (t_min + t_max) + B_factor * integ > time) {
+             t_max = 0.5 * (t_min + t_max);
+@@ -246,7 +265,7 @@
+     // CALCULATE THE CORRECTION //
+     //////////////////////////////
+     for (int k = 0; k < m_alpha.rows(); k++) { 
+-        integ += m_alpha[k] * std::legendre(k, 2 * (time - tmean) / tlength); 
++        integ += m_alpha[k] * legendreP(k, 2 * (time - tmean) / tlength); 
+     }
+ 
+     return B_factor * integ;
+--- a/MuonSpectrometer/MuonCablings/MuonCablingData/src/MdtMezzanineCard.cxx
++++ b/MuonSpectrometer/MuonCablings/MuonCablingData/src/MdtMezzanineCard.cxx
+@@ -6,6 +6,7 @@
+ #include <algorithm>
+ #include <iostream>
+ #include <set>
++#include <iterator>
+ 
+ namespace {
+ using Mapping = MdtMezzanineCard::Mapping;
+--- a/Tracking/TrkEvent/TrkEventPrimitives/src/ProjectionMatricesSet.cxx
++++ b/Tracking/TrkEvent/TrkEventPrimitives/src/ProjectionMatricesSet.cxx
+@@ -8,6 +8,7 @@
+ 
+ #include "TrkEventPrimitives/ProjectionMatricesSet.h"
+ #include <cmath>
++#include <vector>
+ 
+ Trk::ProjectionMatricesSet::ProjectionMatricesSet(int maxdim) :
+     m_maxdim(maxdim)
+--- a/MuonSpectrometer/MuonDetDescr/MuonReadoutGeometry/src/sTgcReadoutElement.cxx
++++ b/MuonSpectrometer/MuonDetDescr/MuonReadoutGeometry/src/sTgcReadoutElement.cxx
+@@ -19,7 +19,6 @@
+ #include <GeoModelHelpers/getChildNodesWithTrf.h>
+ 
+ #include <cmath>
+-#include <ext/alloc_traits.h>
+ #include <map>
+ #include <memory>
+ #include <stdexcept>
+--- a/MuonSpectrometer/MuonDetDescr/MuonReadoutGeometry/src/MuonPadDesign.cxx
++++ b/MuonSpectrometer/MuonDetDescr/MuonReadoutGeometry/src/MuonPadDesign.cxx
+@@ -5,7 +5,6 @@
+ #include "MuonReadoutGeometry/MuonPadDesign.h"
+ #include "GeoPrimitives/GeoPrimitivesToStringConverter.h"
+ #include "MuonReadoutGeometry/GlobalUtilities.h"
+-#include <ext/alloc_traits.h>
+ #include <stdexcept>
+ using MuonGM::MuonPadDesign;
+ 
+--- a/MuonSpectrometer/MuonDetDescr/MuonReadoutGeometry/src/MuonStation.cxx
++++ b/MuonSpectrometer/MuonDetDescr/MuonReadoutGeometry/src/MuonStation.cxx
+@@ -19,6 +19,7 @@
+ #include "GeoPrimitives/GeoPrimitivesToStringConverter.h"
+ #include "EventPrimitives/EventPrimitivesToStringConverter.h"
+ #include "CxxUtils/inline_hints.h"
++#include <iomanip>
+ namespace MuonGM {
+ 
+     MuonStation::MuonStation(std::string_view stName, 
+@@ -153,7 +154,7 @@
+         setDeltaAmdbLRS(delta_amdb);
+ 
+         ATH_MSG_DEBUG("Station " << getStationType() << " at zi/fi " << getEtaIndex() << "/" << getPhiIndex()
+-                << " adding Aline     " << setiosflags(std::ios::fixed) << std::setprecision(6) << std::setw(12) 
++                << " adding Aline     " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << std::setw(12) 
+                 << tras << " " << traz << " " << trat << " " << rots << " " << rotz << " " << rott << std::endl
+                 << "  delta_amdb computed from A-line " << Amg::toString(delta_amdb));
+     }
+--- a/MuonSpectrometer/MuonCablings/MuonCablingData/MuonCablingData/HedgehogBoard.h
++++ b/MuonSpectrometer/MuonCablings/MuonCablingData/MuonCablingData/HedgehogBoard.h
+@@ -11,6 +11,7 @@
+ #include <memory>
+ #include <iosfwd>
+ #include <CxxUtils/ArrayHelper.h>
++#include <ostream>
+ 
+ namespace Muon{
+     /** @brief  Helper struct to represent the High-voltage pins and a possible connection between them. Likewise the MdtMezzanine Card,
+--- a/Calorimeter/CaloConditions/src/CaloHadDMCoeff2.cxx
++++ b/Calorimeter/CaloConditions/src/CaloHadDMCoeff2.cxx
+@@ -8,6 +8,7 @@
+ #include <cmath>
+ #include <iomanip>
+ #include <iostream>
++#include <sstream>
+ 
+ /* ***************************************************************************
+ c-tor
+--- a/Tracking/Acts/ActsGeometry/src/ExtrapolationTool.cxx
++++ b/Tracking/Acts/ActsGeometry/src/ExtrapolationTool.cxx
+@@ -216,191 +216,8 @@
+ }
+ 
+ 
+-Acts::Result<ExtrapolationTool::PropagationOutput>
+-ExtrapolationTool::propagationSteps(const EventContext& ctx,
+-                                    const Acts::BoundTrackParameters& startParameters,
+-                                    const Acts::Direction navDir,
+-                                    const double pathLimit) const {
+-
+-  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " begin");
+-
+-  const Acts::MagneticFieldContext mfContext = m_ctxProvider.getMagneticFieldContext(ctx);
+-  const Acts::GeometryContext tgContext = m_ctxProvider.getGeometryContext(ctx);
+-  
+-  PropagationOutput output;
+-
+-  auto res = std::visit([&](const auto& propagator) -> Acts::Result<ExtrapolationTool::PropagationOutput> {
+-      using Propagator = std::decay_t<decltype(propagator)>;
+-
+-      // Action list and abort list
+-      using ActorList =
+-      Acts::ActorList<SteppingLogger, Acts::MaterialInteractor, EndOfWorld>;
+-      using Options = typename Propagator::template Options<ActorList>;
+-
+-      Options options = prepareOptions<Options>(tgContext, mfContext, startParameters, navDir, pathLimit);
+-
+-      auto result = propagator.propagate(startParameters, options);
+-      if (!result.ok()) {
+-        return result.error();
+-      }
+-      auto& propRes = *result;
+-
+-      auto steppingResults = propRes.template get<SteppingLogger::result_type>();
+-      auto materialResult = propRes.template get<Acts::MaterialInteractor::result_type>();
+-      output.first = std::move(steppingResults.steps);
+-      output.second = std::move(materialResult);
+-      // try to force return value optimization, not sure this is necessary
+-      return std::move(output);
+-    }, *m_varProp);
+-
+-  if (!res.ok()) {
+-    ATH_MSG_DEBUG("Got error during propagation: "
+-		              << res.error() << " " << res.error().message()
+-                  << ". Returning empty step vector.");
+-    return res.error();
+-  }
+-  output = std::move(*res);
+-
+-  ATH_MSG_VERBOSE("Collected " << output.first.size() << " steps");
+-  if(output.first.size() == 0) {
+-    ATH_MSG_WARNING("ZERO steps returned by stepper, that is not typically a good sign");
+-  }
+-
+-  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " end");
+-
+-  return output;
+-}
+-
+-
+-
+-Acts::Result<Acts::BoundTrackParameters>
+-    ExtrapolationTool::propagate(const EventContext& ctx,
+-                                 const Acts::BoundTrackParameters& startParameters,
+-                                 const Acts::Direction navDir, 
+-                                 const double pathLimit) const
+-{
+-  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " begin");
+-
+-  const Acts::MagneticFieldContext mfContext = m_ctxProvider.getMagneticFieldContext(ctx);
+-  const Acts::GeometryContext tgContext = m_ctxProvider.getGeometryContext(ctx);
+-
+-  auto parameters = std::visit([&](const auto& propagator) -> Acts::Result<Acts::BoundTrackParameters> {
+-      using Propagator = std::decay_t<decltype(propagator)>;
+-
+-      // Action list and abort list
+-      using ActorList =
+-      Acts::ActorList<Acts::MaterialInteractor, EndOfWorld>;
+-      using Options = typename Propagator::template Options<ActorList>;
+-
+-      Options options = prepareOptions<Options>(tgContext, mfContext, startParameters, navDir, pathLimit);
+-
+-      
+-      auto result = propagator.propagate(startParameters, options);
+-      if (!result.ok()) {
+-        ATH_MSG_DEBUG("Got error during propagation:" << result.error());
+-        return result.error();
+-      }
+-      if (!result.value().endParameters.has_value()) {
+-        ATH_MSG_DEBUG("Propagation did not result in valid end parameters.");
+-        return Acts::PropagatorError::Failure;
+-      }
+-      return result.value().endParameters.value();
+-    }, *m_varProp);
+-
+-  return parameters;
+-}
+-
+-Acts::Result<ExtrapolationTool::PropagationOutput>
+-  ExtrapolationTool::propagationSteps(const EventContext& ctx,
+-                                      const Acts::BoundTrackParameters& startParameters,
+-                                      const Acts::Surface& target,
+-                                      const Acts::Direction navDir, 
+-                                      const double pathLimit) const {
+-  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " begin");
+-
+-  PropagationOutput output;
+-
+-  const Acts::MagneticFieldContext mfContext = m_ctxProvider.getMagneticFieldContext(ctx);
+-  const Acts::GeometryContext tgContext = m_ctxProvider.getGeometryContext(ctx);
+-
+-  auto res = std::visit([&](const auto& propagator) -> Acts::Result<PropagationOutput> {
+-      using Propagator = std::decay_t<decltype(propagator)>;
+-
+-      // Action list and abort list
+-      using ActorList =
+-      Acts::ActorList<SteppingLogger, Acts::MaterialInteractor>;
+-      using Options = typename Propagator::template Options<ActorList>;
+-
+-      Options options = prepareOptions<Options>(tgContext, mfContext, startParameters, navDir, pathLimit);
+-      auto result = target.type() == Acts::Surface::Perigee  ?
+-        propagator.template propagate<Options, Acts::ForcedSurfaceReached, Acts::PathLimitReached>(startParameters, target, options) :
+-        propagator.template propagate<Options, Acts::SurfaceReached, Acts::PathLimitReached>(startParameters, target, options);
+-
+-      
+-      if (!result.ok()) {
+-        return result.error();
+-      }
+-      auto& propRes = *result;
+-
+-      auto steppingResults = propRes.template get<SteppingLogger::result_type>();
+-      auto materialResult = propRes.template get<Acts::MaterialInteractor::result_type>();
+-      output.first = std::move(steppingResults.steps);
+-      output.second = std::move(materialResult);
+-      return std::move(output);
+-    }, *m_varProp);
+-
+-  if (!res.ok()) {
+-    ATH_MSG_DEBUG("Got error during propagation:" << res.error()
+-                  << ". Returning empty step vector.");
+-    return res.error();
+-  }
+-  output = std::move(*res);
+-
+-  ATH_MSG_VERBOSE("Collected " << output.first.size() << " steps");
+-  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " end");
+-
+-  return output;
+-}
+-
+-Acts::Result<Acts::BoundTrackParameters>
+-    ExtrapolationTool::propagate(const EventContext& ctx,
+-                                 const Acts::BoundTrackParameters& startParameters,
+-                                 const Acts::Surface& target,
+-                                 const Acts::Direction navDir, const double pathLimit) const
+-{
+-  
+-  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " begin");
+-  
+-  const Acts::MagneticFieldContext mfContext = m_ctxProvider.getMagneticFieldContext(ctx);
+-  const Acts::GeometryContext tgContext = m_ctxProvider.getGeometryContext(ctx);
+-
+-  auto parameters = std::visit([&](const auto& propagator) -> Acts::Result<Acts::BoundTrackParameters> {
+-      using Propagator = std::decay_t<decltype(propagator)>;
+-
+-      // Action list and abort list
+-      using ActorList =
+-      Acts::ActorList<Acts::MaterialInteractor>;
+-      using Options = typename Propagator::template Options<ActorList>;
+-
+-      Options options = prepareOptions<Options>(tgContext, mfContext, startParameters, navDir, pathLimit);
+-      auto result = target.type() == Acts::Surface::Perigee  ?
+-        propagator.template propagate<Options, Acts::ForcedSurfaceReached, Acts::PathLimitReached>(startParameters, target, options) :
+-        propagator.template propagate<Options, Acts::SurfaceReached, Acts::PathLimitReached>(startParameters, target, options);
+-      if (!result.ok()) {
+-        ATH_MSG_DEBUG("Got error during propagation: " << result.error());
+-        return result.error();
+-      }
+-      if (!result.value().endParameters.has_value()) {
+-        ATH_MSG_DEBUG("Propagation did not result in valid end parameters.");
+-        return Acts::PropagatorError::Failure;
+-      }
+-      return result.value().endParameters.value();
+-    }, *m_varProp);
+-
+-  return parameters;
+-}
+-
+-
++// (defined before its uses: clang does not instantiate it for the std::visit lambdas below
++// when the definition comes after them)
+ template<typename OptionsType>
+ OptionsType ExtrapolationTool::prepareOptions(const Acts::GeometryContext& gctx,
+                                               const Acts::MagneticFieldContext& mfContext,
+@@ -425,6 +242,192 @@
+   return options;
+ }
+ 
++Acts::Result<ExtrapolationTool::PropagationOutput>
++ExtrapolationTool::propagationSteps(const EventContext& ctx,
++                                    const Acts::BoundTrackParameters& startParameters,
++                                    const Acts::Direction navDir,
++                                    const double pathLimit) const {
++
++  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " begin");
++
++  const Acts::MagneticFieldContext mfContext = m_ctxProvider.getMagneticFieldContext(ctx);
++  const Acts::GeometryContext tgContext = m_ctxProvider.getGeometryContext(ctx);
++  
++  PropagationOutput output;
++
++  auto res = std::visit([&](const auto& propagator) -> Acts::Result<ExtrapolationTool::PropagationOutput> {
++      using Propagator = std::decay_t<decltype(propagator)>;
++
++      // Action list and abort list
++      using ActorList =
++      Acts::ActorList<SteppingLogger, Acts::MaterialInteractor, EndOfWorld>;
++      using Options = typename Propagator::template Options<ActorList>;
++
++      Options options = prepareOptions<Options>(tgContext, mfContext, startParameters, navDir, pathLimit);
++
++      auto result = propagator.propagate(startParameters, options);
++      if (!result.ok()) {
++        return result.error();
++      }
++      auto& propRes = *result;
++
++      auto steppingResults = propRes.template get<SteppingLogger::result_type>();
++      auto materialResult = propRes.template get<Acts::MaterialInteractor::result_type>();
++      output.first = std::move(steppingResults.steps);
++      output.second = std::move(materialResult);
++      // try to force return value optimization, not sure this is necessary
++      return std::move(output);
++    }, *m_varProp);
++
++  if (!res.ok()) {
++    ATH_MSG_DEBUG("Got error during propagation: "
++		              << res.error() << " " << res.error().message()
++                  << ". Returning empty step vector.");
++    return res.error();
++  }
++  output = std::move(*res);
++
++  ATH_MSG_VERBOSE("Collected " << output.first.size() << " steps");
++  if(output.first.size() == 0) {
++    ATH_MSG_WARNING("ZERO steps returned by stepper, that is not typically a good sign");
++  }
++
++  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " end");
++
++  return output;
++}
++
++
++
++Acts::Result<Acts::BoundTrackParameters>
++    ExtrapolationTool::propagate(const EventContext& ctx,
++                                 const Acts::BoundTrackParameters& startParameters,
++                                 const Acts::Direction navDir, 
++                                 const double pathLimit) const
++{
++  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " begin");
++
++  const Acts::MagneticFieldContext mfContext = m_ctxProvider.getMagneticFieldContext(ctx);
++  const Acts::GeometryContext tgContext = m_ctxProvider.getGeometryContext(ctx);
++
++  auto parameters = std::visit([&](const auto& propagator) -> Acts::Result<Acts::BoundTrackParameters> {
++      using Propagator = std::decay_t<decltype(propagator)>;
++
++      // Action list and abort list
++      using ActorList =
++      Acts::ActorList<Acts::MaterialInteractor, EndOfWorld>;
++      using Options = typename Propagator::template Options<ActorList>;
++
++      Options options = prepareOptions<Options>(tgContext, mfContext, startParameters, navDir, pathLimit);
++
++      
++      auto result = propagator.propagate(startParameters, options);
++      if (!result.ok()) {
++        ATH_MSG_DEBUG("Got error during propagation:" << result.error());
++        return result.error();
++      }
++      if (!result.value().endParameters.has_value()) {
++        ATH_MSG_DEBUG("Propagation did not result in valid end parameters.");
++        return Acts::PropagatorError::Failure;
++      }
++      return result.value().endParameters.value();
++    }, *m_varProp);
++
++  return parameters;
++}
++
++Acts::Result<ExtrapolationTool::PropagationOutput>
++  ExtrapolationTool::propagationSteps(const EventContext& ctx,
++                                      const Acts::BoundTrackParameters& startParameters,
++                                      const Acts::Surface& target,
++                                      const Acts::Direction navDir, 
++                                      const double pathLimit) const {
++  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " begin");
++
++  PropagationOutput output;
++
++  const Acts::MagneticFieldContext mfContext = m_ctxProvider.getMagneticFieldContext(ctx);
++  const Acts::GeometryContext tgContext = m_ctxProvider.getGeometryContext(ctx);
++
++  auto res = std::visit([&](const auto& propagator) -> Acts::Result<PropagationOutput> {
++      using Propagator = std::decay_t<decltype(propagator)>;
++
++      // Action list and abort list
++      using ActorList =
++      Acts::ActorList<SteppingLogger, Acts::MaterialInteractor>;
++      using Options = typename Propagator::template Options<ActorList>;
++
++      Options options = prepareOptions<Options>(tgContext, mfContext, startParameters, navDir, pathLimit);
++      auto result = target.type() == Acts::Surface::Perigee  ?
++        propagator.template propagate<Options, Acts::ForcedSurfaceReached, Acts::PathLimitReached>(startParameters, target, options) :
++        propagator.template propagate<Options, Acts::SurfaceReached, Acts::PathLimitReached>(startParameters, target, options);
++
++      
++      if (!result.ok()) {
++        return result.error();
++      }
++      auto& propRes = *result;
++
++      auto steppingResults = propRes.template get<SteppingLogger::result_type>();
++      auto materialResult = propRes.template get<Acts::MaterialInteractor::result_type>();
++      output.first = std::move(steppingResults.steps);
++      output.second = std::move(materialResult);
++      return std::move(output);
++    }, *m_varProp);
++
++  if (!res.ok()) {
++    ATH_MSG_DEBUG("Got error during propagation:" << res.error()
++                  << ". Returning empty step vector.");
++    return res.error();
++  }
++  output = std::move(*res);
++
++  ATH_MSG_VERBOSE("Collected " << output.first.size() << " steps");
++  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " end");
++
++  return output;
++}
++
++Acts::Result<Acts::BoundTrackParameters>
++    ExtrapolationTool::propagate(const EventContext& ctx,
++                                 const Acts::BoundTrackParameters& startParameters,
++                                 const Acts::Surface& target,
++                                 const Acts::Direction navDir, const double pathLimit) const
++{
++  
++  ATH_MSG_VERBOSE(name() << "::" << __FUNCTION__ << " begin");
++  
++  const Acts::MagneticFieldContext mfContext = m_ctxProvider.getMagneticFieldContext(ctx);
++  const Acts::GeometryContext tgContext = m_ctxProvider.getGeometryContext(ctx);
++
++  auto parameters = std::visit([&](const auto& propagator) -> Acts::Result<Acts::BoundTrackParameters> {
++      using Propagator = std::decay_t<decltype(propagator)>;
++
++      // Action list and abort list
++      using ActorList =
++      Acts::ActorList<Acts::MaterialInteractor>;
++      using Options = typename Propagator::template Options<ActorList>;
++
++      Options options = prepareOptions<Options>(tgContext, mfContext, startParameters, navDir, pathLimit);
++      auto result = target.type() == Acts::Surface::Perigee  ?
++        propagator.template propagate<Options, Acts::ForcedSurfaceReached, Acts::PathLimitReached>(startParameters, target, options) :
++        propagator.template propagate<Options, Acts::SurfaceReached, Acts::PathLimitReached>(startParameters, target, options);
++      if (!result.ok()) {
++        ATH_MSG_DEBUG("Got error during propagation: " << result.error());
++        return result.error();
++      }
++      if (!result.value().endParameters.has_value()) {
++        ATH_MSG_DEBUG("Propagation did not result in valid end parameters.");
++        return Acts::PropagatorError::Failure;
++      }
++      return result.value().endParameters.value();
++    }, *m_varProp);
++
++  return parameters;
++}
++
++
++
+ Acts::Result<ExtrapolationTool::BoundParamVec_t> 
+     ExtrapolationTool::propagateAndRecord(const EventContext& ctx,
+                                           const Acts::BoundTrackParameters& startParameters,
+--- a/InnerDetector/InDetDetDescr/TRT_GeoModel/CMakeLists.txt
++++ b/InnerDetector/InDetDetDescr/TRT_GeoModel/CMakeLists.txt
+@@ -4,7 +4,7 @@
+ atlas_subdir( TRT_GeoModel )
+ 
+ # External dependencies:
+-find_package( GeoModel COMPONENTS GeoModelKernel GeoModelDBManager GeoModelRead)
++find_package( GeoModel COMPONENTS GeoGenericFunctions GeoModelKernel GeoModelDBManager GeoModelRead)
+ 
+ # Component(s) in the package:
+ atlas_add_component( TRT_GeoModel
+--- a/InnerDetector/InDetDetDescr/TRT_GeoModel/src/ArrayFunction.h
++++ b/InnerDetector/InDetDetDescr/TRT_GeoModel/src/ArrayFunction.h
+@@ -4,41 +4,10 @@
+ 
+ #ifndef TRT_GEOMODEL_ARRAYFUNCTION_H
+ #define TRT_GEOMODEL_ARRAYFUNCTION_H
+-//-------------------------------------------------------//
+-// This one dimensional function takes its values from   //
+-// an array..which it copies in.                         //
+-//-------------------------------------------------------//
+ 
++// GeoModel's own GeoGenfun::ArrayFunction: a second definition of the class here was an ODR
++// violation, which the Linux dynamic linker papers over and macOS's does not (its RTTI differed
++// from GeoModel's, so GeoModel's persistification could not cast to it).
++#include "GeoGenericFunctions/ArrayFunction.h"
+ 
+-#include "GeoGenericFunctions/AbsFunction.h"
+-#include <vector>
+-namespace GeoGenfun {
+-class ArrayFunction : public AbsFunction  {
+-
+-  // cppcheck-suppress unknownMacro
+-  FUNCTION_OBJECT_DEF(ArrayFunction)
+-    
+-    public:
+-  
+-  // Constructor
+-  ArrayFunction(const double *begin, const double *end);
+-  
+-  // Destructor
+-  virtual ~ArrayFunction();
+-  
+-  // Copy constructor
+-  ArrayFunction(const ArrayFunction &right);
+-  
+-  // Retreive function value
+-  virtual double operator ()(double argument) const override;
+-  virtual double operator ()(const Argument & a) const override {return operator() (a[0]);}
+-  
+- private:
+-  
+-  // It is illegal to assign a ArrayFunction
+-  const ArrayFunction & operator=(const ArrayFunction &right);
+-
+-  std::vector<double> m_values;
+-};
+-}
+ #endif
+--- a/InnerDetector/InDetDetDescr/TRT_GeoModel/src/ArrayFunction.cxx
++++ b/InnerDetector/InDetDetDescr/TRT_GeoModel/src/ArrayFunction.cxx
+@@ -2,28 +2,4 @@
+   Copyright (C) 2002-2024 CERN for the benefit of the ATLAS collaboration
+ */
+ 
+-#include "ArrayFunction.h"
+-
+-namespace GeoGenfun {
+-
+-FUNCTION_OBJECT_IMP(ArrayFunction)
+-  
+-// Constructor
+-ArrayFunction::ArrayFunction(const double *begin, const double *end) :
+-  m_values(begin,end) {}
+-  
+-// Destructor
+-ArrayFunction::~ArrayFunction(){}
+-  
+-// Copy constructor
+-ArrayFunction::ArrayFunction(const ArrayFunction &right):
+-  GeoGenfun::AbsFunction(), m_values(right.m_values) {}
+-  
+-  // Retrieve function value
+-double ArrayFunction::operator ()(double argument) const {
+-  int i =  int (argument+0.5);
+-  if (i<0 || i>=int(m_values.size())) return 0;
+-  else return m_values[i];
+-}
+-
+-}
++// GeoGenfun::ArrayFunction is GeoModel's (see ArrayFunction.h).

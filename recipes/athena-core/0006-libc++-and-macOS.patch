@@ -23,7 +23,8 @@ Athena with libc++ and on macOS (Apple silicon), and with libunwind's unwind.h:
   the unwind.h of libunwind does not define (on linux-64, gperftools brings it into the
   environment, ahead of GCC's);
 - PathResolver: a directory it creates counts as created when it exists afterwards (libc++'s
-  create_directories returns false for a path ending with a separator).
+  create_directories returns false for a path ending with a separator);
+- TestTools' leakcheck.h includes <malloc.h> only where there is one.
 
 --- a/Control/CxxUtils/Root/excepts.cxx
 +++ b/Control/CxxUtils/Root/excepts.cxx
@@ -329,3 +330,15 @@ Athena with libc++ and on macOS (Apple silicon), and with libunwind's unwind.h:
            msg(MSG::ERROR) << "Unable to create directories to write file to " << targetDir << endmsg;
            return false;
          }
+--- a/AtlasTest/TestTools/TestTools/leakcheck.h
++++ b/AtlasTest/TestTools/TestTools/leakcheck.h
+@@ -41,7 +41,9 @@
+ 
+ 
+ 
++#if __has_include(<malloc.h>)
+ #include <malloc.h>
++#endif
+ #include <unordered_set>
+ #include <iostream>
+ #include <cassert>
