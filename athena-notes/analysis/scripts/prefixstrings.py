@@ -6,6 +6,7 @@ a tail-merged string literal could be lost (PLAN.md, M6).
 
 <lib dir> is the lib/ of a kept build tree, <prefix> its host prefix (host_env_placehold...).
 """
+
 import collections
 import os
 import re
@@ -22,8 +23,13 @@ for f in sorted(os.listdir(libdir)):
         s = m.group()[:-1]
         if b":" in s and s.endswith(b"/lib"):
             continue  # RUNPATH (rewritten by patchelf, not padded)
-        ext = os.path.splitext(s.split(b"/")[-1])[1].decode("latin-1") or "(" + s.split(b"/")[-1][-12:].decode("latin-1") + ")"
+        ext = (
+            os.path.splitext(s.split(b"/")[-1])[1].decode("latin-1")
+            or "(" + s.split(b"/")[-1][-12:].decode("latin-1") + ")"
+        )
         kinds[ext] += 1
-        examples.setdefault(ext, (f, s.replace(pre, b"$PREFIX")[-100:].decode("latin-1")))
+        examples.setdefault(
+            ext, (f, s.replace(pre, b"$PREFIX")[-100:].decode("latin-1"))
+        )
 for k, n in kinds.most_common():
     print(f"{n:6d} {k:12s} e.g. {examples[k][0]}: {examples[k][1]}")

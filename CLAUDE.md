@@ -47,8 +47,13 @@ proxy that `asetup` adds answers 403 from here). First reads from CVMFS are slow
 component types a configuration (a module or a job script) uses; `cfgmap.py` maps that to
 packages and layers. The container has the EL9 packages the release needs beyond the base
 image (libicu, libcurl, libuuid-devel for cling, libbrotli for ROOT's TreePlayer, diffutils
-for ATLAS's tests); install missing ones one at a time (`dnf install` gives up on the batch).
-If the host's CVMFS is remounted, the containers see it again without a restart.
+for ATLAS's tests, procps-ng for the job transforms, which for athena.py, glibc-devel for
+linking with LCG's gcc); install missing ones one at a time
+(`dnf install` gives up on the batch; libcurl needs `--allowerasing`).
+If the host's CVMFS is remounted, the containers see it again without a restart. Everything
+that matters lives in the `athena-work` volume, so the containers can be recreated (README's
+`docker run` lines; athena-ref is `almalinux:9` with the same `/work` and `/cvmfs` mounts):
+`docker system prune` removes them when they are stopped.
 
 Recipes are built with `athena-notes/build-local.sh` (adapted from the CMSSW one):
 `docker exec athena-dev bash -c 'export PATH=/work/tools/bin:$PATH; cd /repo &&
@@ -56,7 +61,8 @@ Recipes are built with `athena-notes/build-local.sh` (adapted from the CMSSW one
 all of them except the Athena layers, in dependency order. Packages go to `/work/output` (also
 used as a channel), logs to `/work/logs/<name>-linux_aarch64.log`, and only python 3.13 is
 built. `KEEP_BUILD=1` keeps the build directories in `/work/output/bld`, for
-`athena-notes/analysis/scripts/compile_cost.py` (compile time and memory of a layer).
+`athena-notes/analysis/scripts/compile_cost.py` (compile time and memory of a layer; it runs
+ninja, so put the build's `build_env/bin` first in `PATH`).
 
 - The image is Ubuntu-based: `/bin/sh` is dash, and CMake installs shared libraries without
   the execute bit unless `CMAKE_INSTALL_SO_NO_EXE=0`. conda-forge's CI is AlmaLinux.
@@ -81,9 +87,10 @@ built. `KEEP_BUILD=1` keeps the build directories in `/work/output/bld`, for
   fails the sha256 check. The fix is to seed its cache: put the tarball in
   `/work/output/src_cache/<key>_<file>`, the unpacked tree (without the top directory) in
   `<key>_extracted`, and a `.metadata/<key>.json` like the other entries there.
-- Every ATLAS project installs a copy of its base project's CMake find modules, and the copy of
-  the layer just below comes first. A change to athena-externals' `cmake/Find*.cmake` reaches a
-  layer only once every layer below it is rebuilt (its `conda-postconfig.cmake` is read from
+- Every ATLAS project installs a copy of its base project's CMake find modules and of
+  AtlasCMake's modules, and the copy of the layer just below comes first. A change to
+  athena-externals' `cmake/Find*.cmake`, or a patch to AtlasCMake, reaches a layer only once
+  every layer below it is rebuilt (its `conda-postconfig.cmake` is read from
   AthenaExternals itself, so it reaches every layer right away).
 - To try configure or compile fixes without a full recipe build, use a kept build tree
   (`KEEP_BUILD=1`): its `work/conda_build.sh` is `build.sh` inside `( ... )` after the

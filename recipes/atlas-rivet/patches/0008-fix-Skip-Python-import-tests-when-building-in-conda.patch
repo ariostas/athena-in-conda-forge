@@ -1,0 +1,50 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chris Burr <christopher.burr@cern.ch>
+Date: Wed, 4 Mar 2026 00:49:05 +0100
+Subject: [PATCH] fix: Skip Python import tests when building in conda
+
+Skip testImport.sh and testCmdLine.sh (exit 77) when CONDA_BUILD is
+set. During the build phase, core.so references libRivet via an
+absolute install-prefix path that doesn't exist until make install.
+On macOS with SIP, DYLD_LIBRARY_PATH cannot override this. The conda
+package tests verify the installed module works correctly.
+---
+ test/testCmdLine.sh | 6 ++++++
+ test/testImport.sh  | 6 ++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/test/testCmdLine.sh b/test/testCmdLine.sh
+index a674c95ff..57993bdb5 100755
+--- a/test/testCmdLine.sh
++++ b/test/testCmdLine.sh
+@@ -1,5 +1,11 @@
+ #! /usr/bin/env bash
+
++# Skip when building in conda: core.so references libRivet via an absolute
++# install-prefix path that doesn't exist until make install, and
++# DYLD_LIBRARY_PATH cannot override it on macOS due to SIP. The conda
++# package tests verify the installed module works correctly.
++if [ -n "$CONDA_BUILD" ]; then exit 77; fi
++
+ #set -x
+
+ export LD_LIBRARY_PATH=$LIBLOCATION:$LD_LIBRARY_PATH
+diff --git a/test/testImport.sh b/test/testImport.sh
+index 04e396f6a..dcfb2e74b 100755
+--- a/test/testImport.sh
++++ b/test/testImport.sh
+@@ -1,5 +1,11 @@
+ #! /usr/bin/env bash
+
++# Skip when building in conda: core.so references libRivet via an absolute
++# install-prefix path that doesn't exist until make install, and
++# DYLD_LIBRARY_PATH cannot override it on macOS due to SIP. The conda
++# package tests verify the installed module works correctly.
++if [ -n "$CONDA_BUILD" ]; then exit 77; fi
++
+ #set -x
+
+ # export LD_LIBRARY_PATH=$LIBLOCATION:$LD_LIBRARY_PATH
+--
+2.39.5 (Apple Git-154)
+

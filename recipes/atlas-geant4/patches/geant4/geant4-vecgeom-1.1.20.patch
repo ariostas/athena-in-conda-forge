@@ -1,0 +1,15 @@
+--- a/cmake/Modules/G4VecGeomShim.cmake	2022-04-06 12:35:46.647601710 +0200
++++ b/cmake/Modules/G4VecGeomShim.cmake	2022-04-06 12:33:10.150258328 +0200
+@@ -1,6 +1,11 @@
+ # Create imported target to help use VecGeom (a mess because the VecGeomConfig is...)
+ if(VecGeom_FOUND)
+-  if(NOT TARGET VecGeom::VecGeom)
++  if(TARGET VecGeom::vecgeom AND NOT TARGET VecGeom::VecGeom)
++    add_library(VecGeom::VecGeom INTERFACE IMPORTED)
++    set_target_properties(VecGeom::VecGeom PROPERTIES
++      INTERFACE_INCLUDE_DIRECTORIES "${VECGEOM_INCLUDE_DIR}/VecGeom"
++      INTERFACE_LINK_LIBRARIES "VecGeom::vecgeom")
++  elseif(NOT TARGET VecGeom::VecGeom)
+     add_library(VecGeom::VecGeom UNKNOWN IMPORTED)
+     # VecGeom's config file is awful, so the following is neccessary...
+     foreach(__vglib ${VECGEOM_LIBRARIES})

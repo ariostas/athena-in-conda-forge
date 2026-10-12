@@ -1,0 +1,93 @@
+context:
+  version: "14.0.0"
+  # the dqm_core commit that tdaq-common-cmake's tdaq-common-14-00-00 branch points to
+  commit: 6266dbe6a65cdd17647ada823c45f7704da841c0
+
+package:
+  name: tdaq-dqm-core
+  version: ${{ version }}
+
+# dqm_core, the data quality monitoring framework of tdaq-common 14-00-00: the algorithm and
+# result interfaces of ATLAS's data quality algorithms (Athena's dqm_algorithms) and the
+# histogram assessment (han) of DataQualityInterfaces. Apart from the tdaq-common package, as it
+# needs ROOT.
+source:
+  url: https://gitlab.cern.ch/atlas-tdaq-software/dqm_core/-/archive/${{ commit }}/dqm_core-${{ commit }}.tar.gz
+  sha256: 1834880fa98fc42bf23910f4e4ad1f560e41df218315e529b099fe728ef186e3
+  target_directory: dqm_core
+
+build:
+  number: 0
+  skip:
+    - not linux
+  script:
+    # The package's own CMakeLists.txt, on the replacement for the tdaq build system of the
+    # tdaq-common recipe (cmake/TDAQShim.cmake) and its ROOT functions (TDAQRootShim.cmake).
+    - cp ${RECIPE_DIR}/cmake/CMakeLists.txt ${RECIPE_DIR}/cmake/TDAQShim.cmake ${RECIPE_DIR}/cmake/TDAQRootShim.cmake .
+    - cmake -S . -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${PREFIX} -DPython_EXECUTABLE=${PYTHON} -DTDAQ_PYTHON_DIR=${SP_DIR}
+    - cmake --build build --parallel ${CPU_COUNT}
+    - cmake --install build
+
+requirements:
+  # the libraries have no soname version
+  run_exports:
+    - ${{ pin_subpackage('tdaq-dqm-core', upper_bound='x.x') }}
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+  host:
+    - tdaq-common ==${{ version }}
+    - root_base
+    - root_cxx_standard
+    - python
+    - libboost-devel
+    - libboost-python-devel
+    - libuuid
+    - zlib
+  run:
+    - tdaq-common ==${{ version }}
+    - root_base
+
+tests:
+  - package_contents:
+      lib:
+        - dqm_core
+        - dqm_core_io
+        - dqm_dummy
+        - dqm_dummy_io
+      include:
+        - dqm_core/Algorithm.h
+        - dqm_core/test/DummyAlgorithm.h
+      files:
+        - lib/libdqm_core_rdict.pcm
+        - lib/libdqm_core.rootmap
+  - script:
+      # the dictionaries load, and the dummy algorithm runs on a histogram
+      - python test/test_dqm_core.py
+    files:
+      recipe:
+        - test/
+    requirements:
+      run:
+        - python
+
+about:
+  homepage: https://gitlab.cern.ch/atlas-tdaq-software/dqm_core
+  summary: The data quality monitoring framework of the ATLAS TDAQ common software
+  description: |
+    dqm_core is the data quality monitoring framework of tdaq-common, the part of the ATLAS
+    Trigger and Data Acquisition software that the offline software shares: the interfaces
+    of data quality algorithms and their results, and the framework that runs them on
+    histograms. ATLAS's offline data quality software (in Athena) builds on it.
+  license: Apache-2.0
+  license_file:
+    - dqm_core/LICENSE
+    - dqm_core/NOTICE
+  repository: https://gitlab.cern.ch/atlas-tdaq-software/dqm_core
+
+extra:
+  recipe-maintainers:
+    - ariostas

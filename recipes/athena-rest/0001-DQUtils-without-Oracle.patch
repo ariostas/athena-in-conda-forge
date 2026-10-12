@@ -1,0 +1,37 @@
+DQUtils without the Oracle client library: its C++ code (the COOL readers of the python
+module) uses COOL and CORAL only, and reaches Oracle, if at all, through CORAL's plugins at run
+time. Oracle's client is proprietary and not on conda-forge; where AtlasLCG's FindOracle finds
+nothing, ORACLE_LIBRARIES and ORACLE_INCLUDE_DIRS are NOTFOUND and the package cannot be
+configured.
+
+--- a/DataQuality/DQUtils/CMakeLists.txt
++++ b/DataQuality/DQUtils/CMakeLists.txt
+@@ -6,7 +6,6 @@
+ # External dependencies:
+ find_package( COOL COMPONENTS CoolKernel CoolApplication )
+ find_package( CORAL COMPONENTS CoralBase CoralKernel RelationalAccess )
+-find_package( Oracle )
+ find_package( Python COMPONENTS Development )
+ find_package( ROOT COMPONENTS Core Tree MathCore Hist RIO pthread )
+ find_package( sqlalchemy )
+@@ -16,16 +15,16 @@
+                    src/quick_retrieve.cxx
+                    src/pythonic_coracool.cxx
+                    NO_PUBLIC_HEADERS
+-                   INCLUDE_DIRS ${ORACLE_INCLUDE_DIRS} ${ROOT_INCLUDE_DIRS}
++                   INCLUDE_DIRS ${ROOT_INCLUDE_DIRS}
+                    PRIVATE_INCLUDE_DIRS ${COOL_INCLUDE_DIRS} ${Python_INCLUDE_DIRS} ${CORAL_INCLUDE_DIRS}
+-                   LINK_LIBRARIES ${ORACLE_LIBRARIES} ${ROOT_LIBRARIES}
++                   LINK_LIBRARIES ${ROOT_LIBRARIES}
+                    PRIVATE_LINK_LIBRARIES ${COOL_LIBRARIES} ${Python_LIBRARIES} ${CORAL_LIBRARIES} CoraCool CxxUtils )
+ 
+ atlas_add_dictionary( DQUtilsDict
+                       dict/dictionary.h
+                       dict/dictionary.xml
+-                      INCLUDE_DIRS ${ORACLE_INCLUDE_DIRS} ${COOL_INCLUDE_DIRS} ${ROOT_INCLUDE_DIRS} ${Python_INCLUDE_DIRS} ${CORAL_INCLUDE_DIRS}
+-                      LINK_LIBRARIES ${ORACLE_LIBRARIES} ${COOL_LIBRARIES} ${ROOT_LIBRARIES} ${Python_LIBRARIES} ${CORAL_LIBRARIES} CoraCool DQUtils )
++                      INCLUDE_DIRS ${COOL_INCLUDE_DIRS} ${ROOT_INCLUDE_DIRS} ${Python_INCLUDE_DIRS} ${CORAL_INCLUDE_DIRS}
++                      LINK_LIBRARIES ${COOL_LIBRARIES} ${ROOT_LIBRARIES} ${Python_LIBRARIES} ${CORAL_LIBRARIES} CoraCool DQUtils )
+ 
+ # Install files from the package:
+ atlas_install_python_modules( python/*.py python/ext python/sugar

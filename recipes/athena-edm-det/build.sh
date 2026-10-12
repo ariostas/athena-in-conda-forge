@@ -98,6 +98,14 @@ if find "${INSTALL}" -name authentication.xml | grep .; then
   exit 1
 fi
 
+# The exported targets must not name files of the build environment, which does not exist when
+# the next layer is built (glibc's libraries in the compiler's sysroot: see athena-externals'
+# conda-postconfig.cmake).
+if grep -l "${BUILD_PREFIX}" "${INSTALL}"/cmake/*.cmake; then
+  echo "the layer's CMake configuration names files of the build environment"
+  exit 1
+fi
+
 # Activation: the layer's own setup.sh, as on CVMFS (see activate.sh).
 mkdir -p "${PREFIX}/etc/conda/activate.d" "${PREFIX}/etc/conda/deactivate.d"
 sed -e "s|@LAYER@|${LAYER}|g" -e "s|@PLATFORM@|${PLATFORM}|g" -e "s|@VERSION@|${PKG_VERSION}|g" \

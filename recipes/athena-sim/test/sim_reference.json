@@ -1,0 +1,29 @@
+{
+ "events": 3,
+ "generator": [
+  "73988a75d1504a68970b18cdf4fd0e513f4a29a99acf6f11f582243b27c3ad2f",
+  "721217735200eaa32682f99e6ee3f9d66acb4669876073c972dcbf6b30cb5588",
+  "6db1a4bd94c20700d749d3016a97515419c4b3e068fc36fba7b801bf78ca7f27"
+ ],
+ "totals": {
+  "AtlasHitsVector<MDTSimHit>/MDT_Hits": 72,
+  "AtlasHitsVector<RPCSimHit>/RPC_Hits": 15,
+  "AtlasHitsVector<SiHit>/BCMHits": 71,
+  "AtlasHitsVector<SiHit>/BLMHits": 38,
+  "AtlasHitsVector<SiHit>/PixelHits": 9811,
+  "AtlasHitsVector<SiHit>/SCT_Hits": 28417,
+  "AtlasHitsVector<TGCSimHit>/TGC_Hits": 39,
+  "AtlasHitsVector<TRTUncompressedHit>/TRTUncompressedHits": 47672,
+  "AtlasHitsVector<TileHit>/MBTSHits": 99,
+  "AtlasHitsVector<TileHit>/TileHitVec": 2759,
+  "AtlasHitsVector<TrackRecord>/CaloEntryLayer": 1111,
+  "AtlasHitsVector<TrackRecord>/MuonEntryLayer": 29,
+  "AtlasHitsVector<TrackRecord>/MuonExitLayer": 18,
+  "EventInfo_v1/EventInfo": 141,
+  "LArHitContainer/LArHitEMB": 40555,
+  "LArHitContainer/LArHitEMEC": 46464,
+  "LArHitContainer/LArHitFCAL": 36100,
+  "LArHitContainer/LArHitHEC": 6213,
+  "McEventCollection/TruthEvent": 15418
+ }
+}

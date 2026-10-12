@@ -1,0 +1,49 @@
+context:
+  version: "25.0.73"
+
+package:
+  name: athena
+  version: ${{ version }}
+
+source:
+  # No Athena code is built here; this is only so that the package can ship a licence file.
+  url: https://gitlab.cern.ch/atlas/athena/-/raw/release/${{ version }}/LICENSE
+  sha256: df0bcdf92b98809d8211977018ebd08d468725c484edaee823251f494c66ffff
+  file_name: LICENSE
+
+build:
+  number: 0
+  noarch: generic
+
+requirements:
+  run:
+    # the last layer, which pins every layer below it exactly
+    - athena-rest ==${{ version }}
+
+tests:
+  - script:
+      # the top project is set up, under the name ATLAS's own release has
+      - test -n "${Athena_DIR}"
+      - bash test/run_hello.sh
+    files:
+      recipe:
+        - test/
+
+about:
+  homepage: https://gitlab.cern.ch/atlas/athena
+  summary: ATLAS's Athena software, all of it
+  description: |
+    Athena is the offline software of the ATLAS experiment at CERN, built on the Gaudi
+    framework: event generation, detector simulation, digitization, the trigger,
+    reconstruction, derivations and analysis. For conda-forge it is split into layers, each an
+    ATLAS project built on the one below (athena-core, athena-detdescr, athena-edm,
+    athena-edm-det, athena-analysis, athena-reco-tracking, athena-reco, athena-trigger,
+    athena-sim and athena-rest, the project named Athena); this package installs all of them.
+    athena-devel adds what is needed to build Athena packages against them.
+  license: Apache-2.0
+  license_file: LICENSE
+  repository: https://gitlab.cern.ch/atlas/athena
+
+extra:
+  recipe-maintainers:
+    - ariostas

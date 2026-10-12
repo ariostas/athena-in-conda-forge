@@ -1,0 +1,158 @@
+context:
+  version: "25.0.73"
+
+package:
+  name: athena-devel
+  version: ${{ version }}
+
+source:
+  # Nothing is built from it: its licence file goes into the package, and its WorkDir project
+  # and HelloWorld example into the test.
+  url: https://gitlab.cern.ch/atlas/athena/-/archive/release/${{ version }}/athena-release-${{ version }}.tar.gz
+  sha256: e2df75b2fd966f97973e9ed89984222e4070be0d60ace0a4f3975e80e9ec1eba
+
+build:
+  number: 0
+  skip:
+    - not linux
+  # A metapackage: what it pulls in is the point.
+  script:
+    - echo "nothing to build"
+
+requirements:
+  host:
+    # (to pin the run requirements below to the versions the layers were built with)
+    - root_base
+    - root_cxx_standard
+    - libboost-devel
+  run:
+    - athena ==${{ version }}
+    # The compilers, in the major version the layers were built with (the global pinning's):
+    # code built with another major mixes libstdc++ ABIs with theirs (std::format's internals,
+    # as with conda-forge's gcc 14 Gaudi). c-compiler and friends would bring the newest gcc.
+    - gcc_${{ target_platform }} ${{ c_compiler_version }}.*
+    - gxx_${{ target_platform }} ${{ cxx_compiler_version }}.*
+    - gfortran_${{ target_platform }} ${{ fortran_compiler_version }}.*
+    - cmake
+    - make
+    - ninja
+    - pkg-config
+    # No glibc 2.34 sysroot, which the layers were built with: root_base requires the 2.17 one
+    # (for cling), and an environment has only one. Work areas compile against glibc 2.17's
+    # headers (see the README).
+    # Everything the layers were built against: the headers and the link-time symlinks of the
+    # externals, which conda-forge often splits into -devel packages, and the CMake
+    # configurations that Athena's packages look for.
+    - ${{ pin_compatible('root_base', upper_bound='x.x.x') }}
+    - ${{ pin_compatible('root_cxx_standard', upper_bound='x') }}
+    - ${{ pin_compatible('libboost-devel', upper_bound='x.x') }}
+    - libboost-python-devel
+    - tbb-devel
+    - eigen
+    - eigen-abi-devel 3.4.*
+    - clhep
+    - libuuid
+    - nlohmann_json
+    - fmt
+    - range-v3
+    - ms-gsl
+    - xerces-c
+    - zlib
+    - sqlite
+    - gtest
+    - gmock
+    - cppunit
+    - expat
+    - aida
+    - heppdt
+    - zeromq
+    - cppzmq
+    - hepmc3
+    - xrootd
+    - davix
+    - libprotobuf
+    - gperftools
+    - valgrind
+    - libcurl
+    - vdt
+    - libxml2
+    - gsl
+    - libblas
+    - liblapack
+    - fftw
+    - libtirpc
+    - onnxruntime-cpp 1.26.* *_cpu
+    - lwtnn
+    - fastjet-cxx ==3.5.1
+    - fastjet-contrib
+    - hdf5
+    - highfive
+    - lz4-c
+    - lhapdf
+    - nanobind
+    - pyyaml
+    - pythia8
+    - atlas-rivet
+    - yoda
+    - geomodel-core ==6.29.0
+    - geomodel-tools ==6.29.0
+    - atlas-acts ==47.7.0
+    - atlas-gaudi
+    - atlas-geant4 ==10.6.3.15
+    - veccore
+    - lcg-coral
+    - lcg-cool
+    - crestapi
+    - chai
+    - tdaq-common
+    - tdaq-dqm-core
+    - yampl
+    - boost-mpi3
+    - openmpi
+    - qt-main 5.*
+    - coin3d
+    - soqt
+    - libgl-devel
+    - libglu
+  ignore_run_exports:
+    by_name:
+      - root_base
+      - libboost
+
+tests:
+  - script:
+      - bash test/devloop.sh
+    files:
+      recipe:
+        - test/
+      source:
+        - Projects/WorkDir/
+        - Control/AthenaExamples/AthExHelloWorld/
+    requirements:
+      run:
+        - bash
+        - coreutils
+        - grep
+        - sed
+
+about:
+  homepage: https://gitlab.cern.ch/atlas/athena
+  summary: Everything needed to build Athena packages against the installed release
+  description: |
+    This package turns an Athena conda environment into a development environment, as
+    `asetup` does with a release on CVMFS: with it installed, ATLAS's WorkDir project (in a
+    sparse checkout of the athena repository, e.g. from `git atlas init-workdir`) builds the
+    packages checked out next to it against the installed release:
+
+        cmake -S athena/Projects/WorkDir -B build
+        cmake --build build
+        source build/*/setup.sh
+
+    It installs no files. What it pulls in is the point: the compilers, CMake, and the headers,
+    link-time symlinks and CMake configurations of the externals the release was built against.
+  license: Apache-2.0
+  license_file: LICENSE
+
+extra:
+  recipe-maintainers:
+    - ariostas

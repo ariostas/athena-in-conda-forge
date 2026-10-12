@@ -1,0 +1,138 @@
+--- VecGeom/volumes/SpecializedPlacedVolImplHelper.h
++++ VecGeom/volumes/SpecializedPlacedVolImplHelper.h
+@@ -136,7 +136,7 @@
+ #endif
+     Precision output(kInfLength);
+     Transformation3D const *tr = this->GetTransformation();
+-    Specialization::DistanceToIn(*this->GetUnplacedStruct(), tr->Transform<transC, rotC>(point),
++    Specialization::template DistanceToIn<>(*this->GetUnplacedStruct(), tr->Transform<transC, rotC>(point),
+                                  tr->TransformDirection<rotC>(direction), stepMax, output);
+ #ifdef VECGEOM_DISTANCE_DEBUG
+     DistanceComparator::CompareDistanceToIn(this, output, point, direction, stepMax);
+@@ -153,7 +153,7 @@
+ #endif
+     Transformation3D const *tr = this->GetTransformation();
+     Precision output(-1.);
+-    Specialization::template DistanceToOut(*this->GetUnplacedStruct(), tr->Transform<transC, rotC>(point),
++    Specialization::template DistanceToOut<>(*this->GetUnplacedStruct(), tr->Transform<transC, rotC>(point),
+                                            tr->TransformDirection<rotC>(direction), stepMax, output);
+ 
+ #ifdef VECGEOM_DISTANCE_DEBUG
+
+
+--- VecGeom/volumes/UnplacedVolumeImplHelper.h
++++ VecGeom/volumes/UnplacedVolumeImplHelper.h
+@@ -98,7 +98,7 @@
+     assert(d.IsNormalized() && " direction not normalized in call to  DistanceToOut ");
+ #endif
+     Precision output = kInfLength;
+-    Implementation::template DistanceToOut(((UnplacedVolume_t *)this)->UnplacedVolume_t::GetStruct(), p, d, step_max,
++    Implementation::template DistanceToOut<>(((UnplacedVolume_t *)this)->UnplacedVolume_t::GetStruct(), p, d, step_max,
+                                            output);
+ 
+ // detect -inf responses which are often an indication for a real bug
+
+--- VecGeom/volumes/kernel/ImplAsImplementation.h
++++ VecGeom/volumes/kernel/ImplAsImplementation.h
+@@ -51,7 +51,7 @@
+   VECCORE_ATT_HOST_DEVICE
+   static void Contains(UnplacedStruct_t const &s, Vector3D<Real_v> const &point, Bool_v &inside)
+   {
+-    DispatchingImplementation::template Contains(s, point, inside);
++    DispatchingImplementation::template Contains<>(s, point, inside);
+   }
+ 
+   template <typename Real_v, typename Inside_t>
+@@ -59,7 +59,7 @@
+   VECCORE_ATT_HOST_DEVICE
+   static void Inside(UnplacedStruct_t const &s, Vector3D<Real_v> const &point, Inside_t &inside)
+   {
+-    DispatchingImplementation::template Inside(s, point, inside);
++    DispatchingImplementation::template Inside<>(s, point, inside);
+   }
+ 
+   template <typename Real_v>
+@@ -68,7 +68,7 @@
+   static void DistanceToIn(UnplacedStruct_t const &s, Vector3D<Real_v> const &point, Vector3D<Real_v> const &direction,
+                            Real_v const &stepMax, Real_v &distance)
+   {
+-    DispatchingImplementation::template DistanceToIn(s, point, direction, stepMax, distance);
++    DispatchingImplementation::template DistanceToIn<>(s, point, direction, stepMax, distance);
+   }
+ 
+   template <typename Real_v>
+@@ -77,7 +77,7 @@
+   static void DistanceToOut(UnplacedStruct_t const &s, Vector3D<Real_v> const &point, Vector3D<Real_v> const &direction,
+                             Real_v const &stepMax, Real_v &distance)
+   {
+-    DispatchingImplementation::template DistanceToOut(s, point, direction, stepMax, distance);
++    DispatchingImplementation::template DistanceToOut<>(s, point, direction, stepMax, distance);
+   }
+ 
+   template <typename Real_v>
+@@ -85,7 +85,7 @@
+   VECCORE_ATT_HOST_DEVICE
+   static void SafetyToIn(UnplacedStruct_t const &s, Vector3D<Real_v> const &point, Real_v &safety)
+   {
+-    DispatchingImplementation::template SafetyToIn(s, point, safety);
++    DispatchingImplementation::template SafetyToIn<>(s, point, safety);
+   }
+ 
+   template <typename Real_v>
+@@ -93,7 +93,7 @@
+   VECCORE_ATT_HOST_DEVICE
+   static void SafetyToOut(UnplacedStruct_t const &s, Vector3D<Real_v> const &point, Real_v &safety)
+   {
+-    DispatchingImplementation::template SafetyToOut(s, point, safety);
++    DispatchingImplementation::template SafetyToOut<>(s, point, safety);
+   }
+ 
+   template <typename Real_v>
+@@ -102,7 +102,7 @@
+   static Vector3D<Real_v> NormalKernel(UnplacedStruct_t const &s, Vector3D<Real_v> const &point,
+                                        typename vecCore::Mask_v<Real_v> &valid)
+   {
+-    DispatchingImplementation::template NormalKernel(s, point, valid);
++    DispatchingImplementation::template NormalKernel<>(s, point, valid);
+   }
+ };
+
+ 
+--- VecGeom/volumes/kernel/PolyhedronImplementation.h
++++ VecGeom/volumes/kernel/PolyhedronImplementation.h
+@@ -689,7 +689,7 @@
+   {
+     bool inBounds;
+     // Correct tube algorithm obtained from trait class
+-    HasInnerRadiiTraits<innerRadiiT>::TubeKernels::template Contains(
++    HasInnerRadiiTraits<innerRadiiT>::TubeKernels::template Contains<>(
+         unplaced.fBoundingTube, Vector3D<Precision>(point[0], point[1], point[2] - unplaced.fBoundingTubeOffset),
+         inBounds);
+     if (!inBounds) return false;
+@@ -753,7 +753,7 @@
+     // FIX: the bounding tube was wrong. Since the fast UnplacedContains is
+     // used for early return, the bounding tube has to be larger than the
+     // ideal bounding tube to account for the tolerance (offset was wrong)
+-    HasInnerRadiiTraits<innerRadiiT>::TubeKernels::template Contains(
++    HasInnerRadiiTraits<innerRadiiT>::TubeKernels::template Contains<>(
+         unplaced.fBoundingTube, Vector3D<Precision>(point[0], point[1], point[2] - unplaced.fBoundingTubeOffset),
+         inBounds);
+     if (!inBounds) return EInside::kOutside;
+@@ -904,7 +904,7 @@
+   Precision tubeDistance = 0.;
+   {
+     Vector3D<Precision> boundsPoint(point[0], point[1], point[2] - unplaced.fBoundingTubeOffset);
+-    HasInnerRadiiTraits<innerRadiiT>::TubeKernels::template Contains(unplaced.fBoundingTube, boundsPoint, inBounds);
++    HasInnerRadiiTraits<innerRadiiT>::TubeKernels::template Contains<>(unplaced.fBoundingTube, boundsPoint, inBounds);
+     // If the point is inside the bounding tube, the result of DistanceToIn is
+     // unreliable and cannot be used to reject rays.
+     // TODO: adjust tube DistanceToIn function to correctly return a negative
+@@ -913,7 +913,7 @@
+     if (!inBounds) {
+       // If the point is outside the bounding tube, check if the ray misses
+       // the bounds
+-      HasInnerRadiiTraits<innerRadiiT>::TubeKernels::template DistanceToIn(unplaced.fBoundingTube, boundsPoint,
++      HasInnerRadiiTraits<innerRadiiT>::TubeKernels::template DistanceToIn<>(unplaced.fBoundingTube, boundsPoint,
+                                                                            direction, stepMax, tubeDistance);
+       if (tubeDistance == InfinityLength<Precision>()) {
+         return InfinityLength<Precision>();

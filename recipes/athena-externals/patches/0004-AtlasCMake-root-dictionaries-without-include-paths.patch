@@ -1,0 +1,19 @@
+AtlasCMake: ROOT dictionaries without the build's include paths (--noIncludePaths, as the
+Reflex dictionaries already are). rootcling otherwise stores every -I path of the build in the
+dictionary as a string literal: paths into the build tree, and into the host prefix, which
+packaging rewrites in place (a shorter path, padded with NULs). The linker stores a string
+literal that is the tail of another string inside it, so a literal such as "Geant4" or
+"StoreGate" in the same library becomes empty in the package (this blanked the default random
+stream name of the Geant4 simulation tool in AtlasGeant4, which absorbs FastCaloSim's
+dictionaries). At run time, headers are found through ROOT_INCLUDE_PATH.
+
+--- a/Build/AtlasCMake/modules/AtlasDictionaryFunctions.cmake	2026-10-11 18:57:54
++++ b/Build/AtlasCMake/modules/AtlasDictionaryFunctions.cmake	2026-10-11 18:58:06
+@@ -507,6 +507,7 @@
+    set( cmd "${cmd}chmod 755 \${tmpdir}\n" )
+    set( cmd "${cmd}cd \${tmpdir}\n" )
+    set( cmd "${cmd}\"${ROOT_rootcling_EXECUTABLE}\" -f ${libName}CintDict.cxx" )
++   set( cmd "${cmd} --noIncludePaths" )
+    set( cmd "${cmd} -s ${library_name}" )
+    set( cmd "${cmd} -rml ${library_name} -rmf ${libName}.dsomap" )
+    set( cmd "${cmd} $<$<BOOL:${definitions}>:-D>$<JOIN:${definitions}, -D>" )

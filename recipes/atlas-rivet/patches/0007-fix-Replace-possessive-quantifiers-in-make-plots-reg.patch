@@ -1,0 +1,30 @@
+From 0d834ba9f536d6bdc975b9a67d6ab778ec15dfc7 Mon Sep 17 00:00:00 2001
+From: Chris Burr <christopher.burr@cern.ch>
+Date: Tue, 3 Mar 2026 13:47:00 +0100
+Subject: [PATCH] fix: Replace possessive quantifiers in make-plots regex
+
+Python's re module only supports possessive quantifiers (?+) from
+3.11+. Replace with standard non-possessive (?) which has the same
+effect in this context, fixing compatibility with Python 3.10.
+---
+ bin/make-plots | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/bin/make-plots b/bin/make-plots
+index 2df3cdb77..a286aee62 100755
+--- a/bin/make-plots
++++ b/bin/make-plots
+@@ -41,8 +41,8 @@ from math import *
+
+
+ ## Regex patterns
+-pat_begin_block = re.compile(r'^#?+\s*BEGIN ([A-Z0-9_]+) ?(\S+)?')
+-pat_end_block =   re.compile(r'^#?+\s*END ([A-Z0-9_]+)')
++pat_begin_block = re.compile(r'^#?\s*BEGIN ([A-Z0-9_]+) ?(\S+)?')
++pat_end_block =   re.compile(r'^#?\s*END ([A-Z0-9_]+)')
+ pat_comment = re.compile(r'^#|^\s*$')
+ pat_property = re.compile(r'^(\w+?)=(.*)$')
+ pat_property_opt = re.compile(r'^ReplaceOption\[(\w+=\w+)\]=(.*)$')
+--
+2.39.5 (Apple Git-154)
+

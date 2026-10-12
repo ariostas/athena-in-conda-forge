@@ -282,6 +282,15 @@ Deferred until the reco layers work. Options: conda-forge Geant4 11.4 plus an At
 `G4AtlasRK4` (results then differ from production), the ATLAS fork's 11.2.2.3 tag, or the
 production 10.6.3 fork. Only the `sim` layer is affected.
 
+**Decided in M7: the production fork**, `atlas-geant4` (10.6.3.15 with atlasexternals' four
+patches and VecGeom 1.1.21 with its three), static and multithreaded as AthenaExternals builds
+it, so that the simulation can be checked against ATLAS's release like every other layer. It
+conflicts with conda-forge's geant4 and vecgeom (`run_constraints`); the data sets are
+conda-forge's `geant4-data-*` packages in the 10.6 versions. Moving to Geant4 11 is ATLAS's
+decision, and would then be a version bump here.
+The simulation then agrees with the release in its input and in the amounts of hits, but is not
+bit-identical, for a reason not found yet (progress log, M7).
+
 ### D6. Runtime data and conditions
 
 - The activation scripts replace `setup.sh`/`env_setup.sh`. Beyond the search paths
@@ -1036,3 +1045,156 @@ its translation units.
   with its feedstock, and the credentials in PixelConditionsTools' sources with ATLAS;
 - open: a default `FRONTIER_SERVER`, the geometry database and conditions payloads without CVMFS
   (D6), licences (CORAL, COOL, CrestApi, the CREST python clients, yampl); upstream the patches.
+
+### 2026-10-12: sim, rest, the metapackage and the developer workflow (M7)
+
+**Geant4 (D5): ATLAS's fork.** `atlas-geant4` builds the ATLAS simulation team's Geant4
+10.6.3.15 with atlasexternals' four patches, and VecGeom 1.1.21 with its three, as
+AthenaExternals does: static, multithreaded, GDML, VecGeom's cons and polycone, and link-time
+optimization (`build_externals.sh` turns it on for both). The objects are fat, so consumers can
+also link without LTO. It conflicts with conda-forge's geant4 and vecgeom; the data sets are
+conda-forge's `geant4-data-*` in the 10.6 versions. The layers set `ATLAS_GEANT4_USE_LTO` from
+CMake's IPO check, as Projects/Athena does: the first layer writes it into its
+PreConfig.cmake, where it had been empty, so AtlasGeant4 was linked without LTO.
+
+**New externals:** `tdaq-dqm-core` (tdaq-common 14.0.0's dqm_core, on the tdaq-common recipe's
+CMake shim plus a ROOT shim: the data quality algorithms and the histogram assessment) and
+`atlas-rivet` (conda-forge's rivet recipe and patches, on `fastjet-cxx` 3.5.1 build 5:
+conda-forge's rivet needs `fastjet-cxx-devel`, whose `cgal-cpp` does not exist for Boost 1.90
+and Eigen 3.4).
+
+**What is not packaged.** `layers.py` has a "none" pseudo-layer: the packages that compile
+against an external no conda package provides (`UNAVAILABLE_EXT`: the generators conda-forge
+lacks, the GPU stack, the TDAQ release; `UNAVAILABLE_PKG`: Triton's client; `UNDECLARED_EXT`),
+and everything that depends on them. Packages without C++ sources are exempt for the generators
+(they only look up the generator's runtime environment) but not for the GPU stack (interface
+libraries that link `vecmem::core`, and SYCL sources, which are not counted as C++): the rest
+layer's configure step found those. 30 packages, 174 translation units. The eight earlier layers
+are unchanged.
+
+**sim** (155 packages): Geant4 simulation of every subdetector, ISF with FastCaloSim and Fatras,
+the generator interfaces that conda-forge's generators allow (Pythia8, LHAPDF, Rivet), and
+`Sim_tf.py`. **rest** (149 packages, the project `Athena`): the derivation framework,
+D3PDMaker, data quality, VP1, physics validation, test beam, examples and tests.
+
+**Tests.**
+- sim: ATLAS's `test_RUN3_FullG4MT_QS_ttbar_MT` set-up (FullG4MT_QS, MC23e), 3 events of the
+  ttbar EVNT test file, serially. The HITS file is dumped with PyDumper and compared with the
+  release's dump (`compare_sim.py`). The generator record after the beam spot smearing must be
+  identical event by event, and it is. Every hit collection's size, summed over the events, must
+  be within 20% for those with at least 1,000 entries. All are within 10%: Pixel +5%, SCT +9%,
+  TRT -5%, LAr EMB +2.5%, HEC +6%, Tile -0.5%.
+- rest: `Derivation_tf.py` to DAOD_PHYS and DAOD_PHYSLITE from 10 events of the Run 3 ttbar
+  AOD, both dumps compared with the release's by sha256: **identical** (DAOD_PHYS 103,957
+  lines, DAOD_PHYSLITE 30,831).
+
+**The simulation is not identical to the release.** With everything below fixed, the first
+Geant4 vertices agree with ATLAS's and the events diverge after about the sixth, a few metres
+into the detector. Checked and ruled out by running variants of the job:
+- the C library: the packaged layer in the EL9 container gives the same output as on Ubuntu;
+- the allocator: tcmalloc in both;
+- the Geant4 data sets: identical files;
+- VecGeom's and VecCore's configuration: identical;
+- Geant4's link-time optimization;
+- CLHEP (below).
+
+Left: the compiler, and the builds of the other externals. The compiler is conda-forge's gcc
+15.3 against LCG's 15.2; relinking with LCG's gcc fails because its LTO objects are
+zstd-compressed and conda-forge's gcc has no zstd.
+
+Our job also raises FPE INVALID and DIVBYZERO in the simulation in every event, and ATLAS's job
+raises none. aarch64 has no floating point traps, so the FPE auditor only reports the flags per
+algorithm. Jobs without the calorimeters, without the muon system, without the TRT or without
+the silicon detectors all still raise them. The sim test leaves FPEs out of its log check. Next
+steps: ATLAS's simulation experts, and linux-64 (with traps) will say more.
+
+**Fixes on the way:**
+- **The exported targets named the build environment.** Each layer's exported CMake targets
+  named glibc's libraries by absolute path in that layer's build environment:
+  - `libpthread.a`: AtlasLCG's FindROOT caches the `pthread` component in
+    `_ROOT_pthread_library`, so the earlier `ROOT_pthread_LIBRARY` setting did nothing;
+  - `libdl`/`libm`: CMake's FindHDF5, from HDF5's compiler wrapper.
+
+  Later layers built only because the kept build trees still existed; removing them to free
+  disk space showed it. athena-externals' PostConfig now gives these libraries by name, and
+  every layer's `build.sh` fails when its CMake configuration names `$BUILD_PREFIX`. All layers
+  were rebuilt.
+- **`G4VERS`**: SimConfigFlags checks the Geant4 version name (`_check_G4_version`), which
+  ATLAS's setup takes from its Geant4 installation; sim's activation sets it from
+  `G4Version.hh`.
+- **ReleaseData** (the LAr high-voltage maps) is found through `SITEROOT`/`ATLAS_RELEASEDATA`,
+  which ATLAS's `setup.sh` points at `/afs`. sim's and rest's activation point them at CVMFS
+  when it is mounted. conda runs activation scripts alphabetically, so athena-analysis' setup
+  has already set them: the check is whether the directory exists. ReleaseData has no clear
+  licence and is not packaged.
+- **The Geant4 random stream had no name in the packaged library.** Its seeds are derived from
+  `<client>/<stream>`, so they differed from ATLAS's, and so did every random number drawn from
+  it. The literal `"Geant4"` (TransportTool's `RandomStreamName`) was stored as the tail of
+  `$PREFIX/include/Geant4`, one of the include paths rootcling writes into a dictionary
+  (ISF_FastCaloSimParametrization's, linked into AtlasGeant4), and packaging blanked it. This is
+  the M6 hazard again, outside `__FILE__`. `-Wl,-O0` does not stop the tail merging.
+  athena-externals' patch 0004 runs rootcling with `--noIncludePaths`, as AtlasCMake already
+  does for genreflex. It reached sim only after every layer was rebuilt: each project carries a
+  copy of AtlasCMake's modules, like the find modules.
+- **CLHEP**: ATLAS's fork draws RandGaussZiggurat's uniform numbers in double precision
+  (`CLHEP_2_4_7_1_atl01`, ATR-26831). In single precision a number just below 1 rounds to 1,
+  and the tail algorithm takes `log(0)` and draws a different count of numbers from the shared
+  engine. The clhep feedstock change carries the fix as a patch (build 2). It did not remove the
+  FPEs or the divergence.
+- **Oracle**: DQUtils links Oracle's client without using it, and nothing provides it: rest
+  patch 0001 drops it (upstreamable).
+- **`which`**: athena.py calls it, and minimal EL9 images (athena-ref) lack it: a run
+  requirement of athena-core.
+
+**The metapackage and the developer workflow.** `athena` (noarch) requires `athena-rest`, which
+pins every layer exactly. `athena-devel` adds the compilers, CMake and the externals'
+development packages (headers, link-time symlinks, CMake configurations), with ROOT and Boost
+pinned to the builds the layers used. Its test is the developer loop on top of the release:
+- ATLAS's `Projects/WorkDir` and AthExHelloWorld are taken from the release's sources;
+- the tool's message is changed;
+- the work area is configured and built against the installed layers;
+- its `setup.sh` is sourced, and `athena.py` prints the changed message.
+
+It passes. Three things on the way:
+- athena-devel needs the layers' `variants.yaml` (`root_cxx_standard` 23, ...), or its pins do
+  not match the layers.
+- `c-compiler`/`cxx-compiler` brought gcc 16, while the layers are gcc 15 builds: the
+  `std::format` ABI problem again for any code using it. athena-devel now requires
+  `gcc_<platform>`/`gxx_<platform>`/`gfortran_<platform>` in the pinning's major.
+- The layers are built with the glibc 2.34 sysroot, but `root_base` requires the 2.17 one
+  (`sysroot_linux-aarch64 2.17.*`, for cling), so a user environment cannot have 2.34. Work
+  areas compile against glibc 2.17's headers. Components link, but executables that link a
+  layer library fail (`undefined reference to dlopen@GLIBC_2.34`) unless they are linked with
+  `-Wl,--allow-shlib-undefined`, as checked in an athena-devel environment. athena-devel could
+  add the flag in an activation script.
+
+`athena`'s test runs HelloWorld with every layer activated. With a local channel, mamba solves
+the athena-devel environment only with flexible channel priority (rattler-build solves it
+either way).
+
+**Cost** (`compile_cost.py`, `-j10`):
+- sim: 1,095 compiles, 1.7 h summed wall (2.0 h for the whole ninja log); peak RSS median
+  0.6 GB, p90 1.25 GB, max 1.8 GB (GeneratorFilters' component list, the ACTS Fatras tools).
+  Recipe 23 minutes. The package is 323 MB: AtlasCMake installs the object files of the
+  simulation packages (640 MB, `objects-Release`, as in ATLAS's release on CVMFS) so that a
+  work area can relink AtlasGeant4.
+- rest: 1,256 compiles, 2.6 h summed wall (3.1 h); peak RSS median 0.65 GB, p90 1.6 GB, max
+  2.5 GB (LArCafJobs, the derivation framework tools). Recipe 27 minutes, package 55 MB.
+Both are the lightest layers: sim `-j3`, rest `-j2` to `-j3` on a 7 GB runner. Neither runs
+unit tests at build time yet.
+
+**M7 is done**: ten layers hold 1,936 of the release's 1,966 packages (99% of its translation
+units), every layer passes its tests, `athena` installs them all and `athena-devel` builds a work
+area against them. The simulation runs but is not identical to ATLAS's.
+
+**Next:**
+- why the simulation differs (ATLAS's simulation experts; linux-64, where FPEs trap);
+- athena-devel: link flags for executables in work areas (glibc 2.17 sysroot);
+- M8: linux-64 and osx-arm64;
+- the unit tests of the M6 and M7 layers at build time;
+- raise the prefix replacement/tail merging hazard (now also through rootcling's include
+  paths) with conda-forge, the clhep changes with its feedstock, and the credentials in
+  PixelConditionsTools' sources with ATLAS;
+- open: a default `FRONTIER_SERVER`, the geometry database, conditions payloads and ReleaseData
+  without CVMFS (D6), licences (CORAL, COOL, CrestApi, the CREST python clients, yampl);
+  upstream the patches.

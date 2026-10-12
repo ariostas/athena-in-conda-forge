@@ -1,0 +1,58 @@
+From 815ec2cff4fb7926404ce9eb2689f61d194cb090 Mon Sep 17 00:00:00 2001
+From: Chris Burr <christopher.burr@cern.ch>
+Date: Tue, 3 Mar 2026 21:02:24 +0100
+Subject: [PATCH] fix: Remove install_name_tool calls and WITH_OSX conditional
+
+Remove the WITH_OSX conditional and install_name_tool calls from the
+pyext Makefile. The install_name_tool rewrites fail with cctools-port
+due to fake code signatures. Conda's binary relocation handles library
+path fixups for the installed package.
+---
+ pyext/Makefile.am | 24 ------------------------
+ 1 file changed, 24 deletions(-)
+
+diff --git a/pyext/Makefile.am b/pyext/Makefile.am
+index 76a776dfc..64301eafe 100644
+--- a/pyext/Makefile.am
++++ b/pyext/Makefile.am
+@@ -10,28 +10,6 @@ PYCORE_SRC = \
+ 
+ all-local: build/rivet/core.so
+ 
+-if WITH_OSX
+-
+-build/rivet/core.so: build.py rivet/core.cpp $(PYCORE_SRC)
+-	$(MKDIR_P) $(abs_builddir)/build/rivet
+-	cd $(abs_builddir) && $(PYEXT_ENV) RIVET_LOCAL=1 $(PYTHON) $(abs_builddir)/build.py
+-	touch $@
+-	install_name_tool -change \
+-           $(libdir)/libRivet.dylib \
+-           $(abs_top_srcdir)/src/.libs/libRivet.dylib \
+-           $(abs_builddir)/build/rivet/core.so
+-
+-# TODO: always update the .py files, without triggering an extension rebuild
+-install-exec-local: build/rivet/core.so
+-	$(MKDIR_P) $(DESTDIR)$(RIVET_PYTHONPATH)
+-	cp -r $(abs_builddir)/build/rivet $(DESTDIR)$(RIVET_PYTHONPATH)/
+-	install_name_tool -change \
+-         $(abs_top_srcdir)/src/.libs/libRivet.dylib \
+-         $(libdir)/libRivet.dylib \
+-         $(abs_builddir)/build/rivet/core.so
+-
+-else
+-
+ build/rivet/core.so: build.py rivet/core.cpp $(PYCORE_SRC)
+ 	$(MKDIR_P) $(abs_builddir)/build/rivet
+ 	cd $(abs_builddir) && $(PYEXT_ENV) RIVET_LOCAL=1 $(PYTHON) $(abs_builddir)/build.py
+@@ -42,8 +20,6 @@ install-exec-local: build/rivet/core.so
+ 	$(MKDIR_P) $(DESTDIR)$(RIVET_PYTHONPATH)
+ 	cp -r $(abs_builddir)/build/rivet $(DESTDIR)$(RIVET_PYTHONPATH)/
+ 
+-endif
+-
+ uninstall-local:
+ 	rm -rf $(DESTDIR)$(RIVET_PYTHONPATH)/rivet
+ 
+-- 
+2.39.5 (Apple Git-154)
+

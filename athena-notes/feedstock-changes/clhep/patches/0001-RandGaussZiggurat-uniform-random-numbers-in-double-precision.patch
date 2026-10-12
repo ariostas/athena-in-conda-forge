@@ -1,0 +1,18 @@
+RandGaussZiggurat: uniform random numbers in double precision (ATLAS's fork of CLHEP, commit
+1085f1cc, ATR-26831). ziggurat_UNI() returned the engine's flat() as a float, which rounds
+values just below 1.0 up to 1.0: ziggurat_nfix() then takes log(1.0 - 1.0), a division by zero
+(and invalid operations after it), and draws a different number of random numbers than with
+the exact value, which changes the random sequence of everything that shares the engine (e.g.
+Geant4's, in ATLAS's simulation of transition radiation in the TRT).
+
+--- a/Random/Random/RandGaussZiggurat.h	2026-10-11 20:44:23
++++ b/Random/Random/RandGaussZiggurat.h	2026-10-11 20:44:23
+@@ -112,7 +112,7 @@
+   static CLHEP_THREAD_LOCAL bool ziggurat_is_init;
+   
+   static inline unsigned long ziggurat_SHR3(HepRandomEngine* anEngine) {return (unsigned int)(*anEngine);};
+-  static inline float ziggurat_UNI(HepRandomEngine* anEngine) {return anEngine->flat();};
++  static inline double ziggurat_UNI(HepRandomEngine* anEngine) {return anEngine->flat();};
+   static inline float ziggurat_RNOR(HepRandomEngine* anEngine) {
+     if(!ziggurat_is_init) ziggurat_init();
+     long hz=(signed)ziggurat_SHR3(anEngine);

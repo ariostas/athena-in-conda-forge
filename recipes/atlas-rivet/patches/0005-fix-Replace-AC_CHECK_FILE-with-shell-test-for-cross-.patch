@@ -1,0 +1,38 @@
+From 094210d69619424b7aba92ae625fbf3cf611d1b4 Mon Sep 17 00:00:00 2001
+From: Chris Burr <christopher.burr@cern.ch>
+Date: Tue, 3 Mar 2026 11:58:48 +0100
+Subject: [PATCH 5/5] fix: Replace AC_CHECK_FILE with shell test for
+ cross-compilation
+
+AC_CHECK_FILE refuses to work when cross-compiling since it cannot
+check file existence on the target host. Replace with a simple shell
+test -f which checks the build machine filesystem as intended.
+---
+ configure.ac | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/configure.ac b/configure.ac
+index 65eede512..a2a4449d7 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -369,11 +369,12 @@ if test x$enable_pyext = xyes; then
+     fi
+   fi
+ 
+-  AC_CHECK_FILE([pyext/rivet/core.cpp],
+-                [],
+-                [if test "x$CYTHON_FOUND" != "xyes"; then
+-                  AC_MSG_ERROR([Cython is required for --enable-pyext, no pre-built core.cpp was found.])
+-                fi])
++  AC_MSG_CHECKING([for pyext/rivet/core.cpp])
++  AS_IF([test -f "$srcdir/pyext/rivet/core.cpp"],
++        [AC_MSG_RESULT([yes])],
++        [AC_MSG_RESULT([no])
++         AS_IF([test "x$CYTHON_FOUND" != "xyes"],
++               [AC_MSG_ERROR([Cython is required for --enable-pyext, no pre-built core.cpp was found.])])])
+ 
+   cython_compiler=$CXX
+   ## Set extra Python extension build flags (to cope with Cython output code oddities)
+-- 
+2.39.5 (Apple Git-154)
+

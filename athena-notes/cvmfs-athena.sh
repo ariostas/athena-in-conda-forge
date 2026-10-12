@@ -6,6 +6,9 @@
 # (a copy of this file in the athena-work volume).
 export LCG_RELEASE_BASE=/cvmfs/sft.cern.ch/lcg/releases
 source /cvmfs/sft.cern.ch/lcg/releases/gcc/15.2.0-35657/aarch64-el9/setup.sh
+# as asetup sets it: the release's environment finds ReleaseData (e.g. the LAr HV maps of the
+# simulation, through ATLASCALDATA) and TwissFiles under it
+export SITEROOT=/cvmfs/atlas.cern.ch/repo/sw/software/25.0
 source /cvmfs/atlas.cern.ch/repo/sw/software/25.0/Athena/25.0.73/InstallArea/aarch64-el9-gcc15-opt/setup.sh >/dev/null 2>&1
 export ATLAS_POOLCOND_PATH=/cvmfs/atlas-condb.cern.ch/repo/conditions
 # ATLAS's public Frontier server, as asetup sets it, but without its proxy (403 from here)

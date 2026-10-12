@@ -1,0 +1,31 @@
+From e391dbda24fdc73be0071ea99c4c929894c79e51 Mon Sep 17 00:00:00 2001
+From: Matthew Feickert <matthew.feickert@cern.ch>
+Date: Tue, 26 May 2026 16:37:21 +0700
+Subject: [PATCH] fix: Drop --rpath=no from fastjet-config invocation
+
+The conda-forge fastjet-config has a bug where the shared lib
+detection variable is empty, causing --rpath=no to emit an error
+message to stdout that contaminates the linker flags. Since conda
+handles rpaths independently, this flag is unnecessary.
+
+Co-authored-by: Chris Burr <christopher.burr@cern.ch>
+---
+ configure.ac | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/configure.ac b/configure.ac
+index 2ede98703..c16fc1e3f 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -205,7 +205,7 @@ if test -f "$FJCONFIG"; then
+     AC_MSG_ERROR([FastJet version 3.2.0 or later is required])
+   fi
+   # Only keep -l flags (library names)
+-  FASTJETLIBADD=`echo "$($FJCONFIG --libs --plugins --rpath=no)" | tr ' ' '\n' | grep '^-l' | tr '\n' ' '`
++  FASTJETLIBADD=`echo "$($FJCONFIG --libs --plugins)" | tr ' ' '\n' | grep '^-l' | tr '\n' ' '`
+   FASTJETLDFLAGS=`echo "$($FJCONFIG --libs --plugins --rpath=no)" | tr ' ' '\n' | grep '^-L' | tr '\n' ' '`
+ else
+   FASTJETLIBADD="-l$FASTJETLIBNAME -lfastjetplugins"
+-- 
+2.54.0
+

@@ -1,0 +1,200 @@
+From 280cb86f3bc7bc973b74cdc73d84c8ce98b6230b Mon Sep 17 00:00:00 2001
+From: Guilherme Lima <lima@fnal.gov>
+Date: Tue, 15 Feb 2022 17:13:08 -0600
+Subject: [PATCH] Find/replace kHalfConeTolerance -> kConeTolerance
+
+One less tolerance parameter (kHalfConeTolerance totally eliminated).
+
+Verified all cone, polycone tests:
+- identical results in double precision: all tests passed.
+- identical number of mismatches in benchmarks for single precision.
+- extra failures in shape_testPolycone (FarAwayPoints), changes result code 368 -> 496
+---
+ VecGeom/base/Math.h                         |  1 -
+ VecGeom/volumes/ConeUtilities.h             | 32 ++++++++++-----------
+ VecGeom/volumes/kernel/ConeImplementation.h | 18 ++++++------
+ test/shape_tester/shape_testCone.cpp        |  2 +-
+ 4 files changed, 26 insertions(+), 27 deletions(-)
+
+diff --git a/VecGeom/base/Math.h b/VecGeom/base/Math.h
+index d5dabba3..4dac6e0b 100644
+--- a/VecGeom/base/Math.h
++++ b/VecGeom/base/Math.h
+@@ -50,7 +50,6 @@ VECGEOM_CONST Precision kRadToDeg          = 180. / kPi;
+ VECGEOM_CONST Precision kRadTolerance      = 1e-9;
+ VECGEOM_CONST Precision kTiny              = 1e-30;
+ VECGEOM_CONST Precision kHalfTolerance     = 0.5 * kTolerance;
+-VECGEOM_CONST Precision kHalfConeTolerance = 0.5 * kConeTolerance;
+ VECGEOM_CONST Precision kToleranceSquared  = kTolerance * kTolerance;
+ 
+ template <typename T>
+diff --git a/VecGeom/volumes/ConeUtilities.h b/VecGeom/volumes/ConeUtilities.h
+index 610f226e..45563db2 100644
+--- a/VecGeom/volumes/ConeUtilities.h
++++ b/VecGeom/volumes/ConeUtilities.h
+@@ -94,18 +94,18 @@ static void PointInCyclicalSector(UnplacedStruct_t const &volume, Real_v const &
+ 
+   if (onSurfaceT) {
+     // in this case, includeSurface is irrelevant
+-    ret = (Abs(startCheck) <= kHalfConeTolerance) | (Abs(endCheck) <= kHalfConeTolerance);
++    ret = (Abs(startCheck) <= kConeTolerance) | (Abs(endCheck) <= kConeTolerance);
+   } else {
+     if (smallerthanpi) {
+       if (includeSurface)
+-        ret = (startCheck >= -kHalfConeTolerance) & (endCheck >= -kHalfConeTolerance);
++        ret = (startCheck >= -kConeTolerance) & (endCheck >= -kConeTolerance);
+       else
+-        ret = (startCheck >= kHalfConeTolerance) & (endCheck >= kHalfConeTolerance);
++        ret = (startCheck >= kConeTolerance) & (endCheck >= kConeTolerance);
+     } else {
+       if (includeSurface)
+-        ret = (startCheck >= -kHalfConeTolerance) | (endCheck >= -kHalfConeTolerance);
++        ret = (startCheck >= -kConeTolerance) | (endCheck >= -kConeTolerance);
+       else
+-        ret = (startCheck >= kHalfConeTolerance) | (endCheck >= kHalfConeTolerance);
++        ret = (startCheck >= kConeTolerance) | (endCheck >= kConeTolerance);
+     }
+   }
+ }
+@@ -175,7 +175,7 @@ static void PhiPlaneTrajectoryIntersection(Precision alongX, Precision alongY, P
+ 
+   Real_v dirDotXY = (dir.y() * alongX) - (dir.x() * alongY);
+   vecCore__MaskedAssignFunc(dist, dirDotXY != 0, ((alongY * pos.x()) - (alongX * pos.y())) / NonZero(dirDotXY));
+-  ok &= dist > -kHalfConeTolerance;
++  ok &= dist > -kConeTolerance;
+   // if( /*Backend::early_returns &&*/ vecCore::MaskEmpty(ok) ) return;
+ 
+   if (insectorCheck) {
+@@ -304,12 +304,12 @@ static typename vecCore::Mask_v<Real_v> IsOnZPlaneAndMovingInside(UnplacedStruct
+   Precision fDz = cone.fDz;
+ 
+   if (ForTopPlane) {
+-    return (rho > (cone.fSqRmin2 - kHalfConeTolerance)) && (rho < (cone.fSqRmax2 + kHalfConeTolerance)) &&
+-           (point.z() < (fDz + kHalfConeTolerance)) && (point.z() > (fDz - kHalfConeTolerance)) &&
++    return (rho > (cone.fSqRmin2 - kConeTolerance)) && (rho < (cone.fSqRmax2 + kConeTolerance)) &&
++           (point.z() < (fDz + kConeTolerance)) && (point.z() > (fDz - kConeTolerance)) &&
+            (direction.z() < Real_v(0.));
+   } else {
+-    return (rho > (cone.fSqRmin1 - kHalfConeTolerance)) && (rho < (cone.fSqRmax1 + kHalfConeTolerance)) &&
+-           (point.z() < (-fDz + kHalfConeTolerance)) && (point.z() > (-fDz - kHalfConeTolerance)) &&
++    return (rho > (cone.fSqRmin1 - kConeTolerance)) && (rho < (cone.fSqRmax1 + kConeTolerance)) &&
++           (point.z() < (-fDz + kConeTolerance)) && (point.z() > (-fDz - kConeTolerance)) &&
+            (direction.z() > Real_v(0.));
+   }
+ }
+@@ -325,12 +325,12 @@ static typename vecCore::Mask_v<Real_v> IsOnZPlaneAndMovingOutside(UnplacedStruc
+   Precision fDz = cone.fDz;
+ 
+   if (ForTopPlane) {
+-    return (rho > (cone.fSqRmin2 - kHalfConeTolerance)) && (rho < (cone.fSqRmax2 + kHalfConeTolerance)) &&
+-           (point.z() < (fDz + kHalfConeTolerance)) && (point.z() > (fDz - kHalfConeTolerance)) &&
++    return (rho > (cone.fSqRmin2 - kConeTolerance)) && (rho < (cone.fSqRmax2 + kConeTolerance)) &&
++           (point.z() < (fDz + kConeTolerance)) && (point.z() > (fDz - kConeTolerance)) &&
+            (direction.z() > Real_v(0.));
+   } else {
+-    return (rho > (cone.fSqRmin1 - kHalfConeTolerance)) && (rho < (cone.fSqRmax1 + kHalfConeTolerance)) &&
+-           (point.z() < (-fDz + kHalfConeTolerance)) && (point.z() > (-fDz - kHalfConeTolerance)) &&
++    return (rho > (cone.fSqRmin1 - kConeTolerance)) && (rho < (cone.fSqRmax1 + kConeTolerance)) &&
++           (point.z() < (-fDz + kConeTolerance)) && (point.z() > (-fDz - kConeTolerance)) &&
+            (direction.z() < Real_v(0.));
+   }
+ }
+@@ -517,9 +517,9 @@ public:
+ 
+     // very fast check on z-height
+     Real_v absz       = Abs(point[2]);
+-    completelyoutside = absz > MakePlusTolerant<ForInside>(cone.fDz, kHalfConeTolerance);
++    completelyoutside = absz > MakePlusTolerant<ForInside>(cone.fDz, kConeTolerance);
+     if (ForInside) {
+-      completelyinside = absz < MakeMinusTolerant<ForInside>(cone.fDz, kHalfConeTolerance);
++      completelyinside = absz < MakeMinusTolerant<ForInside>(cone.fDz, kConeTolerance);
+     }
+     if (vecCore::MaskFull(completelyoutside)) {
+       return;
+diff --git a/VecGeom/volumes/kernel/ConeImplementation.h b/VecGeom/volumes/kernel/ConeImplementation.h
+index 0d6f3305..ebe80919 100644
+--- a/VecGeom/volumes/kernel/ConeImplementation.h
++++ b/VecGeom/volumes/kernel/ConeImplementation.h
+@@ -133,8 +133,8 @@ struct ConeImplementation {
+ 
+     // outside of Z range and going away?
+     Float_t distz          = Abs(point.z()) - cone.fDz; // avoid a division for now
+-    Bool_t outZAndGoingOut = (distz > kHalfConeTolerance && (point.z() * dir.z()) >= zero) ||
+-                             (Abs(distz) < kHalfConeTolerance && (point.z() * dir.z()) > zero);
++    Bool_t outZAndGoingOut = (distz > kConeTolerance && (point.z() * dir.z()) >= zero) ||
++                             (Abs(distz) < kConeTolerance && (point.z() * dir.z()) > zero);
+     done |= outZAndGoingOut;
+     if (vecCore::MaskFull(done)) return;
+ 
+@@ -149,7 +149,7 @@ struct ConeImplementation {
+     vecCore__MaskedAssignFunc(distance, !done, Float_t(-1.0));
+ 
+     // For points inside z-range, return -1
+-    Bool_t inside = distz < -kHalfConeTolerance;
++    Bool_t inside = distz < -kConeTolerance;
+ 
+     inside &= rsq < MakeMinusTolerantSquare<true>(outerRad, cone.fOuterTolerance);
+ 
+@@ -173,7 +173,7 @@ struct ConeImplementation {
+ 
+ 
+ #ifdef EDGE_POINTS
+-    Bool_t onZsurf  = (Abs(point.z()) - cone.fDz) < Real_v(kHalfTolerance);
++    Bool_t onZsurf  = (Abs(point.z()) - cone.fDz) < Real_v(kConeTolerance);
+     Bool_t onLoZSrf = onZsurf && point.z() < zero;
+     Bool_t onHiZSrf = onZsurf && point.z() > zero;
+     Bool_t loZcond  = onLoZSrf && (IsOnRing<Real_v, false, true>(cone, point));
+@@ -276,7 +276,7 @@ struct ConeImplementation {
+     //=== Next, check all dimensions of the cone: for points outside --> return -1
+     vecCore__MaskedAssignFunc(distance, !done, Real_v(-1.0));
+ 
+-    Bool_t outside = distz > Real_v(kHalfConeTolerance);
++    Bool_t outside = distz > Real_v(kConeTolerance);
+ 
+     Real_v rsq           = point.Perp2();
+     Real_v outerRad = ConeUtilities::GetRadiusOfConeAtPoint<Real_v, false>(cone, point.z());
+@@ -302,8 +302,8 @@ struct ConeImplementation {
+     Bool_t isGoingUp   = direction.z() > zero;
+     Bool_t isGoingDown = direction.z() < zero;
+     Bool_t isOnZPlaneAndMovingOutside(false);
+-    isOnZPlaneAndMovingOutside = !outside && ((isGoingUp && point.z() > zero && Abs(distz) < kHalfTolerance) ||
+-                                              (isGoingDown && point.z() < zero && Abs(distz) < kHalfTolerance));
++    isOnZPlaneAndMovingOutside = !outside && ((isGoingUp && point.z() > zero && Abs(distz) < kConeTolerance) ||
++                                              (isGoingDown && point.z() < zero && Abs(distz) < kConeTolerance));
+     vecCore__MaskedAssignFunc(distance, !done && isOnZPlaneAndMovingOutside, distz);
+     done |= isOnZPlaneAndMovingOutside;
+     if (vecCore::MaskFull(done)) return;
+@@ -385,7 +385,7 @@ struct ConeImplementation {
+     vecCore__MaskedAssignFunc(safety, !done, Float_t(-1.0));
+ 
+     // For points inside z-range, return -1
+-    Bool_t inside = distz < -kHalfConeTolerance;
++    Bool_t inside = distz < -kConeTolerance;
+ 
+     // This logic to check if the point is inside is far better than
+     // using GenericKernel and will improve performance.
+@@ -453,7 +453,7 @@ struct ConeImplementation {
+ 
+     // This logic to check if the point is outside is far better then
+     // using GenericKernel and will improve performance.
+-    Bool_t outside = distz > Real_v(kHalfConeTolerance);
++    Bool_t outside = distz > Real_v(kConeTolerance);
+ 
+     Float_t outerRad  = GetRadiusOfConeAtPoint<Real_v, false>(cone, point.z());
+     outside |= rsq > MakePlusTolerantSquare<true>(outerRad, cone.fOuterTolerance);
+diff --git a/test/shape_tester/shape_testCone.cpp b/test/shape_tester/shape_testCone.cpp
+index dd266c4a..424c809c 100644
+--- a/test/shape_tester/shape_testCone.cpp
++++ b/test/shape_tester/shape_testCone.cpp
+@@ -33,7 +33,7 @@ int runTester(ImplT const *shape, int npoints, bool debug, bool stat)
+ {
+ 
+   ShapeTester<ImplT> tester;
+-  tester.SetSolidTolerance(vecgeom::kHalfConeTolerance);
++  tester.SetSolidTolerance(vecgeom::kConeTolerance);
+   tester.setDebug(debug);
+   tester.setStat(stat);
+   tester.SetMaxPoints(npoints);
+-- 
+2.32.1 (Apple Git-133)
+

@@ -1,0 +1,15 @@
+# ATLAS uses its fork of CLHEP 2.4.7.1. clhep is zipped with geant4 in the global pinning,
+# where 2.4.7.1 goes with 11.3.2.
+clhep:
+  - "2.4.7.1"
+geant4:
+  - "11.3.2"
+
+# ATLAS builds for EL9 (glibc 2.34), as the Athena layers that link this.
+c_stdlib_version:
+  - if: linux
+    then: "2.34"
+    else: "13.3"
+MACOSX_DEPLOYMENT_TARGET:
+  - if: osx
+    then: "13.3"

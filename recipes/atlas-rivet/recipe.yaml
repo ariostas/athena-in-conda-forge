@@ -1,0 +1,125 @@
+context:
+  version: "4.1.4"
+
+# conda-forge's rivet (its feedstock's recipe, build script and patches), built against
+# FastJet 3.5.1 build 5 and fastjet-contrib instead of their -devel packages. Those require
+# cgal-cpp, and no cgal-cpp goes with both Boost 1.90 and Eigen 3.4, which the Athena layers
+# are built with: conda-forge's rivet cannot be installed with them. Athena's Rivet interface
+# (Rivet_i) and its Higgs truth classification (TruthRivetTools, which DAOD_PHYS uses) need it.
+# ATLAS's release has Rivet 4.1.2 (LCG_110); the patches are for 4.1.4.
+package:
+  name: atlas-rivet
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.com/hepcedar/rivet/-/archive/rivet-${{ version }}/rivet-rivet-${{ version }}.tar.gz
+  sha256: 3bceaeec2b49161c02fa08bfa6e4c5fff64247afd0b639ad9d544521b047d002
+  # from conda-forge's rivet-feedstock
+  patches:
+    - patches/0001-fix-Fix-Python-extension-build-for-modern-Python-3.1.patch
+    - patches/0002-fix-Replace-shell-ls-with-make-wildcard-in-analyses-.patch
+    - patches/0003-fix-Use-C-linker-for-libRivet-convenience-library-ag.patch
+    - patches/0004-fix-Remove-install_name_tool-calls-and-WITH_OSX-cond.patch
+    - patches/0005-fix-Replace-AC_CHECK_FILE-with-shell-test-for-cross-.patch
+    - patches/0006-fix-Drop-rpath-no-from-fastjet-config-invocation.patch
+    - patches/0007-fix-Replace-possessive-quantifiers-in-make-plots-reg.patch
+    - patches/0008-fix-Skip-Python-import-tests-when-building-in-conda.patch
+    - patches/0009-fix-Don-t-require-libpython-to-build-the-Python-exte.patch
+
+build:
+  number: 0
+  skip:
+    - win
+
+requirements:
+  run_exports:
+    - ${{ pin_subpackage("atlas-rivet", upper_bound="x.x") }}
+  build:
+    - ${{ stdlib("c") }}
+    - ${{ compiler("cxx") }}
+    - automake
+    - libtool
+    - make
+    - pkg-config
+    - gnuconfig
+    - sed
+    - grep
+    - gawk
+  host:
+    - python
+    - hepmc3
+    - yoda
+    # FastJet 3.5.1 as in ATLAS's release, in its last build with the headers in the package
+    - fastjet-cxx ==3.5.1 *_5
+    - fastjet-contrib
+    - cython
+    - zlib
+  run:
+    - python
+    - matplotlib-base
+    - requests
+    # Rivet's public headers include zlib's, FastJet's and fjcontrib's (as conda-forge's rivet):
+    # FastJet's build 5, the last with its headers in the package
+    - zlib
+    - fastjet-cxx ==3.5.1 *_5
+    - fastjet-contrib
+    # rivet-build compiles analyses with the C++ compiler recorded at build time
+    - cxx-compiler
+  run_constraints:
+    # the same files as conda-forge's rivet
+    - rivet <0a0
+
+tests:
+  - package_contents:
+      bin:
+        - rivet
+        - rivet-build
+        - rivet-config
+      lib:
+        - Rivet
+      include:
+        - Rivet/Analysis.hh
+      site_packages:
+        - rivet
+      files:
+        - lib/pkgconfig/rivet.pc
+        - lib/Rivet/RivetATLASAnalyses.so
+  - python:
+      imports:
+        - rivet
+      pip_check: false
+  - script:
+      - rivet --help
+      - rivet --list-analyses ATLAS_2016_I1457605 | grep ATLAS_2016_I1457605
+      - if grep -E 'build_env|prefix-map' "${CONDA_PREFIX}/bin/rivet-build"; then exit 1; fi
+  - files:
+      source:
+        - test/testMath.cc
+        - test/testNaN.cc
+        - test/testAPI.hepmc
+    script:
+      - export CXX="$(rivet-config --cxx)"
+      - export CXXFLAGS="$(rivet-config --cxxflags)"
+      - export LDFLAGS="$(rivet-config --ldflags)"
+      - $CXX test/testMath.cc -o testMath $CXXFLAGS $LDFLAGS -lRivet
+      - ./testMath
+      - cd test
+      - $CXX testNaN.cc -o testNaN $CXXFLAGS $LDFLAGS -lm -lz -lHepMC3 -lYODA -lRivet
+      - ./testNaN testAPI.hepmc
+
+about:
+  license: GPL-3.0-only
+  license_file: COPYING
+  summary: 'Rivet, the particle-physics MC analysis toolkit, for ATLAS''s Athena'
+  description: |
+    The Rivet toolkit (Robust Independent Validation of Experiment and Theory) is a system for
+    validation of Monte Carlo event generators, with a large set of experimental analyses. This
+    is conda-forge's rivet built against the FastJet build that ATLAS's Athena layers use; for
+    other uses, conda-forge's rivet is the one to install.
+  homepage: https://gitlab.com/hepcedar/rivet/
+  repository: https://gitlab.com/hepcedar/rivet/
+  documentation: https://rivet.hepforge.org/
+
+extra:
+  recipe-maintainers:
+    - ariostas

@@ -1,0 +1,40 @@
+From 39eeefb8905eb007f4bc3f958685dd761759cd35 Mon Sep 17 00:00:00 2001
+From: Chris Burr <christopher.burr@cern.ch>
+Date: Tue, 3 Mar 2026 11:41:10 +0100
+Subject: [PATCH 3/5] fix: Use C++ linker for libRivet convenience library
+ aggregation
+
+libRivet_la_SOURCES is empty since the library is assembled purely
+from convenience sub-libraries. As documented in the GNU Automake
+manual (section 8.3.5, Libtool Convenience Libraries), this causes
+automake to default to the C linker, which does not link the C++
+standard library. This can lead to crashes when the C++ runtime
+symbols are resolved from a different libc++ than the one used by
+Rivet's dependencies (e.g. YODA), causing double-frees in std::locale
+during YODA::Writer::write.
+
+Apply the standard automake idiom of adding a dummy C++ source via
+nodist_EXTRA to force C++ linking.
+---
+ src/Makefile.am | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/Makefile.am b/src/Makefile.am
+index 8c9fc632b..76a1658c1 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -2,6 +2,11 @@ SUBDIRS = Core Tools Projections AnalysisTools
+ 
+ lib_LTLIBRARIES = libRivet.la
+ 
++# Force C++ linking (see GNU Automake manual, section 8.3.5). Without this,
++# automake defaults to the C linker because libRivet_la_SOURCES is empty,
++# which omits the C++ standard library from the link and can cause crashes
++# when multiple libc++ copies are present at runtime.
++nodist_EXTRA_libRivet_la_SOURCES = dummy.cc
+ libRivet_la_SOURCES =
+ 
+ libRivet_la_LDFLAGS = -export-dynamic -avoid-version -L$(YODALIBPATH)
+-- 
+2.39.5 (Apple Git-154)
+

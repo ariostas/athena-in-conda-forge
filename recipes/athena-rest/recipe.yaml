@@ -1,0 +1,174 @@
+context:
+  version: "25.0.73"
+
+package:
+  name: athena-rest
+  version: ${{ version }}
+
+source:
+  url: https://gitlab.cern.ch/atlas/athena/-/archive/release/${{ version }}/athena-release-${{ version }}.tar.gz
+  sha256: e2df75b2fd966f97973e9ed89984222e4070be0d60ace0a4f3975e80e9ec1eba
+  patches:
+    # DQUtils' C++ code without Oracle's client, which it does not use (not on conda-forge)
+    - 0001-DQUtils-without-Oracle.patch
+
+build:
+  number: 0
+  skip:
+    - not linux
+    - match(python, "<3.13")
+  script:
+    file: build.sh
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    # AthExFortranAlgorithm
+    - ${{ compiler('fortran') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+    # AtlasLCG's Findlz4
+    - pkg-config
+  host:
+    - athena-sim ==${{ version }}
+    # the data quality algorithms and histogram assessment (dqm_algorithms,
+    # DataQualityInterfaces)
+    - tdaq-dqm-core ==14.0.0
+    # the VP1 event display
+    - qt-main 5.*
+    - coin3d
+    - soqt
+    - libgl-devel
+    - libglu
+    # the layers below, whose headers (and CMake configuration) this layer includes
+    - athena-trigger ==${{ version }}
+    - atlas-geant4 ==10.6.3.15
+    - veccore
+    # the generator interfaces (Pythia8_i, Pythia8B_i, G4ExternalDecay, Rivet_i, TruthRivetTools)
+    - pythia8
+    - atlas-rivet
+    - yoda
+    - highfive
+    - athena-reco ==${{ version }}
+    # the externals of the layers below, whose headers this layer includes:
+    - libblas
+    - liblapack
+    - fftw
+    - libtirpc
+    # flavour tagging, tau, egamma and lepton identification networks
+    - onnxruntime-cpp 1.26.* *_cpu
+    - lwtnn
+    # jet substructure (as in ATLAS's release, fjcontrib 1.10x on FastJet 3.5.1)
+    - fastjet-contrib
+    # HDF5Utils, the HDF5 writers of flavour tagging
+    - hdf5
+    - lz4-c
+    # PDF reweighting (ReweightUtils, AsgAnalysisAlgorithms)
+    - lhapdf
+    # the python bindings of the columnar tools (ColumnarToolWrapperPython)
+    - nanobind
+    # the YAML configurations of the CP algorithms (the unit tests run them)
+    - pyyaml
+    - fastjet-cxx ==3.5.1 *_5
+    - athena-reco-tracking ==${{ version }}
+    - athena-analysis ==${{ version }}
+    - athena-edm-det ==${{ version }}
+    - athena-edm ==${{ version }}
+    - athena-detdescr ==${{ version }}
+    - athena-core ==${{ version }}
+    - libxml2
+    - geomodel-core ==6.29.0
+    - geomodel-tools ==6.29.0
+    - atlas-acts ==47.7.0
+    - gsl
+    - athena-externals ==${{ version }}
+    - atlas-gaudi
+    - lcg-coral
+    - lcg-cool
+    - crestapi
+    - chai
+    - tdaq-common
+    - yampl
+    - boost-mpi3
+    - openmpi
+    - python
+    - root_base
+    - root_cxx_standard
+    - libboost-devel
+    - libboost-python-devel
+    - tbb-devel
+    - eigen
+    - eigen-abi-devel
+    - clhep
+    - libuuid
+    - nlohmann_json
+    - fmt
+    - range-v3
+    - ms-gsl
+    - xerces-c
+    - zlib
+    - sqlite
+    - gtest
+    - gmock
+    - cppunit
+    - expat
+    - aida
+    - heppdt
+    - zeromq
+    - cppzmq
+    - hepmc3
+    # ByteStream input from remote storage
+    - xrootd
+    - davix
+    # EventIndexProducer
+    - libprotobuf
+    # PerfMonGPerfTools
+    - gperftools
+    # headers only (AthenaServices)
+    - valgrind
+    - libcurl
+    - vdt
+    # the build draws the python import graph of the packages (apydep)
+    - pygraphviz
+  run:
+    - athena-sim ==${{ version }}
+    - python
+    - root_base
+    # DQUtils, DQDefects (the data quality defect database's python interface)
+    - sqlalchemy
+    - pyyaml
+  ignore_run_exports:
+    from_package:
+      # static libraries, linked into the sim layer's libraries
+      - atlas-geant4
+
+tests:
+  - script:
+      # ATLAS's DAOD_PHYS and DAOD_PHYSLITE derivations (Derivation_tf.py) of ATLAS's Run 3 ttbar
+      # AOD test file on CVMFS: the outputs are checked against ATLAS's release
+      - bash test/run_derivation.sh
+      # every component of the layer has its configurable
+      - python test/check_confdb.py "${Athena_DIR}/lib/Athena.components"
+    files:
+      recipe:
+        - test/
+
+about:
+  homepage: https://gitlab.cern.ch/atlas/athena
+  summary: The last layer of ATLAS's Athena software (derivations, data quality, event display)
+  description: |
+    Athena is the offline software of the ATLAS experiment at CERN, built on the Gaudi
+    framework. This package is the last of the layers Athena is split into for conda-forge,
+    on top of athena-sim, and the ATLAS project named Athena: the derivation framework
+    (Derivation_tf.py, DAOD_PHYS and PHYSLITE among others), data quality (histogram
+    assessment), the VP1 event display, physics validation, test beam and examples. The
+    athena package installs all the layers.
+  license: Apache-2.0
+  license_file: LICENSE
+  repository: https://gitlab.cern.ch/atlas/athena
+
+extra:
+  recipe-maintainers:
+    - ariostas

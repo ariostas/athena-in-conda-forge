@@ -8,10 +8,21 @@
 find_package( Threads REQUIRED )
 link_libraries( Threads::Threads )
 
-# About 180 packages ask for "pthread" as a ROOT component, and AtlasLCG's FindROOT then looks
-# for a libpthread, finding the one in root_base's (glibc 2.17) sysroot in the host prefix. Its
-# linker script points at /lib64/libpthread.so.0, which does not exist in the build sysroot.
-set( ROOT_pthread_LIBRARY "pthread" CACHE FILEPATH "pthread (not a ROOT component)" )
+# glibc's libraries by name, not by path. Otherwise find_library finds them in a sysroot: the
+# compiler's in the build environment, whose absolute path then ends up in the exported targets
+# of every layer (a path that exists only during that build), or root_base's (glibc 2.17) in the
+# host prefix, whose libpthread linker script points at /lib64/libpthread.so.0.
+# - About 170 packages ask for "pthread" as a ROOT component: AtlasLCG's FindROOT looks it up
+#   in _ROOT_pthread_library.
+# - CMake's FindHDF5 resolves the libraries of HDF5's compiler wrapper (-ldl -lm) one by one.
+set( _ROOT_pthread_library "pthread" CACHE FILEPATH "pthread (not a ROOT component)" )
+foreach( _lang C CXX )
+   foreach( _lib dl m pthread rt )
+      set( HDF5_${_lang}_LIBRARY_${_lib} "${_lib}" CACHE FILEPATH "glibc's lib${_lib}" )
+   endforeach()
+endforeach()
+unset( _lang )
+unset( _lib )
 
 # AtlasLCG's FindROOT requires ROOT's python modules, and looks for them in <ROOT>/lib:
 # conda-forge has them in site-packages. Without them ROOT_FOUND is false, which goes unnoticed

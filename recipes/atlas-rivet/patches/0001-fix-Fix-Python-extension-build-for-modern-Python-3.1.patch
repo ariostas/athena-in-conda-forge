@@ -1,0 +1,78 @@
+From af76347dfdd28911e7e1e29b33e5f06e5009d3fa Mon Sep 17 00:00:00 2001
+From: Chris Burr <christopher.burr@cern.ch>
+Date: Wed, 4 Mar 2026 00:26:40 +0100
+Subject: [PATCH] fix: Fix Python extension build for modern Python (3.12+)
+
+- Do not link extension modules against libpython on any platform.
+  Python symbols are resolved at runtime from the interpreter. Linking
+  libpython directly causes duplicate PyModuleDef_Type symbols which
+  breaks PEP 489 multi-phase module initialization, resulting in
+  "initialization of core did not return an extension module".
+  On macOS, use -undefined dynamic_lookup for deferred symbol resolution.
+- Use sysconfig.get_path('include') instead of
+  sysconfig.get_config_var('INCLUDEPY') to find Python headers, as the
+  latter returns the stale build-time path which may not match the
+  actual install prefix.
+- Pass --module-name rivet.core to Cython so the generated PyModuleDef
+  has the correct fully qualified name for PEP 489 multi-phase init.
+---
+ pyext/build.py.in       | 23 +++++++----------------
+ pyext/rivet/Makefile.am |  2 +-
+ 2 files changed, 8 insertions(+), 17 deletions(-)
+
+diff --git a/pyext/build.py.in b/pyext/build.py.in
+index 731ae0d..3272a75 100644
+--- a/pyext/build.py.in
++++ b/pyext/build.py.in
+@@ -27,7 +27,7 @@ incargs = " ".join("-I{}".format(d) for d in incdirs)
+ incargs += " -I@prefix@/include"
+ incargs += " @HEPMC3CPPFLAGS@ @FASTJETCPPFLAGS@ @FJCONTRIBCPPFLAGS@ @YODACPPFLAGS@ @YAML_CPP_CPPFLAGS@"
+ incargs += " @CPPFLAGS@"
+-incargs += " -I" + sysconfig.get_config_var("INCLUDEPY")
++incargs += " -I" + sysconfig.get_path("include")
+ 
+ ## Compile args
+ cmpargs = "@PYEXT_CXXFLAGS@"
+@@ -59,23 +59,14 @@ libargs += " @YODALIBS@ @YAML_CPP_LDFLAGS@"
+ # print("\n")
+ 
+ ## Python compile/link args
+-pyargs = "-I" + sysconfig.get_config_var("INCLUDEPY")
+-libpys = [os.path.join(sysconfig.get_config_var(ld), sysconfig.get_config_var("LDLIBRARY")) for ld in ["LIBPL", "LIBDIR"]]
+-libpys.extend( glob(os.path.join(sysconfig.get_config_var("LIBPL"), "libpython*.*")) )
+-libpys.extend( glob(os.path.join(sysconfig.get_config_var("LIBDIR"), "libpython*.*")) )
+-libpy = None
+-for lp in libpys:
+-    if os.path.exists(lp):
+-        libpy = lp
+-        break
+-if libpy is None:
+-    print("No libpython found in expected location exiting")
+-    print("Considered locations were:", libpys)
+-    sys.exit(1)
+-pyargs += " " + libpy
++## Do not link against libpython. Extension modules resolve Python
++## symbols at runtime from the interpreter. Linking libpython directly
++## can cause duplicate symbols and breaks PEP 489 multi-phase init.
++pyargs = "-I" + sysconfig.get_path("include")
++if platform.system() == "Darwin":
++    pyargs += " -undefined dynamic_lookup"
+ pyargs += " " + sysconfig.get_config_var("LIBS")
+ pyargs += " " + sysconfig.get_config_var("LIBM")
+-#pyargs += " " + sysconfig.get_config_var("LINKFORSHARED")
+ 
+ 
+ ## Assemble the compile & link command
+diff --git a/pyext/rivet/Makefile.am b/pyext/rivet/Makefile.am
+index f51a45e..d68dd93 100644
+--- a/pyext/rivet/Makefile.am
++++ b/pyext/rivet/Makefile.am
+@@ -17,7 +17,7 @@ if WITH_CYTHON
+ 
+ RIVETINCLUDE = $(top_srcdir)/include/Rivet/
+ core.cpp: core.pyx __init__.pxd $(RIVETINCLUDE)/Analysis.hh $(RIVETINCLUDE)/AnalysisHandler.hh $(RIVETINCLUDE)/AnalysisLoader.hh $(RIVETINCLUDE)/Run.hh $(RIVETINCLUDE)/Tools/ProjectionTreePlotter.hh
+-	$(CYTHON) $(srcdir)/core.pyx --cplus -2 -I $(top_srcdir)/pyext -o $@
++	$(CYTHON) $(srcdir)/core.pyx --cplus -2 --module-name rivet.core -I $(top_srcdir)/pyext -o $@
+ else
+ core.cpp:
+ 	@echo "Not (re)generating core.cpp since Cython is not installed"

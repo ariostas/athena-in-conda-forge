@@ -45,6 +45,77 @@ UNDECLARED_EXT = {
     # tdaq-common's ROOT-dependent part (webdaq), for athenaHLT's services (not in athena jobs)
     "HLT/Trigger/TrigControl/TrigServices": "webdaq",
 }
+# Externals that no conda package provides (not on conda-forge, no recipe here): the packages
+# that compile against them are not packaged at all ("none"), nor is anything that depends on
+# them. Packages without compiled code look generators up only for their runtime environment
+# (find_package(<X>Environment)) and are packaged. Of the generators, conda-forge has the ones
+# ATLAS's simulation and its tests need (Pythia8, LHAPDF, Rivet/YODA); EvtGen_i needs Tauola++
+# and Photos++ (EvtGenExternal), which it does not.
+UNAVAILABLE_EXT = {
+    # MC generators
+    "Herwig3",
+    "ThePEG",
+    "Sherpa",
+    "EvtGen",
+    "Photospp",
+    "Tauolapp",
+    "Hijing",
+    "Starlight",
+    "Crmc",
+    "EPOS4",
+    "OpenLoops",
+    "MadGraph",
+    "Superchic",
+    "SFGen",
+    "Pepper",
+    "Hto4l",
+    "Prophecy4f",
+    "Recola",
+    "Apfel",
+    "chaplin",
+    "cln",
+    "ginac",
+    "ggvvamp",
+    "qqvvamp",
+    "nlox",
+    # the GPU stack (CUDA, traccc, vecmem, detray) and the full TDAQ release
+    "traccc",
+    "vecmem",
+    "CUDA",
+    "APTypes",
+    "detray",
+    "tdaq",
+}
+# Of those, the ones a package needs even without C++ sources: interface libraries that link
+# vecmem::core (AthDeviceInterfaces, ActsGPUInterfaces), and SYCL code (AthExSYCL,
+# EFTrackingDataTransfer), which calls vecmem's CMake functions and is not counted as C++.
+UNAVAILABLE_EXT_NOCODE = {"traccc", "vecmem", "CUDA", "APTypes", "detray", "tdaq"}
+# Packages that need an unavailable external although others use it only when it is found.
+UNAVAILABLE_PKG = {
+    # Triton's C++ client (FlavorTagInference builds without it)
+    "Control/AthTriton/AthTritonComps": "TritonClient",
+}
+NONE = "none"
+
+
+def unpackaged(g):
+    """Packages that cannot be built from conda packages, and everything that needs them."""
+    out = set(UNDECLARED_EXT) | set(UNAVAILABLE_PKG)
+    out |= {
+        p
+        for p in g
+        if set(g[p]["externals"])
+        & (UNAVAILABLE_EXT if g[p]["tus"] + g[p]["gen_tus"] else UNAVAILABLE_EXT_NOCODE)
+    }
+    changed = True
+    while changed:
+        changed = False
+        for p in g:
+            if p not in out and set(g[p]["deps"]) & out:
+                out.add(p)
+                changed = True
+    return out
+
 
 LAYERS = [
     dict(
@@ -329,7 +400,9 @@ ALLOW_COMPONENTS = re.compile(
 
 def build_layers(g, layers=LAYERS):
     projects = load_projects()
-    assigned = {}
+    # Packages that cannot be built are left out up front: no layer can have them, and since
+    # their dependents are left out too, no seed's closure reaches them.
+    assigned = {p: NONE for p in unpackaged(g)}
     dropped = {}
     for L in layers:
         name = L["name"]
@@ -346,8 +419,6 @@ def build_layers(g, layers=LAYERS):
         def bad(p, components_ok=False):
             if p in assigned:
                 return False
-            if p in UNDECLARED_EXT:
-                return True
             if frx and frx.match(p):
                 return True
             if (
@@ -438,13 +509,16 @@ def layer_stats(g, ps, heavy):
 
 
 def report(g, assigned, layers, secs, cores, heavy):
-    order = [L["name"] for L in layers]
+    order = [L["name"] for L in layers] + [NONE]
     rank = {n: i for i, n in enumerate(order)}
     by = collections.defaultdict(list)
     for p, layer in assigned.items():
         by[layer].append(p)
     viol = [
-        (p, q) for p in g for q in g[p]["deps"] if rank[assigned[q]] > rank[assigned[p]]
+        (p, q)
+        for p in g
+        for q in g[p]["deps"]
+        if rank[assigned[q]] > rank[assigned[p]] and assigned[p] != NONE
     ]
     tviol = collections.defaultdict(set)
     for p in g:
@@ -543,6 +617,7 @@ def main():
             f"- {L['name']}: {L['desc']} (seeds dropped for forbidden deps: "
             f"{len(dropped[L['name']])})"
         )
+    print(f"- {NONE}: not packaged (externals that no conda package provides)")
     print()
     report(g, assigned, LAYERS, a.sec_per_tu, a.cores, heavy)
 

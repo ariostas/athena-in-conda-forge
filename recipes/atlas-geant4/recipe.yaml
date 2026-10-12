@@ -1,0 +1,117 @@
+context:
+  version: "10.6.3.15"
+  vecgeom_version: "1.1.21"
+
+# Geant4 as ATLAS builds it in AthenaExternals (External/Geant4 and External/VecGeom): the
+# ATLAS simulation team's fork of Geant4 10.6.3 (its patch 03 with ATLAS's fixes and
+# additions, such as the G4AtlasRK4 stepper that Athena includes unconditionally), with
+# VecGeom's cons and polycone, multithreaded, as static libraries. Athena links the static
+# libraries into one big component (AtlasGeant4), so that Geant4's singletons exist once. The
+# simulation's results depend on this exact build: conda-forge's geant4 (11.x) is a different
+# physics release.
+package:
+  name: atlas-geant4
+  version: ${{ version }}
+
+source:
+  - url: https://gitlab.cern.ch/atlas-simulation-team/geant4/-/archive/v${{ version }}/geant4-v${{ version }}.tar.gz
+    sha256: 502683969aedbffbceca1ee6d246c5dcc4024e86c967181fdb27e2cd166cb5c5
+    target_directory: geant4
+    # atlasexternals 2.1.91's External/Geant4/patches
+    patches:
+      - patches/geant4/geant4-vecgeom-1.1.20.patch
+      - patches/geant4/geant4-nosymlink.patch
+      - patches/geant4/geant4-cpp23.patch
+      - patches/geant4/geant4-fsqrt.patch
+  - url: https://gitlab.cern.ch/VecGeom/VecGeom/-/archive/v${{ vecgeom_version }}/VecGeom-v${{ vecgeom_version }}.tar.gz
+    sha256: bbae40766e08798549fcf86b1cb6a1ab0032124b9a0b4153eab198220d5cae62
+    target_directory: vecgeom
+    # atlasexternals 2.1.91's External/VecGeom/patches
+    patches:
+      - patches/vecgeom/VecGeom-1.1.20-kConeTolerance.patch
+      - patches/vecgeom/VecGeom-1.2.9-clang.patch
+      - patches/vecgeom/VecGeom-1.1.21-gcc15.patch
+
+build:
+  number: 0
+  skip:
+    - win
+  script:
+    file: build.sh
+
+requirements:
+  build:
+    - ${{ compiler('c') }}
+    - ${{ compiler('cxx') }}
+    - ${{ stdlib('c') }}
+    - cmake
+    - ninja
+  host:
+    - clhep
+    - veccore
+    - xerces-c
+    - expat
+    - zlib
+  run:
+    # what the static libraries link to, which their CMake configuration names
+    - ${{ pin_compatible('clhep', upper_bound='x.x.x.x') }}
+    - veccore
+    - xerces-c
+    - expat
+    - zlib
+  run_exports:
+    - ${{ pin_subpackage('atlas-geant4', upper_bound='x.x.x.x') }}
+  run_constraints:
+    # the same files as conda-forge's geant4 and vecgeom
+    - geant4 <0a0
+    - geant4-base <0a0
+    - vecgeom <0a0
+
+tests:
+  - package_contents:
+      include:
+        - Geant4/G4Version.hh
+        - Geant4/G4AtlasRK4.hh
+        - VecGeom/base/Global.h
+      files:
+        - lib/libG4global.a
+        - lib/libG4geometry.a
+        - lib/libG4physicslists.a
+        - lib/libG4persistency.a
+        - lib/libvecgeom.a
+        - lib/Geant4-10.6.3/Geant4Config.cmake
+        - lib/cmake/VecGeom/VecGeomConfig.cmake
+  - script:
+      - cmake -S test -B build -G Ninja ${CMAKE_ARGS} -DCMAKE_PREFIX_PATH=${PREFIX}
+      - cmake --build build
+      # ATLAS's version name, which Athena's FindGeant4 reads
+      - ./build/g4_test | grep -F "geant4.10.6.patch03.atlasmt15"
+    files:
+      recipe:
+        - test/
+    requirements:
+      run:
+        - ${{ compiler('cxx') }}
+        - ${{ stdlib('c') }}
+        - cmake
+        - ninja
+
+about:
+  homepage: https://geant4.web.cern.ch/
+  repository: https://gitlab.cern.ch/atlas-simulation-team/geant4
+  summary: Geant4 10.6.3 as the ATLAS experiment uses it, with VecGeom
+  description: |
+    Geant4 is a toolkit for the simulation of the passage of particles through matter. This
+    package is the ATLAS simulation team's fork of Geant4 10.6.3, with the patches and options
+    of ATLAS's AthenaExternals: static, multithreaded libraries with GDML and VecGeom 1.1.21's
+    cons and polycone, for ATLAS's Athena (athena-sim). For other uses, conda-forge's geant4
+    is the current release.
+  license: LicenseRef-Geant4 AND Apache-2.0
+  license_file:
+    - geant4/LICENSE
+    - vecgeom/LICENSE.txt
+    - vecgeom/APACHE-LICENSE-2.0.txt
+
+extra:
+  recipe-maintainers:
+    - ariostas

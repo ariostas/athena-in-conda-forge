@@ -1,0 +1,23 @@
+--- geant4-v10.6.3.15/cmake/Modules/G4BuildSettings.cmake	2024-12-02 13:34:00.000000000 +0100
++++ geant4-v10.6.3.15/cmake/Modules/G4BuildSettings.cmake	2025-05-15 09:25:20.056003925 +0200
+@@ -159,7 +159,7 @@
+ #   - Choose C++ Standard to build against from supported list.
+ #   - Note that only C++17 is supported on Windows with MSVC
+ #
+-set(__g4_default_cxxstd 11 14 17 20 c++11 c++14 c++17 c++20)
++set(__g4_default_cxxstd 11 14 17 20 c++11 c++14 c++17 c++20 c++23)
+ if(MSVC)
+   set(__g4_default_cxxstd 17 20 c++17 c++20)
+ endif()
+
+--- geant4-v10.6.3.15/source/visualization/HepRep/src/DefaultHepRep.cc	2024-12-02 13:34:00.000000000 +0100
++++ geant4-v10.6.3.15/source/visualization/HepRep/src/DefaultHepRep.cc	2025-05-15 10:04:54.614644278 +0200
+@@ -91,7 +91,7 @@
+ }
+ 
+ string DefaultHepRep::checkForException() {
+-    return NULL;
++  return string();
+ }
+ 
+ vector<HepRepInstanceTree*> DefaultHepRep::getInstanceTreeList() {

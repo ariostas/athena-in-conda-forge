@@ -20,6 +20,14 @@ option( ATLAS_USE_CPPCHECK "Use CppCheck in the build" OFF )
 set( CxxUtilsSettings_DIR "${ATHENA_SOURCE_DIR}/Control/CxxUtils/cmake" )
 find_package( CxxUtilsSettings )
 
+# Link-time optimisation of the AtlasGeant4 component and its object libraries, as
+# Projects/Athena decides it (the first layer writes it into its PreConfig.cmake, which leaves
+# it empty when unset). Set before the base project's PreConfig.cmake defines it.
+include( CheckIPOSupported )
+check_ipo_supported( RESULT ATLAS_IPO_CHECK_RESULT LANGUAGES C CXX )
+set( ATLAS_GEANT4_USE_LTO ${ATLAS_IPO_CHECK_RESULT} CACHE BOOL
+   "Use link-time-optimization in building AtlasGeant4" FORCE )
+
 find_package( AtlasCMake QUIET )
 
 # The base project(s). The first layer also needs Gaudi and whatever Athena's project file
