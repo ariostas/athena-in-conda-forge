@@ -1270,6 +1270,22 @@ took:
   matched by a dictionary's selection patterns; libc++'s `create_directories` returning false
   for a path ending with `/`; no `LD_PRELOAD` in `athena_preload.sh`; AtlasCMake's
   `.components` files from the library's real name (`.dylib` for shared libraries).
+- athena-detdescr and athena-edm (patches 0001): `sincos` (a glibc extension; `CxxUtils::sincos`
+  or a local shim), missing includes, `std::legendre` (a recurrence instead), `<malloc.h>`, an
+  Apple-only branch of INav4MomAssocs that no longer compiles, byte order macros. TRT_GeoModel's
+  private copy of GeoModel's `ArrayFunction` broke GeoModel's persistifier on macOS: two
+  classes with one name, so the `dynamic_cast` there failed on the copy's RTTI.
+- FPEs on macOS that are not Athena's: the edm T/P converter tests of the tau EDM (20.1.7.2,
+  20.7.2.2) reported FPE INVALID in every event. Bisected (FE_INVALID checks around the
+  dumper's python functions, then inside the converter): `xAODTauJetAuxContainerCnv_v2` takes
+  `DeltaR` with the HLT taus' intermediate axis, a null vector, and conda-forge's macOS
+  libPhysics computes `fZ/ptot` before testing `ptot == 0` (`fdiv` then `fcsel`): 0/0. ROOT is
+  built with gcc on Linux, which does not speculate trapping operations. Apple silicon cannot
+  trap FPEs, so there is no stack trace; lldb needs developer mode. The tests check the logs for
+  FPE warnings only on Linux.
+- macOS rootmaps name `libRootUtils.so` (AtlasCMake uses the module suffix for reflex
+  dictionaries and links only dictionary libraries to it): the layers' build scripts link
+  every missing `.so` a rootmap names to the `.dylib`.
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's

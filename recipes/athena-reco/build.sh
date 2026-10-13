@@ -121,6 +121,17 @@ if find "${INSTALL}" -name authentication.xml | grep .; then
   exit 1
 fi
 
+# On macOS AtlasCMake names the libraries in rootmaps with the module suffix (.so) and links
+# dictionary libraries to that name, but not the regular libraries that have a reflex dictionary
+# built in (RootUtils): ROOT's autoloading of their classes fails without the link.
+if [ "$(uname -s)" = Darwin ]; then
+  for lib in $(sed -n 's/^\[ \(lib[^ ]*\.so\) \]$/\1/p' "${INSTALL}/lib/${LAYER}.rootmap" | sort -u); do
+    if [ ! -e "${INSTALL}/lib/${lib}" ] && [ -e "${INSTALL}/lib/${lib%.so}.dylib" ]; then
+      ln -s "${lib%.so}.dylib" "${INSTALL}/lib/${lib}"
+    fi
+  done
+fi
+
 # The exported targets must not name files of the build environment, which does not exist when
 # the next layer is built (glibc's libraries in the compiler's sysroot: see athena-externals'
 # conda-postconfig.cmake).

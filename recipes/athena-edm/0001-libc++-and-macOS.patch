@@ -1,0 +1,155 @@
+The event data model layer with libc++ and on macOS:
+- TrkExUtils, TrkPatternParameters: __sincos() on macOS, where sincos() (a GNU extension) is
+  missing;
+- includes that libstdc++ brings in through other headers and libc++ does not (<sstream>,
+  <algorithm>), and no <malloc.h> where nothing from it is used;
+- NavFourMom: no second definition of DVLEltBaseInit<T>::s_regbase for macOS (an old linker
+  workaround: AthContainers defines it, as const, and clang rejects the mismatch);
+- PyDumper: the compiler's __BYTE_ORDER__ rather than glibc's __BYTE_ORDER (undefined on macOS,
+  where both bit field layouts were declared).
+
+--- a/Tracking/TrkExtrapolation/TrkExUtils/src/RungeKuttaUtils.cxx
++++ b/Tracking/TrkExtrapolation/TrkExUtils/src/RungeKuttaUtils.cxx
+@@ -19,6 +19,13 @@
+ 
+ #include "CxxUtils/vec.h"
+ #include "CxxUtils/inline_hints.h"
++
++#ifdef __APPLE__
++namespace {
++// sincos() is a GNU extension; macOS has __sincos()
++inline void sincos(double x, double* s, double* c) { __sincos(x, s, c); }
++}
++#endif
+ 
+ namespace {
+ /*
+--- a/Tracking/TrkEvent/TrkPatternParameters/src/PatternTrackParameters.cxx
++++ b/Tracking/TrkEvent/TrkPatternParameters/src/PatternTrackParameters.cxx
+@@ -17,6 +17,13 @@
+ #include <iostream>
+ #include <iomanip>
+ #include <sstream>
++
++#ifdef __APPLE__
++namespace {
++// sincos() is a GNU extension; macOS has __sincos()
++inline void sincos(double x, double* s, double* c) { __sincos(x, s, c); }
++}
++#endif
+ 
+ ///////////////////////////////////////////////////////////////////
+ // Conversion Trk::PatternTrackParameters to  Trk::TrackParameters
+--- a/Trigger/TrigEvent/TrigSteeringEvent/src/RobRequestInfo.cxx
++++ b/Trigger/TrigEvent/TrigSteeringEvent/src/RobRequestInfo.cxx
+@@ -3,6 +3,7 @@
+ */
+ 
+ #include "TrigSteeringEvent/RobRequestInfo.h"
++#include <algorithm>
+ 
+ void HLT::RobRequestInfo::addRequestScheduledRobIDs(const std::vector<uint32_t>& roblist) {
+    m_requestScheduledRobIDs.resize(m_requestScheduledRobIDs.size()+roblist.size());
+--- a/Trigger/TrigConfiguration/TrigConfL1Data/Root/TriggerItemNode.cxx
++++ b/Trigger/TrigConfiguration/TrigConfL1Data/Root/TriggerItemNode.cxx
+@@ -12,6 +12,7 @@
+ #include <inttypes.h>
+ #include <stdexcept>
+ #include <sys/types.h>
++#include <sstream>
+ 
+ using namespace std;
+ using namespace TrigConf;
+--- a/Trigger/TrigConfiguration/TrigConfL1Data/Root/TriggerItem.cxx
++++ b/Trigger/TrigConfiguration/TrigConfL1Data/Root/TriggerItem.cxx
+@@ -11,6 +11,7 @@
+ #include <iomanip>
+ #include <stdexcept>
+ #include <algorithm>
++#include <sstream>
+ 
+ using namespace std;
+ using namespace TrigConf;
+--- a/Reconstruction/RecEventTPCnv/src/RecoTimingObjCnv_p1.cxx
++++ b/Reconstruction/RecEventTPCnv/src/RecoTimingObjCnv_p1.cxx
+@@ -6,7 +6,6 @@
+ #include "RecEventTPCnv/RecoTimingObjCnv_p1.h"
+ #include "CxxUtils/read_athena_statm.h"
+ 
+-#include <malloc.h>
+ 
+ #include <sys/time.h>
+ #include <sys/resource.h>
+--- a/Event/NavFourMom/src/INav4MomAssocs.cxx
++++ b/Event/NavFourMom/src/INav4MomAssocs.cxx
+@@ -179,13 +179,4 @@
+ }
+ 
+ 
+-#ifdef __APPLE__
+-/////////////////////////////////////////////////////////////////// 
+-// Static template members: 
+-/////////////////////////////////////////////////////////////////// 
+-// This is only necessary for MacOSX where there's a bug in the linker that causes duplicate symbols if
+-// the static templates for the same concrete type are instantiated in two different .cxx files
+-template <class T> DataVector_detail::RegisterDVLEltBaseInit<T> DataVector_detail::DVLEltBaseInit<T>::s_regbase;
+-template class DataVector_detail::RegisterDVLEltBaseInit<IParticle> DataVector_detail::DVLEltBaseInit<IParticle>::s_regbase;
+-#endif
+ 
+--- a/Event/FourMom/src/P4PxPyPzEBase.cxx
++++ b/Event/FourMom/src/P4PxPyPzEBase.cxx
+@@ -7,6 +7,7 @@
+ #include <limits>
+ #include <iomanip>
+ #include <cstdlib>
++#include <sstream>
+ 
+ P4PxPyPzEBase::~P4PxPyPzEBase()
+ {}
+--- a/Event/FourMom/src/P4PtEtaPhiMBase.cxx
++++ b/Event/FourMom/src/P4PtEtaPhiMBase.cxx
+@@ -6,6 +6,7 @@
+ #include <cmath>
+ #include <iomanip>
+ #include <cstdlib>
++#include <sstream>
+ 
+ P4PtEtaPhiMBase::~P4PtEtaPhiMBase()
+ {}
+--- a/Event/FourMom/src/P4IPtCotThPhiMBase.cxx
++++ b/Event/FourMom/src/P4IPtCotThPhiMBase.cxx
+@@ -5,6 +5,7 @@
+ #include "FourMom/P4IPtCotThPhiMBase.h"
+ #include <cmath>
+ #include <iomanip>
++#include <sstream>
+ 
+ P4IPtCotThPhiMBase::~P4IPtCotThPhiMBase()
+ {}
+--- a/Event/FourMom/src/P4EEtaPhiMBase.cxx
++++ b/Event/FourMom/src/P4EEtaPhiMBase.cxx
+@@ -7,6 +7,7 @@
+ #include <iomanip>
+ #include <cstdlib>
+ #include <limits>
++#include <sstream>
+ 
+ P4EEtaPhiMBase::~P4EEtaPhiMBase()
+ {}
+--- a/Event/PyDumper/PyDumper/PyDumperDict.h
++++ b/Event/PyDumper/PyDumper/PyDumperDict.h
+@@ -34,12 +34,12 @@
+     /* This is the IEEE 754 single-precision format.  */
+     struct
+       {
+-#if     __BYTE_ORDER == __BIG_ENDIAN
++#if     __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+         unsigned int negative:1;
+         unsigned int exponent:8;
+         unsigned int mantissa:23;
+ #endif                          /* Big endian.  */
+-#if     __BYTE_ORDER == __LITTLE_ENDIAN
++#if     __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+         unsigned int mantissa:23;
+         unsigned int exponent:8;
+         unsigned int negative:1;

@@ -11,6 +11,15 @@
 #   no n-tuple: it must run without errors).
 set -euo pipefail
 
+# The error patterns of ATLAS's noerror.sh. On macOS, without the FPE auditor's warnings:
+# conda-forge builds ROOT there with clang, which evaluates some guarded divisions anyway
+# (TVector3::PseudoRapidity of a null vector computes 0/0, then discards it), so floating point
+# exceptions are reported that ATLAS's release on Linux does not have.
+errors_re="^ERROR | ERROR |^FATAL | FATAL | WARNING\s*FPE|runtime error:"
+if [ "$(uname -s)" = Darwin ]; then
+  errors_re="^ERROR | ERROR |^FATAL | FATAL |runtime error:"
+fi
+
 here=$(cd "$(dirname "$0")" && pwd)
 # The references are per platform: ATLAS's release itself writes different floating point
 # numbers on x86_64 and aarch64. ATLAS has no release for macOS to compare with.
@@ -26,7 +35,7 @@ opendata=${1:-${PWD}/opendata/DAOD_PHYSLITE.37001701._000001.pool.root.1}
 
 # What ATLAS's tests check in a job's log (noerror.sh)
 noerror() {
-  if grep -Ea -e "^ERROR | ERROR |^FATAL | FATAL | WARNING\s*FPE|runtime error:" "$1"; then
+  if grep -Ea -e "${errors_re}" "$1"; then
     echo "FAILED: errors in $1"
     exit 1
   fi

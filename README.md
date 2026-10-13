@@ -90,8 +90,8 @@ The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
 | `atlas-geant4` (ATLAS's Geant4 10.6.3 fork with VecGeom 1.1.21, as AthenaExternals builds them) | [recipes/atlas-geant4](recipes/atlas-geant4) | ✅ | ✅ | ✅ |
 | `atlas-rivet` (conda-forge's Rivet 4.1.4 recipe, on FastJet 3.5.1 build 5) | [recipes/atlas-rivet](recipes/atlas-rivet) | ✅ | ✅ | ✅ |
 | `athena-core` (framework, StoreGate, configuration, POOL I/O, conditions, ByteStream) | [recipes/athena-core](recipes/athena-core) | ✅ | ✅ | ✅ |
-| `athena-detdescr` (identifiers, GeoModel geometry, ACTS geometry, magnetic field) | [recipes/athena-detdescr](recipes/athena-detdescr) | ✅ | · | ✅ |
-| `athena-edm` (xAOD and trigger event data model: AOD/DAOD I/O) | [recipes/athena-edm](recipes/athena-edm) | ✅ | · | · |
+| `athena-detdescr` (identifiers, GeoModel geometry, ACTS geometry, magnetic field) | [recipes/athena-detdescr](recipes/athena-detdescr) | ✅ | ✅ | ✅ |
+| `athena-edm` (xAOD and trigger event data model: AOD/DAOD I/O) | [recipes/athena-edm](recipes/athena-edm) | ✅ | · | ✅ |
 | `athena-edm-det` (detector event data: HITS/RDO/ESD I/O) | [recipes/athena-edm-det](recipes/athena-edm-det) | ✅ | · | · |
 | `athena-analysis` (CP tools and algorithms, trigger decision tool) | [recipes/athena-analysis](recipes/athena-analysis) | ✅ | · | · |
 | `athena-reco-tracking` (inner detector and ITk tracking, vertexing) | [recipes/athena-reco-tracking](recipes/athena-reco-tracking) | ✅ | · | · |
@@ -510,6 +510,15 @@ so that a work area can relink it with its own changes.
   - Every project's `cmake/modules/` has both `FindNumPy.cmake` and `Findnumpy.cmake`, and
     AtlasLCG's `FindVDT.cmake` hides ROOT's `FindVdt.cmake` on the case-insensitive file
     system: athena-externals defines the `VDT::VDT` target that ROOT looks for.
+  - The FPE auditor reports floating point exceptions that are not Athena's: conda-forge
+    builds ROOT with clang, which evaluates some guarded divisions anyway and then discards
+    them (`TVector3::PseudoRapidity` of a null vector divides 0 by 0, e.g. in the tau T/P
+    converter). The tests check the logs for FPE warnings only on Linux. ROOT's macOS build
+    would need `-ffp-exception-behavior=maytrap` (ATLAS adds `strict` to a few of its own
+    libraries with clang): to be reported to conda-forge's root feedstock.
+  - The rootmaps name libraries with a `.so` suffix; AtlasCMake links dictionary libraries to
+    that name but not the libraries with a built-in dictionary (RootUtils): the layers' build
+    scripts add the missing links.
 - **The tests' references are per platform**: ATLAS's own release writes different floating point
   numbers on x86_64 and aarch64 (dumps of ESD, AOD, derivations, tracking, CP n-tuples; the
   DAOD reading and trigger counts agree). The linux-64 references come from ATLAS's x86_64

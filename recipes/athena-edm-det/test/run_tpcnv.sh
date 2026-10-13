@@ -5,6 +5,16 @@
 # files and references from CVMFS, so they are skipped without it. Some also need the network.
 set -euo pipefail
 
+# The error patterns of ATLAS's noerror.sh. On macOS, without the FPE auditor's warnings:
+# conda-forge builds ROOT there with clang, which evaluates some guarded divisions anyway
+# (TVector3::PseudoRapidity of a null vector computes 0/0, then discards it), so floating point
+# exceptions are reported that ATLAS's release on Linux does not have.
+errors_re="^ERROR | ERROR |^FATAL | FATAL | WARNING\s*FPE|runtime error:"
+if [ "$(uname -s)" = Darwin ]; then
+  errors_re="^ERROR | ERROR |^FATAL | FATAL |runtime error:"
+fi
+export errors_re
+
 DATA=/cvmfs/atlas-nightlies.cern.ch/repo/data/data-art
 if [ ! -d "${DATA}" ]; then
   echo "SKIPPED: ${DATA} is not available"
@@ -31,7 +41,7 @@ run_one() {
     ATLAS_REFERENCE_TAG=${tag} "${test}_test.py" > log 2>&1 || status=$?
   fi
   if [ "${status}" != 0 ] ||
-      grep -Ea "^ERROR | ERROR |^FATAL | FATAL | WARNING\s*FPE|runtime error:" log > errors; then
+      grep -Ea "${errors_re}" log > errors; then
     echo "FAILED ${test} (${pkg}, exit code ${status}):"
     head -50 errors 2>/dev/null || true
     tail -30 log
