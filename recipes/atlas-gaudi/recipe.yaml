@@ -27,8 +27,10 @@ build:
     # On macOS conda-forge's libc++ headers mark library features newer than the deployment
     # target as unavailable (libc++ 20's markup of std::from_chars does not even compile); the
     # environments have conda-forge's own, current libc++ at run time.
+    # -fno-assume-unique-vtables: a dynamic_cast to a final class must not compare vtable
+    # addresses, as each macOS library has its own copy of a vtable without a key function.
     - if: osx
-      then: export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY"
+      then: export CXXFLAGS="${CXXFLAGS} -D_LIBCPP_DISABLE_AVAILABILITY -fno-assume-unique-vtables"
     # On macOS the executables load libpython even when they use none of its symbols themselves
     # (conda-forge's -dead_strip_dylibs would drop it): the libraries they link look Python's
     # symbols up in the process (patch 0002).

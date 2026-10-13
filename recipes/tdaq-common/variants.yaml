@@ -3,8 +3,13 @@
 # closest is 1.90, which it is migrating to (migrations/libboost190.yaml in the pinning). Every
 # library in the stack must use the same ones. Drop the boost block once the global pinning
 # moves.
+# On macOS 6.40.04: 6.40.02's TTreeIndex rounds 64-bit keys to the precision of long double,
+# which is double on Apple silicon, so POOL cannot find the entries of files whose index_ref
+# values are beyond 2^53 (ROOT's fix: a cast in TTreeIndex's constructor, in 6.40.04).
 root_base:
-  - "6.40.2"
+  - if: osx
+    then: "6.40.4"
+    else: "6.40.2"
 root_cxx_standard:
   - "23"
 libboost_devel:

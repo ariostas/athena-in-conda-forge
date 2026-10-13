@@ -40,8 +40,17 @@ run_one() {
     cd "tpcnv/${test}/run"
     ATLAS_REFERENCE_TAG=${tag} "${test}_test.py" > log 2>&1 || status=$?
   fi
+  # On macOS a dump may differ from ATLAS's reference in the last digit of a number (its math
+  # library rounds some results differently): if that is the log's only error, the test passes
+  # (lastdigit_diff.py).
+  local accepted=
+  if [ "${status}" = 0 ] && [ "$(uname -s)" = Darwin ] &&
+      [ "$(grep -Ea "${errors_re}" log)" = "ERROR running diff with reference" ] &&
+      python "${here}/lastdigit_diff.py" log; then
+    accepted=1
+  fi
   if [ "${status}" != 0 ] ||
-      grep -Ea "${errors_re}" log > errors; then
+      { [ -z "${accepted}" ] && grep -Ea "${errors_re}" log > errors; }; then
     echo "FAILED ${test} (${pkg}, exit code ${status}):"
     head -50 errors 2>/dev/null || true
     tail -30 log

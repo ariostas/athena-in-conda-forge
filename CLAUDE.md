@@ -137,6 +137,14 @@ ninja, so put the build's `build_env/bin` first in `PATH`).
   - The ROOT-based recipes use clang 20, the compiler of conda-forge's ROOT 6.40
     (`variants.yaml`), and C++ code needs `-D_LIBCPP_DISABLE_AVAILABILITY`: conda-forge's
     libc++ 20 headers mark `std::from_chars` with an attribute that does not compile.
+  - ROOT is 6.40.04 there (6.40.02, ATLAS's, elsewhere): 6.40.02's `TTreeIndex` loses the low
+    bits of 64-bit keys where `long double` is `double`, and POOL cannot read most MC files.
+  - Each macOS library has a private copy of the vtable of a class without a key function, and
+    clang compiles a `dynamic_cast` to a final class as a vtable address comparison: Athena and
+    Gaudi need `-fno-assume-unique-vtables` there (athena-externals' `conda-postconfig.cmake`).
+  - conda-forge's ROOT (clang) raises FPEs that ATLAS's (gcc) does not: the tests check the
+    logs for FPE warnings only on Linux. Apple silicon cannot trap FPEs and lldb needs
+    developer mode: bisect with `fetestexcept(FE_INVALID)` checks instead.
   - CMake scans C++20 sources for modules, which needs clang-scan-deps: off everywhere.
   - Python imports only `.so` extensions, also on macOS; CMake's MODULE libraries are `.so`.
   - Use `sed -i.orig` (then remove the copy): GNU and BSD sed agree on no other `-i` form.

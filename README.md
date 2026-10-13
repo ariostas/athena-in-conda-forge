@@ -91,10 +91,10 @@ The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
 | `atlas-rivet` (conda-forge's Rivet 4.1.4 recipe, on FastJet 3.5.1 build 5) | [recipes/atlas-rivet](recipes/atlas-rivet) | ✅ | ✅ | ✅ |
 | `athena-core` (framework, StoreGate, configuration, POOL I/O, conditions, ByteStream) | [recipes/athena-core](recipes/athena-core) | ✅ | ✅ | ✅ |
 | `athena-detdescr` (identifiers, GeoModel geometry, ACTS geometry, magnetic field) | [recipes/athena-detdescr](recipes/athena-detdescr) | ✅ | ✅ | ✅ |
-| `athena-edm` (xAOD and trigger event data model: AOD/DAOD I/O) | [recipes/athena-edm](recipes/athena-edm) | ✅ | · | ✅ |
-| `athena-edm-det` (detector event data: HITS/RDO/ESD I/O) | [recipes/athena-edm-det](recipes/athena-edm-det) | ✅ | · | · |
-| `athena-analysis` (CP tools and algorithms, trigger decision tool) | [recipes/athena-analysis](recipes/athena-analysis) | ✅ | · | · |
-| `athena-reco-tracking` (inner detector and ITk tracking, vertexing) | [recipes/athena-reco-tracking](recipes/athena-reco-tracking) | ✅ | · | · |
+| `athena-edm` (xAOD and trigger event data model: AOD/DAOD I/O) | [recipes/athena-edm](recipes/athena-edm) | ✅ | ✅ | ✅ |
+| `athena-edm-det` (detector event data: HITS/RDO/ESD I/O) | [recipes/athena-edm-det](recipes/athena-edm-det) | ✅ | ✅ | ✅ |
+| `athena-analysis` (CP tools and algorithms, trigger decision tool) | [recipes/athena-analysis](recipes/athena-analysis) | ✅ | ✅ | · |
+| `athena-reco-tracking` (inner detector and ITk tracking, vertexing) | [recipes/athena-reco-tracking](recipes/athena-reco-tracking) | ✅ | ✅ | · |
 | `athena-reco` (full reconstruction, `Reco_tf.py`, digitization) | [recipes/athena-reco](recipes/athena-reco) | ✅ | · | · |
 | `athena-trigger` (L1 simulation, High-Level Trigger) | [recipes/athena-trigger](recipes/athena-trigger) | ✅ | · | · |
 | `athena-sim` (Geant4 simulation, ISF, generator interfaces, `Sim_tf.py`) | [recipes/athena-sim](recipes/athena-sim) | ✅ | · | · |
@@ -510,6 +510,20 @@ so that a work area can relink it with its own changes.
   - Every project's `cmake/modules/` has both `FindNumPy.cmake` and `Findnumpy.cmake`, and
     AtlasLCG's `FindVDT.cmake` hides ROOT's `FindVdt.cmake` on the case-insensitive file
     system: athena-externals defines the `VDT::VDT` target that ROOT looks for.
+  - **ROOT 6.40.04 rather than 6.40.02** (Linux keeps ATLAS's 6.40.02): 6.40.02's
+    `TTreeIndex` rounds 64-bit keys to the precision of `long double`, which on Apple silicon
+    is a plain `double`, so POOL could not find the entries of files whose `index_ref`
+    values are beyond 2^53 (most of ATLAS's MC files: "duplicate key", then "POOL read
+    failed"). ROOT fixed it in 6.40.04, which conda-forge has.
+  - Clang compiles a `dynamic_cast` to a `final` class as a comparison with the address of its
+    vtable, but on macOS a class without a key function (all its virtual functions inline) has
+    a private copy of its vtable in every library that uses it, so the cast fails for objects
+    made in another library (POOL's converters could not write RDOs). Athena (through
+    athena-externals' CMake configuration) and Gaudi are built with
+    `-fno-assume-unique-vtables` on macOS.
+  - macOS's math library rounds some results differently from glibc's: athena-edm-det's T/P
+    converter tests accept, on macOS only, numbers that differ from ATLAS's reference in their
+    last printed digit (one number in one test so far).
   - The FPE auditor reports floating point exceptions that are not Athena's: conda-forge
     builds ROOT with clang, which evaluates some guarded divisions anyway and then discards
     them (`TVector3::PseudoRapidity` of a null vector divides 0 by 0, e.g. in the tau T/P

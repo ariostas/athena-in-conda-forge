@@ -53,6 +53,14 @@ if( APPLE )
    add_compile_definitions( _LIBCPP_DISABLE_AVAILABILITY )
 endif()
 
+# On macOS, clang turns a dynamic_cast to a final class into a comparison with the address of
+# its vtable. A class whose virtual functions are all inline has a vtable in every library that
+# uses it, and the linker makes each copy private to its library: a dynamic_cast to it in one
+# library then fails for an object made in another (POOL's converters on Pixel1RawData).
+if( APPLE )
+   add_compile_options( $<$<COMPILE_LANGUAGE:CXX>:-fno-assume-unique-vtables> )
+endif()
+
 # On macOS (a case-insensitive file system), ROOT's find_dependency(Vdt) finds AtlasLCG's
 # FindVDT.cmake instead of ROOT's FindVdt.cmake. That one creates no VDT::VDT target, and ROOT
 # is then not found. ROOT skips the search when the target exists: the one its module creates.

@@ -1283,9 +1283,36 @@ took:
   built with gcc on Linux, which does not speculate trapping operations. Apple silicon cannot
   trap FPEs, so there is no stack trace; lldb needs developer mode. The tests check the logs for
   FPE warnings only on Linux.
+- athena-edm-det on macOS (patch 0001): `sincos`, unqualified `resetiosflags` (found by ADL
+  only through libstdc++'s enum `fmtflags`), a vector iterator made from 0. Its POOL test then
+  failed to read the mc23 HITS file: ROOT's `TTreeIndex` reported a duplicate key and the
+  second event's EventInfo was not found. The file's `index_ref` values are 0x210889 << 32 plus
+  the entry, beyond 2^53; ROOT 6.40.02 picks between the `Long64_t` key and its `long double`
+  range-checked one with a ternary, so even `BuildIndex(name, true)` (APR's call) converts the
+  key to `long double`, a `double` on Apple silicon (80 or 128 bits on Linux). 6.40.04 casts
+  it; conda-forge has it, and a test with it indexes the file without duplicates. osx-arm64
+  now uses root_base 6.40.4 (a selector in every `variants.yaml`); the ROOT-based externals
+  (tdaq-dqm-core, lcg-cool, Gaudi, ACTS) and layers are rebuilt against it.
 - macOS rootmaps name `libRootUtils.so` (AtlasCMake uses the module suffix for reflex
   dictionaries and links only dictionary libraries to it): the layers' build scripts link
   every missing `.so` a rootmap names to the `.dylib`.
+- With ROOT 6.40.04 the edm-det POOL test read the HITS file, then failed to write the mc23
+  RDO: `PixelRDO_ContainerCnv` reported "Converter not implemented for this concrete type",
+  as `dynamic_cast<const Pixel1RawData*>` failed. `Pixel1RawData` is `final` and all its
+  virtual functions are inline, so it has no key function: every library that uses it has a
+  copy of its vtable, and ld64 makes each copy private (`weak_def_can_be_hidden`; `nm -m`
+  shows them "non-external (was a private external)"). Clang turns a `dynamic_cast` to a final
+  class into a comparison with the vtable's address (since clang 17), which then fails for an
+  object made in another library. Linux's dynamic linker merges the copies. A two-library
+  test reproduces it, and `-fno-assume-unique-vtables` (the run-time `dynamic_cast` instead)
+  fixes it: athena-externals' `conda-postconfig.cmake` adds it for C++ on macOS (so every
+  layer has it) and Gaudi's recipe too. athena-externals, Gaudi and the layers are rebuilt.
+  With it the POOL test reads, writes and reads back the HITS, RDO and ESD files. One T/P
+  converter test (TrackParticleTPCnv_16.6.3) then differs from ATLAS's reference in one number
+  of 137,867 lines, in its last digit: the mass of a 360 GeV pion, computed from its energy and
+  momentum, where macOS's libm rounds differently from glibc's. On macOS a reference diff
+  whose numbers all agree to one unit in their last printed digit is accepted
+  (`test/lastdigit_diff.py`); Linux still compares exactly.
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's

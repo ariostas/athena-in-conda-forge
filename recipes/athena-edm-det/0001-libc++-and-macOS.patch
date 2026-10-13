@@ -1,0 +1,56 @@
+The detector event data layer with libc++ and on macOS:
+- InDetRIO_OnTrack: __sincos() on macOS, where sincos() (a GNU extension) is missing;
+- TrkAlignEvent: std::resetiosflags, which libstdc++ lets argument-dependent lookup find
+  (its fmtflags is an enum in std) and libc++ does not (an unsigned integer);
+- TrigT1CaloCalibConditions: a value-initialised vector iterator rather than one made from 0,
+  which only libstdc++'s iterator accepts.
+
+--- a/InnerDetector/InDetRecEvent/InDetRIO_OnTrack/src/TRT_DriftCircleOnTrack.cxx
++++ b/InnerDetector/InDetRecEvent/InDetRIO_OnTrack/src/TRT_DriftCircleOnTrack.cxx
+@@ -21,6 +21,13 @@
+ #include <memory>
+ #include <ostream>
+ #include <utility>
++
++#ifdef __APPLE__
++namespace {
++// sincos() is a GNU extension; macOS has __sincos()
++inline void sincos(double x, double* s, double* c) { __sincos(x, s, c); }
++}
++#endif
+ 
+ InDet::TRT_DriftCircleOnTrack::TRT_DriftCircleOnTrack(
+   const InDet::TRT_DriftCircle* RIO,
+--- a/Tracking/TrkAlignment/TrkAlignEvent/src/AlignPar.cxx
++++ b/Tracking/TrkAlignment/TrkAlignEvent/src/AlignPar.cxx
+@@ -13,7 +13,7 @@
+        << "(" << ap.paramType() << " ) : " << &ap << endmsg;
+     sl << "   init par: " << std::setw(6) << std::showpos << std::fixed 
+        << ap.initPar()<<" +/- "<<std::noshowpos << ap.initErr() 
+-       <<   resetiosflags(std::ios::floatfield) << endmsg;
++       <<   std::resetiosflags(std::ios::floatfield) << endmsg;
+     sl << "        par: "<< std::showpos << ap.par() << " +/- "
+        << std::noshowpos << ap.err() << endmsg;
+     sl << "  final par: "<< std::showpos << ap.finalPar() << " +/- "
+--- a/Tracking/TrkAlignment/TrkAlignEvent/src/AlignTSOS.cxx
++++ b/Tracking/TrkAlignment/TrkAlignEvent/src/AlignTSOS.cxx
+@@ -183,7 +183,7 @@
+            << std::setw(11)     << std::showpos << std::scientific
+            << itRes->residual() <<"  res/err="<<resnorm
+            << ", dchi2="<<std::noshowpos<<resnorm*resnorm
+-	   << resetiosflags(std::ios::floatfield);
++	   << std::resetiosflags(std::ios::floatfield);
+         sl.flags(f);  
+       }
+     }
+--- a/Trigger/TrigT1/TrigT1CaloCalibConditions/src/L1CaloRampRunPlan.cxx
++++ b/Trigger/TrigT1/TrigT1CaloCalibConditions/src/L1CaloRampRunPlan.cxx
+@@ -18,7 +18,7 @@
+ L1CaloRampRunPlan::L1CaloRampRunPlan(): AbstractL1CaloPersistentCondition("AthenaAttributeList"),
+     m_bEndOfRampRun(false),
+     m_nEventsPerStep(0),
+-    m_itCurrentStep(0),
++    m_itCurrentStep(),
+     m_iCurrentEvent(-1)
+ {
+     this->addSpecification(eEventsPerStep, std::string("EventsPerStep"), std::string("int")   );
