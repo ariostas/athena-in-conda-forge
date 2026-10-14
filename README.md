@@ -93,11 +93,11 @@ The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
 | `athena-detdescr` (identifiers, GeoModel geometry, ACTS geometry, magnetic field) | [recipes/athena-detdescr](recipes/athena-detdescr) | ✅ | ✅ | ✅ |
 | `athena-edm` (xAOD and trigger event data model: AOD/DAOD I/O) | [recipes/athena-edm](recipes/athena-edm) | ✅ | ✅ | ✅ |
 | `athena-edm-det` (detector event data: HITS/RDO/ESD I/O) | [recipes/athena-edm-det](recipes/athena-edm-det) | ✅ | ✅ | ✅ |
-| `athena-analysis` (CP tools and algorithms, trigger decision tool) | [recipes/athena-analysis](recipes/athena-analysis) | ✅ | ✅ | · |
+| `athena-analysis` (CP tools and algorithms, trigger decision tool) | [recipes/athena-analysis](recipes/athena-analysis) | ✅ | ✅ | ✅ |
 | `athena-reco-tracking` (inner detector and ITk tracking, vertexing) | [recipes/athena-reco-tracking](recipes/athena-reco-tracking) | ✅ | ✅ | · |
-| `athena-reco` (full reconstruction, `Reco_tf.py`, digitization) | [recipes/athena-reco](recipes/athena-reco) | ✅ | · | · |
-| `athena-trigger` (L1 simulation, High-Level Trigger) | [recipes/athena-trigger](recipes/athena-trigger) | ✅ | · | · |
-| `athena-sim` (Geant4 simulation, ISF, generator interfaces, `Sim_tf.py`) | [recipes/athena-sim](recipes/athena-sim) | ✅ | · | · |
+| `athena-reco` (full reconstruction, `Reco_tf.py`, digitization) | [recipes/athena-reco](recipes/athena-reco) | ✅ | ✅ | · |
+| `athena-trigger` (L1 simulation, High-Level Trigger) | [recipes/athena-trigger](recipes/athena-trigger) | ✅ | ✅ | · |
+| `athena-sim` (Geant4 simulation, ISF, generator interfaces, `Sim_tf.py`) | [recipes/athena-sim](recipes/athena-sim) | ✅ | ✅ | · |
 | `athena-rest` (the project `Athena`: derivations, data quality, event display, the rest) | [recipes/athena-rest](recipes/athena-rest) | ✅ | · | · |
 | `athena` (all the layers) | [recipes/athena](recipes/athena) | ✅ | · | · |
 | `athena-devel` (compilers and externals for building Athena packages against the release) | [recipes/athena-devel](recipes/athena-devel) | ✅ | · | · |
@@ -533,6 +533,22 @@ so that a work area can relink it with its own changes.
   - The rootmaps name libraries with a `.so` suffix; AtlasCMake links dictionary libraries to
     that name but not the libraries with a built-in dictionary (RootUtils): the layers' build
     scripts add the missing links.
+  - With libc++, AtlasSTLAddReflexDict's rootmap also lists the `pair<>`s of some maps that
+    xAODCoreSTLDict lists, and ROOT warns about each in every job: the layers keep the first
+    entry of each class, the one ROOT uses.
+  - ATLAS's test scripts take GNU's sed, diff and grep for granted (`post.sh`, which compares
+    test logs with references): athena-core requires them from conda-forge there.
+  - The CP algorithms declare the `eventNumber` n-tuple branch as `unsigned long`, but
+    `EventInfo`'s is a `uint64_t`, which is `unsigned long long` there: analysis patch 0002
+    declares it `uint64` (**upstreamable**).
+  - Three unit tests' references depend on libstdc++ (`std::shuffle`'s order, the text of an
+    exception): the layers skip them on macOS (`unit_tests_excluded_osx.txt`).
+- **ATLAS's scripts start with `#!/usr/bin/bash` or `#!/bin/env`** (233 in the sources), which
+  neither macOS nor distributions without the merged `/usr` have: the layers rewrite them to
+  `#!/usr/bin/env` before building.
+- **SelectionHelpers' expression lexer reads a destroyed object** after it is moved (its tokenizer
+  keeps iterators into the moved-from string). It works by chance with libstdc++ and not with
+  libc++, whose strings keep more characters inline: analysis patch 0003 (**upstreamable**).
 - **The tests' references are per platform**: ATLAS's own release writes different floating point
   numbers on x86_64 and aarch64 (dumps of ESD, AOD, derivations, tracking, CP n-tuples; the
   DAOD reading and trigger counts agree). The linux-64 references come from ATLAS's x86_64

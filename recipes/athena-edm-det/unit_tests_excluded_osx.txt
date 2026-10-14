@@ -1,0 +1,5 @@
+# Tests of the packages in unit_tests.txt that build.sh leaves out on macOS (ctest names).
+# Their references list cells in the order std::shuffle gave them with libstdc++: the standard
+# leaves its algorithm to the implementation, and libc++ shuffles the same seed differently
+CaloTPCnv_CaloCellLinkContainerCnv_p2_test_ctest
+CaloTPCnv_CaloCompactCellTool_test_ctest

@@ -57,6 +57,18 @@ if [[ "${target_platform}" == osx-* ]]; then
   RPATH_ARGS=(-DCMAKE_INSTALL_RPATH="${rpath};${PREFIX}/lib")
 fi
 
+# ATLAS's scripts start with #!/usr/bin/bash or #!/bin/env, which are not on every system
+# (macOS has neither): /usr/bin/env finds the interpreter instead. In the sources, for the
+# installed copies and for the build-time tests, which run them from there.
+set +x
+{ grep -rlI -m1 -E '^#! */(usr/bin/bash|bin/env )' . || true; } | while read -r f; do
+  if head -n1 "${f}" | grep -qE '^#! */(usr/bin/bash|bin/env )'; then
+    sed -i.orig -E '1s@^#! */usr/bin/bash@#!/usr/bin/env bash@; 1s@^#! */bin/env @#!/usr/bin/env @' "${f}"
+    rm "${f}.orig"
+  fi
+done
+set -x
+
 # The packages that cannot be built on macOS (packages_excluded_osx.txt, with the reasons) come
 # first, as exclusions: the first matching line decides.
 : > package_filters.txt
@@ -65,6 +77,15 @@ if [[ "${target_platform}" == osx-* ]] && [ -f "${RECIPE_DIR}/packages_excluded_
     "${RECIPE_DIR}/packages_excluded_osx.txt" > package_filters.txt
 fi
 sed -e '/^#/d' -e '/^$/d' -e 's/^/+ /' "${RECIPE_DIR}/packages.txt" >> package_filters.txt
+# L1TopoAlgorithms downloads two networks at build time (ADVAE2A, ARTEMIS2A), whose hls4ml
+# ap_types headers declare std::complex themselves: with libc++ (std::__1::complex) the name
+# is then ambiguous, so on macOS they include <complex> instead.
+OSX_ARGS=()
+if [[ "${target_platform}" == osx-* ]]; then
+  for p in ADVAE2A ARTEMIS2A; do
+    OSX_ARGS+=(-DATLAS_${p}_PATCH="PATCH_COMMAND;patch;-p1;-i;${RECIPE_DIR}/hls4ml-ap_types-libc++.patch")
+  done
+fi
 echo "- .*" >> package_filters.txt
 # The layer project goes where ATLAS keeps its projects: some packages find the athena source
 # tree as ${CMAKE_SOURCE_DIR}/../../.
@@ -88,27 +109,33 @@ cmake -S Projects/CondaLayer -B build -G Ninja ${CMAKE_ARGS} \
   -DCMAKE_INSTALL_SO_NO_EXE=0 \
   -DATLAS_EXTERNAL="${SRC_DIR}/no-atlas-external" \
   -DATLAS_ALWAYS_BUILD_TESTS=OFF \
-  ${RPATH_ARGS[@]+"${RPATH_ARGS[@]}"}
+  ${RPATH_ARGS[@]+"${RPATH_ARGS[@]}"} ${OSX_ARGS[@]+"${OSX_ARGS[@]}"}
 cmake --build build --parallel "${CPU_COUNT}"
+# Installed before the unit tests run: on macOS the build area's libraries find this layer's
+# others through the rpath to its install area, as SIP drops DYLD_LIBRARY_PATH from the
+# scripts (#!/usr/bin/env python) that many tests are.
+cmake --install build
 
 # The unit tests of the packages in unit_tests.txt, which need no input files: built (each
 # package has a Package_<name>_tests target) and run here, in the build area. ctest labels
 # each test with its package's name; the tests in unit_tests_excluded.txt need input files
-# (calibrations from GroupData, ATLAS's test files on CVMFS) and are left out.
+# (calibrations from GroupData, ATLAS's test files on CVMFS) and are left out, and on macOS
+# those in unit_tests_excluded_osx.txt (with the reasons).
 if [ -f "${RECIPE_DIR}/unit_tests.txt" ]; then
   tested=$(sed -e '/^#/d' -e '/^$/d' -e 's|.*/||' "${RECIPE_DIR}/unit_tests.txt")
   excluded=$(sed -e 's/#.*//' -e '/^ *$/d' "${RECIPE_DIR}/unit_tests_excluded.txt")
+  if [[ "${target_platform}" == osx-* ]] && [ -f "${RECIPE_DIR}/unit_tests_excluded_osx.txt" ]; then
+    excluded+=$'\n'$(sed -e 's/#.*//' -e '/^ *$/d' "${RECIPE_DIR}/unit_tests_excluded_osx.txt")
+  fi
   # shellcheck disable=SC2046
   cmake --build build --parallel "${CPU_COUNT}" --target $(sed 's/.*/Package_&_tests/' <<< "${tested}")
   # Where cpuinfo cannot tell the CPU's vendor (e.g. in an emulated or virtualised aarch64),
   # onnxruntime prints a warning, which ends up in the logs that tests compare with references.
   export ATLAS_CTEST_LOG_IGNORE_PATTERN2="onnxruntime cpuid_info warning"
   ctest --test-dir build --output-on-failure --parallel "${CPU_COUNT}" \
-    --label-regex "^($(paste -sd'|' - << "${tested}"))$" \
-    --exclude-regex "^($(paste -sd'|' - << "${excluded}"))$"
+    --label-regex "^($(paste -sd'|' - <<< "${tested}"))$" \
+    --exclude-regex "^($(paste -sd'|' - <<< "${excluded}"))$"
 fi
-
-cmake --install build
 
 # ATLAS's authentication.xml holds database passwords: AtlasAuthentication installs it when it
 # finds it in ${ATLAS_EXTERNAL} (on AFS by default), which is pointed nowhere above. The
@@ -130,6 +157,13 @@ if [ "$(uname -s)" = Darwin ]; then
       ln -s "${lib%.so}.dylib" "${INSTALL}/lib/${lib}"
     fi
   done
+  # With libc++, std::map makes AtlasSTLAddReflexDict's rootmap list the pair<> of some maps
+  # that another dictionary lists too. ROOT keeps the first library of each class and warns
+  # about the others, in every job (and so in the logs ATLAS's tests compare with
+  # references): only the first entry is kept.
+  awk '/^class /{if (($0) in seen) next; seen[$0]=1} {print}' "${INSTALL}/lib/${LAYER}.rootmap" \
+    > "${LAYER}.rootmap.dedup"
+  mv "${LAYER}.rootmap.dedup" "${INSTALL}/lib/${LAYER}.rootmap"
 fi
 
 # The exported targets must not name files of the build environment, which does not exist when

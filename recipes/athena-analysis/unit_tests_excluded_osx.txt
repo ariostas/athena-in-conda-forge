@@ -1,0 +1,4 @@
+# Tests of the packages in unit_tests.txt that build.sh leaves out on macOS (ctest names).
+# The reference has libstdc++'s text of an exception (std::vector::at's out_of_range), which
+# libc++ words differently ("vector")
+L1TopoSimulationUtils_L1TopoSimulationUtils_test_ctest

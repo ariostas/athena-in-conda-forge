@@ -1,0 +1,274 @@
+--- a/Control/AthViews/test/ViewCollectionMerge_test.cxx
++++ b/Control/AthViews/test/ViewCollectionMerge_test.cxx
+@@ -37,6 +37,9 @@
+ #include "gtest/gtest.h"
+ #include "gmock/gmock.h"
+ 
++#include <cstdio>
++#include <cstdlib>
++
+ // Names for storing collections
+ std::string const VIEWS_NAME = "viewVector";
+ std::string const DATA_NAME = "dataVector";
+@@ -718,6 +721,13 @@
+   // if the above gets stuck forever while trying to finalize Boost stuff
+   // inside SGTools, try to use the following:
+   // skips proper finalization:
++#ifdef __APPLE__
++  // macOS's C library has no quick_exit: exit without finalization, as it does
++  const int rc = RUN_ALL_TESTS();
++  std::fflush( nullptr );
++  std::_Exit( rc );
++#else
+   std::quick_exit( RUN_ALL_TESTS() );
+-}
+-
++#endif
++}
++
+--- a/ForwardDetectors/ZDC/ZdcAnalysis/Root/ZDCDataAnalyzer.cxx
++++ b/ForwardDetectors/ZDC/ZdcAnalysis/Root/ZDCDataAnalyzer.cxx
+@@ -7,6 +7,7 @@
+ 
+ #include <utility>
+ #include <format>
++#include <sstream>
+ 
+ #include "CxxUtils/trapping_fp.h"
+ 
+--- a/InnerDetector/InDetRecEvent/SiSPSeededTrackFinderData/src/SiTrajectoryElement_xk.cxx
++++ b/InnerDetector/InDetRecEvent/SiSPSeededTrackFinderData/src/SiTrajectoryElement_xk.cxx
+@@ -21,6 +21,13 @@
+ #include <cmath>
+ #include <memory>
+ #include <stdexcept>
++
++#ifdef __APPLE__
++namespace {
++// sincos() is a GNU extension; macOS has __sincos()
++inline void sincos(double x, double* s, double* c) { __sincos(x, s, c); }
++}
++#endif
+ 
+ ///////////////////////////////////////////////////////////////////
+ // Set work dead trajectory element
+--- a/PhysicsAnalysis/Algorithms/AsgAnalysisAlgorithms/python/AsgAnalysisConfig.py
++++ b/PhysicsAnalysis/Algorithms/AsgAnalysisAlgorithms/python/AsgAnalysisConfig.py
+@@ -248,7 +248,7 @@
+         log = logging.getLogger('makePileupAnalysisSequence')
+ 
+         eventInfoVar = [('runNumber','unsigned'),
+-                        ('eventNumber','unsigned_long'),
++                        ('eventNumber','uint64'),
+                         ('actualInteractionsPerCrossing','float'),
+                         ('averageInteractionsPerCrossing','float')]
+         if config.dataType() is not DataType.Data:
+--- a/PhysicsAnalysis/AnalysisCommon/HDF5Utils/Root/HdfTuple.cxx
++++ b/PhysicsAnalysis/AnalysisCommon/HDF5Utils/Root/HdfTuple.cxx
+@@ -6,6 +6,7 @@
+ 
+ #include "H5Cpp.h"
+ 
++#include <algorithm>
+ #include <cassert>
+ #include <set>
+ #include <stdexcept>
+--- a/PhysicsAnalysis/Columnar/ColumnarCore/ColumnarCore/ColumnarDef.h
++++ b/PhysicsAnalysis/Columnar/ColumnarCore/ColumnarCore/ColumnarDef.h
+@@ -5,8 +5,10 @@
+ #ifndef COLUMNAR_CORE_COLUMNAR_DEF_H
+ #define COLUMNAR_CORE_COLUMNAR_DEF_H
+ 
++#include <cstddef>
+ #include <cstdint>
+ #include <stdexcept>
++#include <string>
+ 
+ namespace columnar
+ {
+--- a/PhysicsAnalysis/CommonTools/ExpressionEvaluation/ExpressionEvaluation/MultipleProxyLoader.h
++++ b/PhysicsAnalysis/CommonTools/ExpressionEvaluation/ExpressionEvaluation/MultipleProxyLoader.h
+@@ -11,6 +11,8 @@
+ 
+ #ifndef MULTIPLE_PROXY_LOADER_H
+ #define MULTIPLE_PROXY_LOADER_H
++
++#include <string>
+ 
+ #include "CxxUtils/checker_macros.h"
+ #include "CxxUtils/ConcurrentStrMap.h"
+--- a/PhysicsAnalysis/JetTagging/JetTagDerivationUtils/src/JetLinkMatcherAlg.h
++++ b/PhysicsAnalysis/JetTagging/JetTagDerivationUtils/src/JetLinkMatcherAlg.h
+@@ -32,7 +32,7 @@
+     VariableMule<double,JC> m_doubles{NAN};
+     VariableMule<int,JC> m_ints{-1};
+     VariableMule<uint,JC> m_uints{0};
+-    VariableMule<ulong,JC> m_ulongs{0};
++    VariableMule<unsigned long,JC> m_ulongs{0};
+     VariableMule<char,JC> m_chars{0};
+     VariableMule<std::vector<char>,JC> m_charVectors{{}};
+     VariableMule<IPLV,JC> m_iparticles{{}};
+--- a/PhysicsAnalysis/JetTagging/JetTagDerivationUtils/src/JetMatcherAlg.h
++++ b/PhysicsAnalysis/JetTagging/JetTagDerivationUtils/src/JetMatcherAlg.h
+@@ -29,7 +29,7 @@
+     VariableMule<double,JC> m_doubles{NAN};
+     VariableMule<int,JC> m_ints{-1};
+     VariableMule<uint,JC> m_uints{0};
+-    VariableMule<ulong,JC> m_ulongs{0};
++    VariableMule<unsigned long,JC> m_ulongs{0};
+     VariableMule<char,JC> m_chars{0};
+     VariableMule<IPLV,JC> m_iparticles{{}};
+     SG::ReadHandleKey<JC> m_targetJet {this, "targetJet", "", "target jet"};
+--- a/Trigger/TrigAnalysis/TrigDecisionTool/Root/ChainGroup.cxx
++++ b/Trigger/TrigAnalysis/TrigDecisionTool/Root/ChainGroup.cxx
+@@ -34,6 +34,7 @@
+ #include <limits>
+ #include <regex>
+ #include <ranges>
++#include <stack>
+ 
+ 
+ using namespace std;
+--- a/Trigger/TrigAnalysis/TrigGlobalEfficiencyCorrection/Root/CheckConfig.cxx
++++ b/Trigger/TrigAnalysis/TrigGlobalEfficiencyCorrection/Root/CheckConfig.cxx
+@@ -8,9 +8,18 @@
+ 
+ #include "TrigGlobalEfficiencyCorrection/Calculator.h"
+ #include "TrigGlobalEfficiencyCorrection/ImportData.h"
++// libc++ 20 (macOS) has no <flat_set> yet: Boost's has the same interface
++#ifndef TRIGGLOBEFFCORR_FLAT_SET
++#if __has_include(<flat_set>)
+ #include <flat_set>
++#define TRIGGLOBEFFCORR_FLAT_SET std::flat_set
++#else
++#include <boost/container/flat_set.hpp>
++#define TRIGGLOBEFFCORR_FLAT_SET boost::container::flat_set
++#endif
++#endif
+ template <typename Key>
+-using flat_set = std::flat_set<Key>;
++using flat_set = TRIGGLOBEFFCORR_FLAT_SET<Key>;
+ 
+ #include <cctype>
+ 
+--- a/Trigger/TrigAnalysis/TrigGlobalEfficiencyCorrection/TrigGlobalEfficiencyCorrection/Calculator.h
++++ b/Trigger/TrigAnalysis/TrigGlobalEfficiencyCorrection/TrigGlobalEfficiencyCorrection/Calculator.h
+@@ -13,13 +13,22 @@
+ #include "TrigGlobalEfficiencyCorrection/Efficiencies.h"
+ #include "TrigGlobalEfficiencyCorrection/ImportData.h"
+ #include "TrigGlobalEfficiencyCorrection/TrigGlobalEfficiencyCorrectionTool.h"
++// libc++ 20 (macOS) has no <flat_set> yet: Boost's has the same interface
++#ifndef TRIGGLOBEFFCORR_FLAT_SET
++#if __has_include(<flat_set>)
+ #include <flat_set>
++#define TRIGGLOBEFFCORR_FLAT_SET std::flat_set
++#else
++#include <boost/container/flat_set.hpp>
++#define TRIGGLOBEFFCORR_FLAT_SET boost::container::flat_set
++#endif
++#endif
+ #include <algorithm>
+ #include <functional>
+ #include <map>
+ 
+ template <typename Key>
+-using flat_set = std::flat_set<Key>;
++using flat_set = TRIGGLOBEFFCORR_FLAT_SET<Key>;
+ 
+ namespace TrigGlobEffCorr {
+ 
+--- a/Trigger/TrigAnalysis/TrigGlobalEfficiencyCorrection/TrigGlobalEfficiencyCorrection/Trigger.h
++++ b/Trigger/TrigAnalysis/TrigGlobalEfficiencyCorrection/TrigGlobalEfficiencyCorrection/Trigger.h
+@@ -13,9 +13,18 @@
+ 
+ #include "TrigGlobalEfficiencyCorrection/ImportData.h"
+ #include "xAODBase/ObjectType.h"
++// libc++ 20 (macOS) has no <flat_set> yet: Boost's has the same interface
++#ifndef TRIGGLOBEFFCORR_FLAT_SET
++#if __has_include(<flat_set>)
+ #include <flat_set>
++#define TRIGGLOBEFFCORR_FLAT_SET std::flat_set
++#else
++#include <boost/container/flat_set.hpp>
++#define TRIGGLOBEFFCORR_FLAT_SET boost::container::flat_set
++#endif
++#endif
+ template <typename Key>
+-using flat_set = std::flat_set<Key>;
++using flat_set = TRIGGLOBEFFCORR_FLAT_SET<Key>;
+ 
+ namespace TrigGlobEffCorr {
+ 
+--- a/Trigger/TrigAnalysis/TrigGlobalEfficiencyCorrection/TrigGlobalEfficiencyCorrection/TrigGlobalEfficiencyCorrectionTool.h
++++ b/Trigger/TrigAnalysis/TrigGlobalEfficiencyCorrection/TrigGlobalEfficiencyCorrection/TrigGlobalEfficiencyCorrectionTool.h
+@@ -17,7 +17,16 @@
+ #include "TriggerAnalysisInterfaces/ITrigGlobalEfficiencyCorrectionTool.h"
+ #include "TriggerMatchingTool/IMatchingTool.h"
+ #include "xAODEgamma/PhotonFwd.h"
++// libc++ 20 (macOS) has no <flat_set> yet: Boost's has the same interface
++#ifndef TRIGGLOBEFFCORR_FLAT_SET
++#if __has_include(<flat_set>)
+ #include <flat_set>
++#define TRIGGLOBEFFCORR_FLAT_SET std::flat_set
++#else
++#include <boost/container/flat_set.hpp>
++#define TRIGGLOBEFFCORR_FLAT_SET boost::container::flat_set
++#endif
++#endif
+ #include <map>
+ #include <memory>
+ #include <set>
+@@ -193,7 +202,7 @@
+   std::unique_ptr<TrigGlobEffCorr::Calculator> m_calculator;         //!
+ 
+   template <typename Key>
+-  using flat_set = std::flat_set<Key>;
++  using flat_set = TRIGGLOBEFFCORR_FLAT_SET<Key>;
+ 
+   /// Internal methods (I) -- initialization of the tool
+   bool loadHierarchies();
+--- a/Trigger/TrigConfiguration/TrigConfIO/CMakeLists.txt
++++ b/Trigger/TrigConfiguration/TrigConfIO/CMakeLists.txt
+@@ -19,7 +19,7 @@
+   INCLUDE_DIRS ${Boost_INCLUDE_DIRS}
+   PRIVATE_INCLUDE_DIRS ${CORAL_INCLUDE_DIRS} ${CrestApi_INCLUDE_DIRS}
+   LINK_LIBRARIES ${Boost_LIBRARIES} TrigConfData TrigConfBase
+-  PRIVATE_LINK_LIBRARIES ${CORAL_LIBRARIES} ${CrestApi_LIBRARIES} nlohmann_json::nlohmann_json -lstdc++fs
++  PRIVATE_LINK_LIBRARIES ${CORAL_LIBRARIES} ${CrestApi_LIBRARIES} nlohmann_json::nlohmann_json $<$<NOT:$<PLATFORM_ID:Darwin>>:-lstdc++fs>
+   )
+ 
+ atlas_add_executable( TestTriggerMenuAccess utils/TestTriggerMenuAccess.cxx
+--- a/Trigger/TrigSteer/TrigCompositeUtils/Root/TrigCompositeUtilsRoot.cxx
++++ b/Trigger/TrigSteer/TrigCompositeUtils/Root/TrigCompositeUtilsRoot.cxx
+@@ -11,6 +11,7 @@
+ 
+ #include "TrigCompositeUtils/TrigCompositeUtils.h"
+ 
++#include <charconv>
+ #include <format>
+ #include <unordered_set>
+ 
+--- a/Trigger/TrigSteer/TrigOutputHandling/src/HLTResultMTMaker.cxx
++++ b/Trigger/TrigSteer/TrigOutputHandling/src/HLTResultMTMaker.cxx
+@@ -9,6 +9,10 @@
+ #include "eformat/SourceIdentifier.h"
+ #include <unistd.h> // gethostname
+ #include <limits.h> // HOST_NAME_MAX
++#ifndef HOST_NAME_MAX // macOS
++#include <sys/param.h>
++#define HOST_NAME_MAX MAXHOSTNAMELEN
++#endif
+ #include <sstream>
+ #include <algorithm>
+ 
+--- a/Trigger/TrigT1/L1Topo/L1TopoSimulationUtils/Root/Conversions.cxx
++++ b/Trigger/TrigT1/L1Topo/L1TopoSimulationUtils/Root/Conversions.cxx
+@@ -3,6 +3,8 @@
+ */
+ 
+ #include "L1TopoSimulationUtils/Conversions.h"
++
++#include <cmath>
+ 
+ int TSU::toTopoInteger(float value, unsigned int resolution) {
+     float tmp = value*resolution;

@@ -1,2 +1,8 @@
+# ATLAS's x86_64 release (athena-notes/refs.sh)
 39b3509d5e430ac04daf0c1888fc7e3be260c282133033424c574de48bd4495e  dump_ESD.txt
 477b1c60c3d198962435450b002cc84a93dc2995960173646ea416a460b34f33  dump_AOD.txt
+# This build (conda-forge's compilers and libraries, run under Rosetta): 12 lines of the ESD
+# dump and 2 of the AOD dump differ from ATLAS's by one unit in the last printed digit
+# (calorimeter cell weights, two MET sums) or by the sign of a zero (tau masses).
+4491d1f549bfb7bd4170ab7f6172a5629970a32b3422ec7f67b547b2bd348e12  dump_ESD.txt
+16f8bdbd1c21b526efd69850de52b6234f8f895e798aa7d47a37ae4fdfbb1a8d  dump_AOD.txt

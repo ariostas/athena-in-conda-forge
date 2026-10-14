@@ -148,6 +148,11 @@ ninja, so put the build's `build_env/bin` first in `PATH`).
   - CMake scans C++20 sources for modules, which needs clang-scan-deps: off everywhere.
   - Python imports only `.so` extensions, also on macOS; CMake's MODULE libraries are `.so`.
   - Use `sed -i.orig` (then remove the copy): GNU and BSD sed agree on no other `-i` form.
+    BSD `paste` needs `-` for stdin (`paste -sd'|' - <<< "${list}"`).
+  - ATLAS's test scripts need GNU sed, diff and grep (athena-core requires them there), and the
+    unit tests that are python scripts lose `DYLD_LIBRARY_PATH`: the layers install before
+    running them, so that the build area's libraries find their own through the rpaths. To
+    rerun a kept tree's tests, put a small env with `sed diffutils grep` first in `PATH`.
 
 ## Conventions
 

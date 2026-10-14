@@ -57,6 +57,18 @@ if [[ "${target_platform}" == osx-* ]]; then
   RPATH_ARGS=(-DCMAKE_INSTALL_RPATH="${rpath};${PREFIX}/lib")
 fi
 
+# ATLAS's scripts start with #!/usr/bin/bash or #!/bin/env, which are not on every system
+# (macOS has neither): /usr/bin/env finds the interpreter instead. In the sources, for the
+# installed copies and for the build-time tests, which run them from there.
+set +x
+{ grep -rlI -m1 -E '^#! */(usr/bin/bash|bin/env )' . || true; } | while read -r f; do
+  if head -n1 "${f}" | grep -qE '^#! */(usr/bin/bash|bin/env )'; then
+    sed -i.orig -E '1s@^#! */usr/bin/bash@#!/usr/bin/env bash@; 1s@^#! */bin/env @#!/usr/bin/env @' "${f}"
+    rm "${f}.orig"
+  fi
+done
+set -x
+
 # The packages that cannot be built on macOS (packages_excluded_osx.txt, with the reasons) come
 # first, as exclusions: the first matching line decides.
 : > package_filters.txt
@@ -112,6 +124,13 @@ if [ "$(uname -s)" = Darwin ]; then
       ln -s "${lib%.so}.dylib" "${INSTALL}/lib/${lib}"
     fi
   done
+  # With libc++, std::map makes AtlasSTLAddReflexDict's rootmap list the pair<> of some maps
+  # that another dictionary lists too. ROOT keeps the first library of each class and warns
+  # about the others, in every job (and so in the logs ATLAS's tests compare with
+  # references): only the first entry is kept.
+  awk '/^class /{if (($0) in seen) next; seen[$0]=1} {print}' "${INSTALL}/lib/${LAYER}.rootmap" \
+    > "${LAYER}.rootmap.dedup"
+  mv "${LAYER}.rootmap.dedup" "${INSTALL}/lib/${LAYER}.rootmap"
 fi
 
 # The exported targets must not name files of the build environment, which does not exist when

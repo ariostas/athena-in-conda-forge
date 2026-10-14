@@ -116,6 +116,13 @@ requirements:
         # athena.py finds its preload script and python with "which" (not in minimal EL9
         # images; macOS has it)
         - which
+    - if: osx
+      then:
+        # GNU's tools, which ATLAS's test scripts take for granted (post.sh: sed scripts with
+        # comments, diff -E; grep -P)
+        - diffutils
+        - grep
+        - sed
 
 tests:
   - script:

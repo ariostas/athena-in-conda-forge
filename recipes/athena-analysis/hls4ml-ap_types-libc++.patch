@@ -1,0 +1,26 @@
+--- a/include/hls4ml/ap_types/ap_fixed_special.h
++++ b/include/hls4ml/ap_types/ap_fixed_special.h
+@@ -27,9 +27,8 @@
+ #endif
+ // FIXME AP_AUTOCC cannot handle many standard headers, so declare instead of
+ // include.
+-// #include <complex>
++#include <complex>
+ namespace std {
+-template<typename _Tp> class complex;
+ }
+ 
+ /*
+--- a/include/hls4ml/ap_types/ap_int_special.h
++++ b/include/hls4ml/ap_types/ap_int_special.h
+@@ -27,9 +27,8 @@
+ #endif
+ // FIXME AP_AUTOCC cannot handle many standard headers, so declare instead of
+ // include.
+-// #include <complex>
++#include <complex>
+ namespace std {
+-template<typename _Tp> class complex;
+ }
+ 
+ /*

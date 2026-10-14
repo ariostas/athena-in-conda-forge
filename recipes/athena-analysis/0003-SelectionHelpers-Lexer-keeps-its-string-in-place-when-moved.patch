@@ -1,0 +1,33 @@
+--- a/PhysicsAnalysis/Algorithms/SelectionHelpers/SelectionHelpers/SelectionExprParser.h
++++ b/PhysicsAnalysis/Algorithms/SelectionHelpers/SelectionHelpers/SelectionExprParser.h
+@@ -42,7 +42,8 @@
+ 
+   /// Disable copying of this class
+   Lexer(const Lexer &) = delete;
+-  /// Default move-constructor behaviour
++  /// Default move-constructor behaviour: the tokenizer's iterators point into
++  /// the string, which is on the heap so that a move leaves it in place
+   Lexer(Lexer &&) = default;
+ 
+   /// Enum over the possible symbols that can be extracted from the token
+@@ -70,7 +71,7 @@
+   Symbol nextSymbol();
+ 
+  private:
+-  std::string m_string;
++  std::unique_ptr<const std::string> m_string;
+   Tokenizer m_tokenizer;
+   Tokenizer::iterator m_iterator;
+ };
+--- a/PhysicsAnalysis/Algorithms/SelectionHelpers/Root/SelectionExprParser.cxx
++++ b/PhysicsAnalysis/Algorithms/SelectionHelpers/Root/SelectionExprParser.cxx
+@@ -45,7 +45,8 @@
+   return true;
+ }
+ 
+-Lexer::Lexer(const std::string& s) : m_string(s), m_tokenizer(m_string, {}) {
++Lexer::Lexer(const std::string& s)
++    : m_string(std::make_unique<const std::string>(s)), m_tokenizer(*m_string, {}) {
+   m_iterator = m_tokenizer.begin();
+ }
+ 

@@ -1313,6 +1313,73 @@ took:
   momentum, where macOS's libm rounds differently from glibc's. On macOS a reference diff
   whose numbers all agree to one unit in their last printed digit is accepted
   (`test/lastdigit_diff.py`); Linux still compares exactly.
+- linux-64: edm-det, analysis and reco-tracking reproduce ATLAS's x86_64 references exactly.
+  The reco dumps do not: of 1.7 million ESD lines 12 differ, and 2 of the AOD's, by one unit
+  in the last printed digit (calorimeter cluster cell weights, two MET `sumet`s) or by the
+  sign of a zero (tau `mCombined`/`mPanTauCellBased`). On aarch64 the same recipe reproduces
+  ATLAS's release, and ATLAS's flags (`-O2`) and conda-forge's (`-march=nocona
+  -mtune=haswell -ftree-vectorize`) should not change IEEE results on x86_64, so presumably a
+  library compiled differently there (ROOT, Eigen, ...) or Rosetta; finding out would take
+  several emulated rebuilds. The dumps are not shipped (their input's licence is unclear), so
+  no tolerance can be applied: `reco_dumps.linux-64.sha256` lists both ATLAS's sums and this
+  build's, with a comment, and the test accepts either. (Unverified on real x86_64 hardware,
+  e.g. conda-forge's CI, which may match ATLAS's.)
+- macOS athena-analysis (patch 0002): missing standard includes, glibc's `ulong` and
+  `HOST_NAME_MAX`, `sincos`, TrigConfIO's `-lstdc++fs` (Linux only now), a header that needs
+  `<string>` before core's `ConcurrentStrMap.h`, and `std::flat_set`, which libc++ 20 does not
+  have: TrigGlobalEfficiencyCorrection takes Boost's `flat_set` there (`__has_include`). One of
+  its headers has CRLF line endings: `_work/mkpatch.py` keeps them now. L1TopoAlgorithms
+  downloads two networks at build time (ADVAE2A, ARTEMIS2A) whose hls4ml `ap_types` declare
+  `template<typename _Tp> class complex;` in `std`, a second `std::complex` next to libc++'s
+  `std::__1::complex`: on macOS `build.sh` passes ATLAS's `ATLAS_<name>_PATCH` hook a patch
+  (`hls4ml-ap_types-libc++.patch`) that includes `<complex>` instead. macOS's C library has
+  no `quick_exit`, which AthViews' unit test calls to skip finalization: `_Exit` there (several
+  sim/reco tests call it too, but none of the tested packages).
+- The layers' unit tests (edm-det, analysis: `unit_tests.txt`) did not run from the start of
+  M8: the `-` that BSD `paste` needs came with `<<` instead of `<<<`, a here-document with an
+  empty body, so ctest's label regex was `^()$` ("No tests were found!!!", not an error).
+  Fixed; the edm-det and analysis packages built before (linux-64, macOS edm-det) are to be
+  rebuilt to run them.
+- ATLAS's scripts start with `#!/usr/bin/bash` (233 in the sources, 51 installed in `bin/`,
+  e.g. core's `noerror.sh`, which ATLAS's ctest wrapper runs after every test) or
+  `#!/bin/env python`: macOS has neither path, and every unit test failed there. The layers'
+  `build.sh` rewrite them to `#!/usr/bin/env ...` in the sources before configuring (some
+  tests run scripts from the sources), on every platform.
+- The macOS unit tests of athena-analysis (77, all pass now) needed more:
+  - SIP drops `DYLD_LIBRARY_PATH` from the many tests that are python scripts
+    (`#!/usr/bin/env python`), and the build area's libraries carry only the install rpaths:
+    Gaudi's plugin loader finds a component library by its full path, but not the layer's
+    libraries it links. The layers now install before running their tests (the first rpath
+    is the layer's own install area).
+  - ATLAS's `post.sh` (log comparison with references) needs GNU sed (comments after sed
+    commands) and GNU diff (`-E`), and HDF5Utils' test GNU grep (`-P`): athena-core requires
+    conda-forge's `sed`, `diffutils` and `grep` on macOS.
+  - With libc++, `std::map` makes AtlasSTLAddReflexDict's rootmap list the `pair<>`s of some
+    maps (`pair<string,vector<int> >`) that xAODCoreSTLDict lists too; ROOT warns about each
+    such duplicate in every job (not for STL containers, so Linux's 41 duplicates are
+    silent), and the warnings broke 7 reference comparisons. The layers' rootmaps keep only the
+    first entry of each class on macOS, which is the one ROOT uses anyway.
+  - SelectionHelpers' expression `Lexer` holds a `std::string` and a `boost::tokenizer` with
+    iterators into it, and is moved with the defaulted move constructor: the iterators then
+    point into the moved-from object, destroyed right after (undefined behaviour everywhere).
+    With libstdc++ (15-character SSO) the 20-character test expression is on the heap and
+    survives; libc++ keeps up to 22 characters inline. Patch 0003 keeps the string on the heap
+    (to be reported to ATLAS).
+  - L1TopoSimulationUtils' reference has libstdc++'s text of an `out_of_range`: excluded on
+    macOS (`unit_tests_excluded_osx.txt`, read by the layers' `build.sh`).
+- With the here-string fixed, athena-edm-det's 364 unit tests run: all pass on linux-64; on
+  macOS 2 of CaloTPCnv fail, whose references list cells in the order `std::shuffle` gave
+  them (the standard leaves its algorithm to the implementation, and libc++ shuffles the same
+  seed differently): excluded on macOS like L1Topo's.
+- athena-analysis's recipe test on macOS (ATLAS's MC DAOD_PHYS test): the CP algorithms'
+  pileup block declares the `eventNumber` branch as `unsigned_long`, but `EventInfo`'s is a
+  `uint64_t`, which is `unsigned long long` on macOS: `SG::ExcAuxTypeMismatch`. Patch 0002
+  declares it `uint64` (the same type on Linux, so Linux's packages need no rebuild). With
+  it, the Open Data analysis, the full-simulation test (149 entries, 5130 branches, as on
+  Linux) and the PHYSLITE one run on macOS (no references there to compare with).
+- With the laptop free overnight (2026-10-13), the builds used 10 threads (5 for macOS, 5 for
+  the linux-64 container), back to 5 in all at 08:00 (`_work/morning.sh`).
+  `_work/osx-chain2.sh` reads each recipe's `CPU_COUNT` from `_work/osx-work/cpu_count`.
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's
