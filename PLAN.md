@@ -1425,6 +1425,9 @@ took:
   release; its aarch64 release has the same sizes), on every platform. The broken macOS
   tracking dump fails it (track particles 924 lines instead of 9828, no forward or large-d0
   tracks, half the vertex lines).
+- Rebuilt with the fix (CPU_COUNT=2): analysis passes again (77 unit tests, 6642 s), and
+  reco-tracking passes with the full output: 419,547 lines, all 9 collections' sizes as in
+  ATLAS's release (6057 s).
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's
