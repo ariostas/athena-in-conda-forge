@@ -1,0 +1,346 @@
+--- a/InnerDetector/InDetRecTools/SiClusterizationTool/src/PixelRDOTool.cxx
++++ b/InnerDetector/InDetRecTools/SiClusterizationTool/src/PixelRDOTool.cxx
+@@ -14,7 +14,14 @@
+ #include "PixelReadoutGeometry/PixelModuleDesign.h"
+ #include "InDetIdentifier/PixelID.h"
+ #include "TrkSurfaces/RectangleBounds.h"
++// libc++ 20 (macOS) has no <flat_set> yet: Boost's has the same interface
++#if __has_include(<flat_set>)
+ #include <flat_set>
++namespace { using std::flat_set; }
++#else
++#include <boost/container/flat_set.hpp>
++namespace { using boost::container::flat_set; }
++#endif
+ 
+ namespace InDet
+ {
+@@ -189,7 +196,7 @@
+     //std::unordered_set<Identifier> > idset;
+ 
+     // This is not used for ITk, still we are creating it for the moment and could be optimized away in the future
+-    std::flat_set<Identifier> idset;
++    flat_set<Identifier> idset;
+ 
+     for(const auto *const rdo : collection) {
+       const Identifier rdoID = rdo->identify();
+--- a/Tracking/TrkFitter/TrkGaussianSumFilter/src/GsfExtrapolator.cxx
++++ b/Tracking/TrkFitter/TrkGaussianSumFilter/src/GsfExtrapolator.cxx
+@@ -28,7 +28,14 @@
+ #include "TrkParameters/TrackParameters.h"
+ #include "TrkTrack/TrackStateOnSurface.h"
+ //
++// libc++ 20 (macOS) has no <flat_set> yet: Boost's has the same interface
++#if __has_include(<flat_set>)
+ #include <flat_set>
++namespace { using std::flat_set; }
++#else
++#include <boost/container/flat_set.hpp>
++namespace { using boost::container::flat_set; }
++#endif
+ #include <boost/container/small_vector.hpp>
+ #include <utility>
+ 
+@@ -705,7 +712,7 @@
+   const Trk::Layer* nextLayer =
+     currentLayer->nextLayer(currentPosition, currentDirection);
+ 
+-  using LayerSet = std::flat_set<
++  using LayerSet = flat_set<
+     const Trk::Layer*,
+     std::less<const Trk::Layer*>,
+     boost::container::small_vector<const Trk::Layer*, 8>>;
+--- a/graphics/EventDisplaysOnline/src/OnlineEventDisplaysSvc.cxx
++++ b/graphics/EventDisplaysOnline/src/OnlineEventDisplaysSvc.cxx
+@@ -18,6 +18,7 @@
+ #include <unistd.h>  //chown
+ #include <stdexcept>
+ #include "Python.h"
++#include <random>
+ 
+ namespace{
+   template<typename ...Ptr>
+@@ -109,7 +110,8 @@
+   for (const std::string& stream : streams){
+     ATH_MSG_DEBUG("streams where a trigger fired and in your desired streams list: " << stream);
+   }
+-  std::random_shuffle(streams.begin(), streams.end());
++  static thread_local std::mt19937 rdm_gen(std::random_device{}());
++  std::shuffle(streams.begin(), streams.end(), rdm_gen);
+   //Pick the first stream as the output directory
+   if(!streams.empty()){
+     m_outputStreamDir = streams[0];
+--- a/InnerDetector/InDetGNNTracking/src/SiGNNTrackFinderTool.cxx
++++ b/InnerDetector/InDetGNNTracking/src/SiGNNTrackFinderTool.cxx
+@@ -155,7 +155,7 @@
+     // random shuffle the edge list.
+     std::random_device rd;
+     std::mt19937 rdm_gen(rd());
+-    std::random_shuffle(edgePairs.begin(), edgePairs.end());
++    std::shuffle(edgePairs.begin(), edgePairs.end(), rdm_gen);
+ 
+     // sort the edge list by the sender * numSpacepoints + receiver.
+     std::sort(edgePairs.begin(), edgePairs.end(), 
+--- a/Tracking/TrkTools/TrkAssociationTools/src/PRDtoTrackMapTool.cxx
++++ b/Tracking/TrkTools/TrkAssociationTools/src/PRDtoTrackMapTool.cxx
+@@ -11,7 +11,6 @@
+ 
+ #include <cassert>
+ #include <vector>
+-#include "ext/functional"
+ 
+ Trk::PRDtoTrackMapTool::PRDtoTrackMapTool(const std::string& t,
+                                           const std::string& n,
+--- a/Tracking/TrkTools/TrkAssociationTools/src/PRD_AssociationTool.cxx
++++ b/Tracking/TrkTools/TrkAssociationTools/src/PRD_AssociationTool.cxx
+@@ -11,7 +11,6 @@
+ #include <cassert>
+ #include <vector>
+ #include <stdexcept>
+-#include "ext/functional"
+ 
+ Trk::PRD_AssociationTool::PRD_AssociationTool(const std::string& t,
+   const std::string& n,
+--- a/Tracking/TrkFitter/TrkiPatFitterUtils/src/FitMeasurement.cxx
++++ b/Tracking/TrkFitter/TrkiPatFitterUtils/src/FitMeasurement.cxx
+@@ -70,7 +70,7 @@
+       m_position(measurementBase->associatedSurface().center()),
+       m_qOverP(0.),
+       m_radiationThickness(0.),
+-      m_residual(0),
++      m_residual{},
+       m_scaleFactor(0.),
+       m_scatterPhi(0.),
+       m_scatterTheta(0.),
+@@ -231,7 +231,7 @@
+       m_position(position),
+       m_qOverP(qOverP),
+       m_radiationThickness(materialEffects->thicknessInX0()),
+-      m_residual(0),
++      m_residual{},
+       m_scaleFactor(0.),
+       m_scatterPhi(0.),
+       m_scatterTheta(0.),
+@@ -339,7 +339,7 @@
+       m_position(position),
+       m_qOverP(qOverP),
+       m_radiationThickness(radiationThickness),
+-      m_residual(0),
++      m_residual{},
+       m_scaleFactor(0.),
+       m_scatterPhi(0.),
+       m_scatterTheta(0.),
+@@ -416,7 +416,7 @@
+       m_position(position),
+       m_qOverP(0.),
+       m_radiationThickness(0.),
+-      m_residual(0),
++      m_residual{},
+       m_scaleFactor(0.),
+       m_scatterPhi(alignmentEffects->deltaAngle()),
+       m_scatterTheta(alignmentEffects->deltaTranslation()),
+@@ -476,7 +476,7 @@
+       m_position(intersection.position()),
+       m_qOverP(0.),
+       m_radiationThickness(0.),
+-      m_residual(0),
++      m_residual{},
+       m_scaleFactor(0.),
+       m_scatterPhi(0.),
+       m_scatterTheta(0.),
+@@ -535,7 +535,7 @@
+       m_position(TSOS.trackParameters()->position()),
+       m_qOverP(0.),
+       m_radiationThickness(0.),
+-      m_residual(0),
++      m_residual{},
+       m_scaleFactor(0.),
+       m_scatterPhi(0.),
+       m_scatterTheta(0.),
+@@ -595,7 +595,7 @@
+       m_position(position),
+       m_qOverP(0.),
+       m_radiationThickness(0.),
+-      m_residual(0),
++      m_residual{},
+       m_scaleFactor(0.),
+       m_scatterPhi(0.),
+       m_scatterTheta(0.),
+@@ -687,7 +687,7 @@
+       m_position(position),
+       m_qOverP(0.),
+       m_radiationThickness(0.),
+-      m_residual(0),
++      m_residual{},
+       m_scaleFactor(0.),
+       m_scatterPhi(0.),
+       m_scatterTheta(0.),
+@@ -747,7 +747,7 @@
+       m_position(perigee.associatedSurface().center()),
+       m_qOverP(0.),
+       m_radiationThickness(0.),
+-      m_residual(0),
++      m_residual{},
+       m_scaleFactor(0.),
+       m_scatterPhi(0.),
+       m_scatterTheta(0.),
+@@ -840,7 +840,7 @@
+       m_position(position),
+       m_qOverP(0.),
+       m_radiationThickness(0.),
+-      m_residual(0),
++      m_residual{},
+       m_scaleFactor(0.),
+       m_scatterPhi(0.),
+       m_scatterTheta(0.),
+--- a/InnerDetector/InDetRecTools/TRT_DetElementsRoadTool_xk/src/TRT_DetElementsRoadUtils_xk.cxx
++++ b/InnerDetector/InDetRecTools/TRT_DetElementsRoadTool_xk/src/TRT_DetElementsRoadUtils_xk.cxx
+@@ -9,6 +9,13 @@
+ #include "TrkSurfaces/RectangleBounds.h"
+ #include "TrkSurfaces/DiscBounds.h"
+ #include "TrkSurfaces/PlaneSurface.h"
++
++#ifdef __APPLE__
++namespace {
++// sincos() is a GNU extension; macOS has __sincos()
++inline void sincos(double x, double* s, double* c) { __sincos(x, s, c); }
++}
++#endif
+ 
+ 
+ ///////////////////////////////////////////////////////////////////
+--- a/InnerDetector/InDetRecTools/TRT_DetElementsRoadTool_xk/src/TRT_DetElementsRoadMaker_xk.cxx
++++ b/InnerDetector/InDetRecTools/TRT_DetElementsRoadTool_xk/src/TRT_DetElementsRoadMaker_xk.cxx
+@@ -32,6 +32,13 @@
+ #include <iostream>
+ #include <iomanip>
+ #include <utility>
++
++#ifdef __APPLE__
++namespace {
++// sincos() is a GNU extension; macOS has __sincos()
++inline void sincos(double x, double* s, double* c) { __sincos(x, s, c); }
++}
++#endif
+ 
+ 
+ ///////////////////////////////////////////////////////////////////
+--- a/InnerDetector/InDetRecTools/SiDetElementsRoadTool_xk/src/SiDetElementsRoadUtils_xk.cxx
++++ b/InnerDetector/InDetRecTools/SiDetElementsRoadTool_xk/src/SiDetElementsRoadUtils_xk.cxx
+@@ -4,6 +4,13 @@
+ 
+ #include "SiDetElementsRoadUtils_xk.h"
+ #include <cmath>
++
++#ifdef __APPLE__
++namespace {
++// sincos() is a GNU extension; macOS has __sincos()
++inline void sincos(double x, double* s, double* c) { __sincos(x, s, c); }
++}
++#endif
+ 
+ ///////////////////////////////////////////////////////////////////
+ // Output parameters: P[ 0]  - radius          centre of wafer
+--- a/InnerDetector/InDetRecTools/SiDetElementsRoadTool_xk/src/SiDetElementsRoadMaker_xk.cxx
++++ b/InnerDetector/InDetRecTools/SiDetElementsRoadTool_xk/src/SiDetElementsRoadMaker_xk.cxx
+@@ -26,6 +26,13 @@
+ 
+ #include <ostream>
+ #include <iomanip>
++
++#ifdef __APPLE__
++namespace {
++// sincos() is a GNU extension; macOS has __sincos()
++inline void sincos(double x, double* s, double* c) { __sincos(x, s, c); }
++}
++#endif
+ 
+ ///////////////////////////////////////////////////////////////////
+ // Constructor
+--- a/InnerDetector/InDetDigitization/FastTRT_Digitization/src/TRTFastDigitizationTool.cxx
++++ b/InnerDetector/InDetDigitization/FastTRT_Digitization/src/TRTFastDigitizationTool.cxx
+@@ -509,7 +509,7 @@
+   // agreeement with full simulation as being 0.04 for mu=10 and 0.12 for mu=60;
+   // I decided to use the functional form a*pow(mu,b) to describe the mu
+   // dependence; solving the 2x2 system gives a=0.01 and b=0.61.
+-  float highTRMergeProb = 0.012*pow(m_NCollPerEvent,0.61);
++  float highTRMergeProb = 0.012*pow(m_NCollPerEvent.value(),0.61);
+ 
+   std::multimap< IdentifierHash, InDet::TRT_DriftCircle * > idHashMap;
+ 
+--- a/InnerDetector/InDetCalibAlgs/TRT_CalibAlgs/scripts/TRTCalib_bhadd.cxx
++++ b/InnerDetector/InDetCalibAlgs/TRT_CalibAlgs/scripts/TRTCalib_bhadd.cxx
+@@ -11,7 +11,6 @@
+ #include <iostream>
+ #include <sys/time.h>
+ #include <sys/resource.h>
+-#include <sys/sysinfo.h>
+ #include <unistd.h>
+ #include <map>
+ #include <vector>
+--- a/graphics/JiveXML/src/ONCRPCServerThreads.cxx
++++ b/graphics/JiveXML/src/ONCRPCServerThreads.cxx
+@@ -2,6 +2,10 @@
+   Copyright (C) 2002-2025 CERN for the benefit of the ATLAS collaboration
+ */
+ 
++#ifdef __APPLE__
++// macOS's <netdb.h> defines struct rpcent: libtirpc's <rpc/rpcent.h> then must not
++#define HAVE_STRUCT_RPCENT 1
++#endif
+ #include "CxxUtils/checker_macros.h"
+ #include "JiveXML/ONCRPCServerThreads.h"
+ #include "JiveXML/ONCRPCThreadCollection.h"
+@@ -19,7 +23,7 @@
+ 
+ #include <sstream>
+ #include <errno.h>
+-#ifdef __APPLE__
++#if defined(__APPLE__) && !defined(_TIRPC_RPC_MSG_H)
+ #include <rpc/rpc.h>
+ extern "C" void get_myaddress (struct sockaddr_in *);
+ #endif
+@@ -392,7 +396,7 @@
+       }
+ 
+       //Next register our server with the RPC daemon
+-#ifndef __APPLE__
++#if !defined(__APPLE__) || defined(_TIRPC_RPC_MSG_H)
+       if (! svc_register(transp,ONCRPCSERVERPROG,ONCRPCSERVERVERS,ONCRPCRequestHandler,IPPROTO_TCP)){
+ #else
+ 	  if (! svc_register(transp,ONCRPCSERVERPROG,ONCRPCSERVERVERS,(void (*)())ONCRPCRequestHandler,IPPROTO_TCP)){
+--- a/graphics/JiveXML/src/ONCRPCServerSvc.cxx
++++ b/graphics/JiveXML/src/ONCRPCServerSvc.cxx
+@@ -17,7 +17,11 @@
+ namespace {
+   std::string fmterror(int code) {
+     char buf[256];
++#if defined(__GLIBC__) && defined(_GNU_SOURCE)
+     return std::string(strerror_r(code, buf, sizeof(buf)));
++#else
++    return strerror_r(code, buf, sizeof(buf)) == 0 ? std::string(buf) : std::string();
++#endif
+   }
+ }
+ 
+--- a/Tracking/TrkAlignment/TrkAlgebraUtils/CMakeLists.txt
++++ b/Tracking/TrkAlignment/TrkAlgebraUtils/CMakeLists.txt
+@@ -10,9 +10,17 @@
+ find_package( ROOT COMPONENTS Core Matrix Tree MathCore Hist RIO pthread )
+ 
+ # Component(s) in the package:
++# The Fortran runtime, for BLAS and LAPACK. Not on macOS: there gfortran's implicit libraries
++# include static ones outside the linker's search path (emutls_w), and BLAS and LAPACK are
++# shared libraries that bring the runtime themselves.
++set( _fortranLibs ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES} )
++if( APPLE )
++   set( _fortranLibs )
++endif()
++
+ atlas_add_library( TrkAlgebraUtils
+                    src/*.cxx
+                    PUBLIC_HEADERS TrkAlgebraUtils
+                    PRIVATE_INCLUDE_DIRS ${ROOT_INCLUDE_DIRS} ${LAPACK_INCLUDE_DIRS} ${BLAS_INCLUDE_DIRS} ${EIGEN_INCLUDE_DIRS}
+-                   PRIVATE_LINK_LIBRARIES ${ROOT_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${EIGEN_LIBRARIES} GaudiKernel ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES} EventPrimitives)
++                   PRIVATE_LINK_LIBRARIES ${ROOT_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${EIGEN_LIBRARIES} GaudiKernel ${_fortranLibs} EventPrimitives)
+ 

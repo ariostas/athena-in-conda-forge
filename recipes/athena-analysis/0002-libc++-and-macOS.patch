@@ -36,6 +36,21 @@
  
  #include "CxxUtils/trapping_fp.h"
  
+--- a/InnerDetector/InDetRecTools/InDetRecToolInterfaces/InDetRecToolInterfaces/ISiCombinatorialTrackFinder.h
++++ b/InnerDetector/InDetRecTools/InDetRecToolInterfaces/InDetRecToolInterfaces/ISiCombinatorialTrackFinder.h
+@@ -164,8 +164,10 @@
+   
+   inline TrackQualityCuts& TrackQualityCuts::operator = (const TrackQualityCuts& TQC) 
+     {
+-      m_idata = TQC.m_idata;
+-      m_ddata = TQC.m_ddata;
++      // copied, then moved: libc++ assigns a map's elements in place, which the const keys
++      // do not allow
++      m_idata = std::map<const std::string,int>(TQC.m_idata);
++      m_ddata = std::map<const std::string,double>(TQC.m_ddata);
+       return(*this);
+     }
+   
 --- a/InnerDetector/InDetRecEvent/SiSPSeededTrackFinderData/src/SiTrajectoryElement_xk.cxx
 +++ b/InnerDetector/InDetRecEvent/SiSPSeededTrackFinderData/src/SiTrajectoryElement_xk.cxx
 @@ -21,6 +21,13 @@

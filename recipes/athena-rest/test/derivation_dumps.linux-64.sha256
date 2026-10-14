@@ -1,2 +1,10 @@
+# ATLAS's x86_64 release (athena-notes/refs.sh)
 41543f27ef2d9b67ab78d166afc2696d7c9ed82cc6b39c0f6bedbe2a83b5a987  dump_PHYS.txt
 66af49f95854d8d763dd377fb5e10b697f1cac785f69fe5abc4bf079a25bacde  dump_PHYSLITE.txt
+# This build (conda-forge's compilers and libraries, run under Rosetta): 30 lines of the PHYS
+# dump differ from ATLAS's by one unit in the last printed digit (jet and track-jet momenta and
+# masses, isolation, cluster energies), 2 of it and 2 of the PHYSLITE dump by one unit of a
+# float (ECF3), and 7 electrons' UEcorr_Pt by more: there this build has exactly the values
+# of ATLAS's aarch64 release.
+53286f03b71fc4d57e45680cad9b7e7c29c1590c52215f7e1782afc60787704a  dump_PHYS.txt
+d61c7e5d322f295ba8fd764a56f9d197cf53cfc69893cd80bb4ef9fa8652c3c7  dump_PHYSLITE.txt

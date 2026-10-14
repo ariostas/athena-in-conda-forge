@@ -98,7 +98,7 @@ The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
 | `athena-reco` (full reconstruction, `Reco_tf.py`, digitization) | [recipes/athena-reco](recipes/athena-reco) | ✅ | ✅ | · |
 | `athena-trigger` (L1 simulation, High-Level Trigger) | [recipes/athena-trigger](recipes/athena-trigger) | ✅ | ✅ | · |
 | `athena-sim` (Geant4 simulation, ISF, generator interfaces, `Sim_tf.py`) | [recipes/athena-sim](recipes/athena-sim) | ✅ | ✅ | · |
-| `athena-rest` (the project `Athena`: derivations, data quality, event display, the rest) | [recipes/athena-rest](recipes/athena-rest) | ✅ | · | · |
+| `athena-rest` (the project `Athena`: derivations, data quality, event display, the rest) | [recipes/athena-rest](recipes/athena-rest) | ✅ | ✅ | · |
 | `athena` (all the layers) | [recipes/athena](recipes/athena) | ✅ | · | · |
 | `athena-devel` (compilers and externals for building Athena packages against the release) | [recipes/athena-devel](recipes/athena-devel) | ✅ | · | · |
 | `clhep` (existing feedstock: built without `-fvisibility-inlines-hidden`, ATLAS's RandGaussZiggurat fix) | [athena-notes/feedstock-changes/clhep](athena-notes/feedstock-changes/clhep) | ✅ | ✅ | ✅ |
@@ -553,7 +553,10 @@ so that a work area can relink it with its own changes.
   numbers on x86_64 and aarch64 (dumps of ESD, AOD, derivations, tracking, CP n-tuples; the
   DAOD reading and trigger counts agree). The linux-64 references come from ATLAS's x86_64
   release, run under Rosetta here. There is no ATLAS release for macOS: there the dumps are
-  written but not compared.
+  written but not compared. On linux-64 the reco and rest dumps of these builds differ from
+  ATLAS's x86_64 release in a few numbers (by one unit in the last printed digit, and the
+  derivations in 7 electrons' `UEcorr_Pt`, where they have the values of ATLAS's aarch64
+  release): their sums are listed with ATLAS's.
 - Under Rosetta, ATLAS's x86_64 release itself reports floating point exceptions (e.g. in the
   muon geometry's initialisation), which it does not on aarch64, and which ATLAS's own FPE
   checks on x86_64 machines would catch: most likely an emulation artifact (not checked on

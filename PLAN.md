@@ -1377,9 +1377,30 @@ took:
   declares it `uint64` (the same type on Linux, so Linux's packages need no rebuild). With
   it, the Open Data analysis, the full-simulation test (149 entries, 5130 branches, as on
   Linux) and the PHYSLITE one run on macOS (no references there to compare with).
+- athena-reco-tracking on macOS: 26 compile and link errors (`ninja -k 0` on the failed tree
+  lists them all), fixed by its new patch 0001: `<flat_set>` (Boost's), `std::random_shuffle`
+  (gone since C++17: `std::shuffle`; SiGNNTrackFinderTool sorts the edges right after, and
+  had made an unused `mt19937` for it), glibc's `sincos()` and `<sys/sysinfo.h>`, GNU's
+  `<ext/functional>` (unused), iterators initialised with `0` (libc++'s have no constructor
+  from a pointer), `pow()` of a Gaudi property (ambiguous), JiveXML's `__APPLE__` branches,
+  which are for Apple's RPC headers (conda-forge's macOS build uses libtirpc as Linux does;
+  `HAVE_STRUCT_RPCENT` keeps libtirpc's `rpcent` from clashing with `<netdb.h>`, and
+  `strerror_r` is POSIX's there), and TrkAlgebraUtils, which links gfortran's implicit
+  libraries, static ones outside the search path on macOS (`emutls_w`): not there, as
+  conda-forge's BLAS and LAPACK bring the runtime themselves. One error was in a header of the
+  analysis layer (`TrackQualityCuts` copies maps with `const std::string` keys, which libc++
+  assigns element by element): analysis patch 0002, so analysis was rebuilt on macOS. None of
+  these changes Linux's results, so the linux-64 packages stand.
 - With the laptop free overnight (2026-10-13), the builds used 10 threads (5 for macOS, 5 for
   the linux-64 container), back to 5 in all at 08:00 (`_work/morning.sh`).
   `_work/osx-chain2.sh` reads each recipe's `CPU_COUNT` from `_work/osx-work/cpu_count`.
+- athena-rest on linux-64: the derivation dumps differ from ATLAS's x86_64 release in 39
+  lines of DAOD_PHYS and 2 of DAOD_PHYSLITE. 30 by one unit in the last printed digit, 4 by one
+  unit of a float (ECF3), and 7 electrons' `UEcorr_Pt` by up to 2.8 GeV: there this build has
+  exactly the values of ATLAS's aarch64 release, whose x86_64 and aarch64 releases disagree on
+  them (a quantity sensitive to the code path, not a problem of this build). The linux-64
+  sha256 file lists this build's sums too, and `run_derivation.sh` accepts any sum listed for
+  a dump, as reco's test does.
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's
