@@ -1,0 +1,44 @@
+--- a/LArCalorimeter/LArG4/LArG4Barrel/src/LArStraightAbsorbers.cxx
++++ b/LArCalorimeter/LArG4/LArG4Barrel/src/LArStraightAbsorbers.cxx
+@@ -8,6 +8,13 @@
+ #include "G4Trap.hh"
+ #include "LArG4Code/LArVG4DetectorParameters.h"
+ 
++#ifdef __APPLE__
++namespace {
++// sincos() is a GNU extension; macOS has __sincos()
++inline void sincos(double x, double* s, double* c) { __sincos(x, s, c); }
++}
++#endif
++
+ const LArStraightAbsorbers* LArStraightAbsorbers::GetInstance(const std::string& strDetector)
+ {
+   static const LArStraightAbsorbers instance(strDetector);
+--- a/LArCalorimeter/LArG4/LArG4Barrel/src/LArStraightElectrodes.cxx
++++ b/LArCalorimeter/LArG4/LArG4Barrel/src/LArStraightElectrodes.cxx
+@@ -8,7 +8,14 @@
+ #include "G4Trap.hh"
+ #include "LArG4Code/LArVG4DetectorParameters.h"
+ 
++#ifdef __APPLE__
++namespace {
++// sincos() is a GNU extension; macOS has __sincos()
++inline void sincos(double x, double* s, double* c) { __sincos(x, s, c); }
++}
++#endif
+ 
++
+ const LArStraightElectrodes* LArStraightElectrodes::GetInstance(const std::string& strDetector)
+ {
+   static const LArStraightElectrodes instance(strDetector);
+--- a/Simulation/Tools/CaloSamplingFractionAnalysis/src/LArFCalSamplingFraction.cxx
++++ b/Simulation/Tools/CaloSamplingFractionAnalysis/src/LArFCalSamplingFraction.cxx
+@@ -753,7 +753,7 @@
+         m_vertex_phi = momentum.vect().phi();
+         m_vertex_eta = -log(tan(momentum.vect().theta() / 2));
+ 
+-        if (!finite(m_vertex_eta))
++        if (!std::isfinite(m_vertex_eta))
+             m_vertex_eta = 0;
+ 
+         m_pt = momentum.vect().perp();

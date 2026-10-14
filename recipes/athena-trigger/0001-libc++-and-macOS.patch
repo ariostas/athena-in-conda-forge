@@ -1,0 +1,29 @@
+--- a/Trigger/TrigConfiguration/TrigConfStorage/src/ReplicaSorter.cxx
++++ b/Trigger/TrigConfiguration/TrigConfStorage/src/ReplicaSorter.cxx
+@@ -11,6 +11,10 @@
+ #include <map>
+ #include <cstring>
+ #include <climits>
++#ifndef HOST_NAME_MAX // macOS
++#include <sys/param.h>
++#define HOST_NAME_MAX MAXHOSTNAMELEN
++#endif
+ #include <unistd.h>
+ #include "RelationalAccess/IDatabaseServiceDescription.h"
+ #include "ReplicaSorter.h"
+--- a/Trigger/TrigTools/TrigInDetTrackFitter/src/TrigInDetTrackFollowingTool.cxx
++++ b/Trigger/TrigTools/TrigInDetTrackFitter/src/TrigInDetTrackFollowingTool.cxx
+@@ -5,6 +5,13 @@
+ #include <cmath>
+ #include <iostream>
+ #include <memory>
++
++#ifdef __APPLE__
++namespace {
++// sincos() is a GNU extension; macOS has __sincos()
++inline void sincos(double x, double* s, double* c) { __sincos(x, s, c); }
++}
++#endif
+ #include "GaudiKernel/SystemOfUnits.h"
+ 
+ #include "TrkTrack/Track.h"

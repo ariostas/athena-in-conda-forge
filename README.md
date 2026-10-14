@@ -543,6 +543,22 @@ so that a work area can relink it with its own changes.
     declares it `uint64` (**upstreamable**).
   - Three unit tests' references depend on libstdc++ (`std::shuffle`'s order, the text of an
     exception): the layers skip them on macOS (`unit_tests_excluded_osx.txt`).
+  - The upper layers need more of the same (reco patch 0002, trigger and sim patches 0001):
+    `std::legendre` (libc++ has none of C++17's special mathematical functions), `finite()`,
+    `sincos()`, `HOST_NAME_MAX`, `<ext/functional>`, `shared_ptr::unique()`. Three that are
+    worth reporting to ATLAS: `DataVector::insert` from moved `unique_ptr`s does not compile
+    with libc++, which compares the input iterators with `==`, and CxxUtils'
+    `releasing_iterator` has only `!=` (**upstreamable**); MuonVertexValidation's source glob
+    `util/[!make]*.cxx` also leaves out `MSVtx*.cxx` where CMake globs without case (macOS,
+    Windows) (**upstreamable**); and CLHEP's GenericFunctions define `clone()` inline in their
+    `.cc` files, which macOS's linker does not export, so code that calls `clone()` on a
+    concrete function class (GeoXPEngine) does not link: reco's patch calls it through the base
+    class.
+  - LArRawConditions' dictionaries select 27 persistent classes of the LAr conditions only
+    through a pattern on libstdc++'s vector iterator (`__gnu_cxx::__normal_iterator<const X*,
+    std::vector<X> >`, whose `std::vector<X>` argument brings `X` in). libc++'s iterator has no
+    such argument, so reconstruction aborted reading the LAr conditions ("no dictionary for
+    class LArMinBiasAverageP"). edm patch 0002 selects them by name (**upstreamable**).
 - **ATLAS's scripts start with `#!/usr/bin/bash` or `#!/bin/env`** (233 in the sources), which
   neither macOS nor distributions without the merged `/usr` have: the layers rewrite them to
   `#!/usr/bin/env` before building.

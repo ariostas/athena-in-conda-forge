@@ -1,0 +1,302 @@
+--- a/Calorimeter/CaloRec/src/CaloTopoClusterMaker.cxx
++++ b/Calorimeter/CaloRec/src/CaloTopoClusterMaker.cxx
+@@ -423,7 +423,7 @@
+ 	  float signedE = pCell->energy();
+ 	  float signedEt = pCell->et();
+ 	  float signedRatio = epsilon; // not 0 in order to keep bad cells 
+-	  if ( finite(noiseSigma) && noiseSigma > 0 && !CaloBadCellHelper::isBad(pCell,m_treatL1PredictedCellsAsGood) ) 
++	  if ( std::isfinite(noiseSigma) && noiseSigma > 0 && !CaloBadCellHelper::isBad(pCell,m_treatL1PredictedCellsAsGood) ) 
+ 	    signedRatio = signedE/noiseSigma;
+ 
+ 	  bool passedCellCut = (m_cellCutsInAbsE?std::abs(signedRatio):signedRatio) > m_cellThresholdOnEorAbsEinSigma;
+--- a/ForwardDetectors/ForwardTracker/ForwardTracker/TransversePoint.h
++++ b/ForwardDetectors/ForwardTracker/ForwardTracker/TransversePoint.h
+@@ -7,6 +7,7 @@
+ 
+ #include <stdexcept>
+ #include <cmath>
++#include <ostream>
+ 
+ namespace ForwardTracker {
+ 
+--- a/ForwardDetectors/ForwardTracker/src/IParticle.cxx
++++ b/ForwardDetectors/ForwardTracker/src/IParticle.cxx
+@@ -4,6 +4,8 @@
+ 
+ #include "ForwardTracker/IParticle.h"
+ 
++#include <ostream>
++
+ namespace ForwardTracker {
+   
+   std::ostream& operator<<(std::ostream& os, const IParticle& p) { os << p.str(); return os; }
+--- a/LArCalorimeter/LArCalibTools/src/LArAverages2Ntuple.cxx
++++ b/LArCalorimeter/LArCalibTools/src/LArAverages2Ntuple.cxx
+@@ -116,8 +116,8 @@
+       trueMaxSample = m_Nsamples;
+     }
+   
+-    const std::vector<unsigned long>& sampleSum = (*it)->sampleSum();
+-    const std::vector<unsigned long>& sampleSum2 = (*it)->sample2Sum();
++    const std::vector<uint64_t>& sampleSum = (*it)->sampleSum();
++    const std::vector<uint64_t>& sampleSum2 = (*it)->sample2Sum();
+     const std::vector<float>& mean = (*it)->mean();
+     const std::vector<float>& RMSv = (*it)->RMS();
+  
+--- a/LArCalorimeter/LArCalibUtils/src/LArR4ElecCalibCalculator.cxx
++++ b/LArCalorimeter/LArCalibUtils/src/LArR4ElecCalibCalculator.cxx
+@@ -115,7 +115,7 @@
+ 
+   const auto& symIDs = larMCsymHdl->symIds();
+ 
+-  const int nUsableBits = int(pow(2, m_nADCBits) * 3 / 4.);
++  const int nUsableBits = int(pow(2, m_nADCBits.value()) * 3 / 4.);
+ 
+ 
+   //Calculate the R4 ramps (ADC2DAC) values, store them in run 1/2/3 style objects (LArRampMC)
+--- a/LArCalorimeter/LArG4/LArG4Validation/src/GeoXPEngine.cxx
++++ b/LArCalorimeter/LArG4/LArG4Validation/src/GeoXPEngine.cxx
+@@ -10,7 +10,13 @@
+ #include "CLHEP/Vector/LorentzVector.h"
+ #include "CLHEP/Units/PhysicalConstants.h"
+ 
++namespace {
++// clone() through the base class: GenericFunctions define their classes' clone() inline in
++// CLHEP's .cc files, and macOS's linker does not export such weak definitions from the library
++const Genfun::AbsFunction* cloneOf(const Genfun::AbsFunction& f) { return f.clone(); }
++}
+ 
++
+ GeoXPEngine::GeoXPEngine (const Genfun::AbsFunction & Bx,
+ 			  const Genfun::AbsFunction & By,
+ 			  const Genfun::AbsFunction & Bz,
+@@ -30,12 +36,12 @@
+ 
+ 
+   if (m<100*CLHEP::keV) { 
+-    m_x.reset ( (Genfun::FixedConstant(x0.x()) + (CLHEP::c_light*p0.x()/p0.vect().mag())*t).clone() );
+-    m_y.reset ( (Genfun::FixedConstant(x0.y()) + (CLHEP::c_light*p0.y()/p0.vect().mag())*t).clone() );
+-    m_z.reset ( (Genfun::FixedConstant(x0.z()) + (CLHEP::c_light*p0.z()/p0.vect().mag())*t).clone() );
+-    m_px.reset ( Genfun::FixedConstant(p0.x()).clone() );
+-    m_py.reset ( Genfun::FixedConstant(p0.y()).clone() );
+-    m_pz.reset ( Genfun::FixedConstant(p0.z()).clone() );
++    m_x.reset ( cloneOf((Genfun::FixedConstant(x0.x()) + (CLHEP::c_light*p0.x()/p0.vect().mag())*t)) );
++    m_y.reset ( cloneOf((Genfun::FixedConstant(x0.y()) + (CLHEP::c_light*p0.y()/p0.vect().mag())*t)) );
++    m_z.reset ( cloneOf((Genfun::FixedConstant(x0.z()) + (CLHEP::c_light*p0.z()/p0.vect().mag())*t)) );
++    m_px.reset ( cloneOf(Genfun::FixedConstant(p0.x())) );
++    m_py.reset ( cloneOf(Genfun::FixedConstant(p0.y())) );
++    m_pz.reset ( cloneOf(Genfun::FixedConstant(p0.z())) );
+     
+ 
+   }
+@@ -62,12 +68,12 @@
+     
+    
+ 
+-    m_px.reset ( (*rkIntegrator.getFunction(0))(CLHEP::c_light*t).clone() );
+-    m_py.reset ( (*rkIntegrator.getFunction(1))(CLHEP::c_light*t).clone() );
+-    m_pz.reset ( (*rkIntegrator.getFunction(2))(CLHEP::c_light*t).clone() );
+-    m_x.reset ( (*rkIntegrator.getFunction(3))(CLHEP::c_light*t).clone() );
+-    m_y.reset ( (*rkIntegrator.getFunction(4))(CLHEP::c_light*t).clone() );
+-    m_z.reset ( (*rkIntegrator.getFunction(5))(CLHEP::c_light*t).clone() );
++    m_px.reset ( cloneOf((*rkIntegrator.getFunction(0))(CLHEP::c_light*t)) );
++    m_py.reset ( cloneOf((*rkIntegrator.getFunction(1))(CLHEP::c_light*t)) );
++    m_pz.reset ( cloneOf((*rkIntegrator.getFunction(2))(CLHEP::c_light*t)) );
++    m_x.reset ( cloneOf((*rkIntegrator.getFunction(3))(CLHEP::c_light*t)) );
++    m_y.reset ( cloneOf((*rkIntegrator.getFunction(4))(CLHEP::c_light*t)) );
++    m_z.reset ( cloneOf((*rkIntegrator.getFunction(5))(CLHEP::c_light*t)) );
+   }
+ }
+ 
+--- a/LArCalorimeter/LArG4/LArG4Validation/src/SingleTrackValidation.cxx
++++ b/LArCalorimeter/LArG4/LArG4Validation/src/SingleTrackValidation.cxx
+@@ -298,7 +298,7 @@
+     // Put Eta and Phi into the Ntuple
+     m_c->phi = theParticle->momentum().phi();
+     m_c->eta = -log(tan(theParticle->momentum().theta()/2));
+-    if (!finite(m_c->eta)) m_c->eta=0;
++    if (!std::isfinite(m_c->eta)) m_c->eta=0;
+     m_c->pt  = theParticle->momentum().perp();
+     int partID = theParticle->pdg_id();
+     double pID = double(partID);
+@@ -306,7 +306,7 @@
+     m_c->Energy = theParticle->momentum().e();
+     m_histos[2]->Fill( theParticle->momentum().phi() );
+     double myEta = -log(tan(theParticle->momentum().theta()/2));
+-    if (!finite(myEta)) m_histos[0]->Fill(0);
++    if (!std::isfinite(myEta)) m_histos[0]->Fill(0);
+     else m_histos[0]->Fill( myEta );
+     m_histos[158]->Fill( pID );
+     m_histos[1]->Fill( theParticle->momentum().perp()/Units::GeV );
+--- a/MuonSpectrometer/MuonCalib/MdtCalib/MdtCalibFitters/src/CurvedLine.cxx
++++ b/MuonSpectrometer/MuonCalib/MdtCalib/MdtCalibFitters/src/CurvedLine.cxx
+@@ -9,6 +9,18 @@
+ #include "MuonCalibMath/BaseFunctionFitter.h"
+ #include "MuonCalibMath/LegendrePolynomial.h"
+ 
++namespace {
++/// The Legendre polynomial P_n(x): std::legendre, or MuonCalibMath's where the standard library
++/// has no special mathematical functions (libc++)
++double legendreP(unsigned int n, double x) {
++#ifdef _LIBCPP_VERSION
++  return MuonCalib::LegendrePolynomial{}.value(n, x);
++#else
++  return std::legendre(n, x);
++#endif
++}
++}
++
+ using namespace MuonCalib;
+ 
+ //*****************************************************************************
+@@ -89,11 +101,11 @@
+     ///////////////////////////////
+ 
+     for (int k = 0; k < m_coeff_xz.rows(); k++) { 
+-        loc_x += m_coeff_xz[k] * std::legendre(k, loc_z); 
++        loc_x += m_coeff_xz[k] * legendreP(k, loc_z); 
+     }
+ 
+     for (int k = 0; k < m_coeff_yz.rows(); k++) { 
+-        loc_y += m_coeff_yz[k] * std::legendre(k, loc_z); 
++        loc_y += m_coeff_yz[k] * legendreP(k, loc_z); 
+     }
+ 
+     ////////////////////////////////
+--- a/MuonSpectrometer/MuonCalib/MdtCalib/MdtCalibRt/src/RtCalibrationCurved.cxx
++++ b/MuonSpectrometer/MuonCalib/MdtCalib/MdtCalibRt/src/RtCalibrationCurved.cxx
+@@ -28,6 +28,18 @@
+ #include "TF1.h"
+ #include "TProfile.h"
+ #include "sstream"
++
++namespace {
++/// The Legendre polynomial P_n(x): std::legendre, or MuonCalibMath's where the standard library
++/// has no special mathematical functions (libc++)
++double legendreP(unsigned int n, double x) {
++#ifdef _LIBCPP_VERSION
++  return MuonCalib::LegendrePolynomial{}.value(n, x);
++#else
++  return std::legendre(n, x);
++#endif
++}
++}
+ 
+ using namespace MuonCalib;
+ 
+@@ -399,7 +411,7 @@
+         for (int p = 0; p < F[h].num_row(); p++) {
+             double x = std::sqrt(1.0 + std::pow(track.getTangent((track.trackHits()[h]->localPosition()).z()).a_x2(), 2));
+             if (x) {
+-                (F[h])[p] = std::legendre(p, (track.trackHits()[h]->localPosition()).z()) / x;
++                (F[h])[p] = legendreP(p, (track.trackHits()[h]->localPosition()).z()) / x;
+             } else {
+                 (F[h])[p] = 0.;
+             }
+--- a/MuonSpectrometer/MuonDigitization/sTGC_Digitization/src/sTgcDigitizationTool.cxx
++++ b/MuonSpectrometer/MuonDigitization/sTGC_Digitization/src/sTgcDigitizationTool.cxx
+@@ -511,8 +511,14 @@
+      const Identifier elemID = m_idHelperSvc->chamberId(digits[0]->identify());
+      const IdentifierHash modHash = m_idHelperSvc->moduleHash(elemID);
+      std::unique_ptr<sTgcDigitCollection> collection = std::make_unique<sTgcDigitCollection>(elemID, modHash);
++#ifdef _LIBCPP_VERSION
++     // libc++'s vector::insert compares input iterators with ==, which DataVector's
++     // releasing_iterator (CxxUtils) does not have
++     for (auto& p : digits) collection->push_back(std::move(p));
++#else
+      collection->insert(collection->end(), std::make_move_iterator(digits.begin()),
+                                            std::make_move_iterator(digits.end()));
++#endif
+      ATH_CHECK(digitContainer->addCollection(collection.release(), modHash));
+   }
+   return StatusCode::SUCCESS;
+--- a/MuonSpectrometer/MuonPhaseII/MuonPatternRecognition/MuonPatternRecognitionAlgs/src/SegmentFittingAlg.cxx
++++ b/MuonSpectrometer/MuonPhaseII/MuonPatternRecognition/MuonPatternRecognitionAlgs/src/SegmentFittingAlg.cxx
+@@ -143,9 +143,15 @@
+                                                   std::make_move_iterator(segments.end()));
+         }
+         resolveAmbiguities(*gctx, allSegments);
++#ifdef _LIBCPP_VERSION
++        // libc++'s vector::insert compares input iterators with ==, which DataVector's
++        // releasing_iterator (CxxUtils) does not have
++        for (auto& p : allSegments) writeSegments->push_back(std::move(p));
++#else
+         writeSegments->insert(writeSegments->end(),
+                                   std::make_move_iterator(allSegments.begin()),
+                                   std::make_move_iterator(allSegments.end()));
++#endif
+         ATH_MSG_VERBOSE("Found in total "<<writeSegments->size()<<" segments. ");
+         return StatusCode::SUCCESS; 
+     }
+--- a/MuonSpectrometer/MuonPhaseII/MuonValidation/MuonVisualizationHelpersR4/src/RootVisualizationService.cxx
++++ b/MuonSpectrometer/MuonPhaseII/MuonValidation/MuonVisualizationHelpersR4/src/RootVisualizationService.cxx
+@@ -120,7 +120,7 @@
+         std::size_t currEvt{toDraw.back()->event()}, plotCount{0};
+         for (const PlotPtr_t& drawMe : toDraw) {
+             /// The client still holds the pointer to the plot
+-            while (!drawMe.unique()) {
++            while (drawMe.use_count() != 1) {
+                 using namespace std::chrono_literals;
+                 ATH_MSG_DEBUG("Wait until "<<drawMe->name()<<" is finished.");
+                 std::this_thread::sleep_for(10ms);
+--- a/MuonSpectrometer/MuonReconstruction/MuonRecTools/MuonAmbiTrackSelectionTool/src/MuonAmbiTrackSelectionTool.cxx
++++ b/MuonSpectrometer/MuonReconstruction/MuonRecTools/MuonAmbiTrackSelectionTool/src/MuonAmbiTrackSelectionTool.cxx
+@@ -6,7 +6,6 @@
+ 
+ #include <cstdio>
+ 
+-#include <ext/functional>
+ #include <iostream>
+ 
+ #include "AthContainers/DataVector.h"
+--- a/MuonSpectrometer/MuonReconstruction/MuonSegmentCombiners/MuonSegmentCombinerTools/MooSegmentCombinationFinder/src/MuonSegmentFinderAlg.cxx
++++ b/MuonSpectrometer/MuonReconstruction/MuonSegmentCombiners/MuonSegmentCombinerTools/MooSegmentCombinationFinder/src/MuonSegmentFinderAlg.cxx
+@@ -68,14 +68,25 @@
+         createNSWSegments(ctx, patt, nswCache);
+         
+         /// Move the segments into the output
++#ifdef _LIBCPP_VERSION
++        // libc++'s vector::insert compares input iterators with ==, which DataVector's
++        // releasing_iterator (CxxUtils) does not have
++        for (auto& p : nswCache.constructedSegs) segmentContainer->push_back(std::move(p));
++#else
+         segmentContainer->insert(segmentContainer->end(), std::make_move_iterator(nswCache.constructedSegs.begin()),
+                                                           std::make_move_iterator(nswCache.constructedSegs.end()));
++#endif
+         
+         nswCache.constructedSegs.clear();
+ 
+         if (!nswSegmentContainer) continue;
++#ifdef _LIBCPP_VERSION
++        // see above
++        for (auto& p : nswCache.quadSegs) nswSegmentContainer->push_back(std::move(p));
++#else
+         nswSegmentContainer->insert(nswSegmentContainer->end(), std::make_move_iterator(nswCache.quadSegs.begin()),
+                                                                 std::make_move_iterator(nswCache.quadSegs.end()));
++#endif
+         nswCache.quadSegs.clear();
+                
+     }  // end loop on pattern combinations
+--- a/MuonSpectrometer/MuonReconstruction/MuonSegmentMakers/MuonSegmentMakerAlgs/CscSegmentMakers/src/CscSegmentUtilTool.cxx
++++ b/MuonSpectrometer/MuonReconstruction/MuonSegmentMakers/MuonSegmentMakerAlgs/CscSegmentMakers/src/CscSegmentUtilTool.cxx
+@@ -880,7 +880,7 @@
+     ATH_MSG_VERBOSE("seg.s1 : ameas " << seg.s1 << " " << ameas);
+     ATH_MSG_VERBOSE("  Direction: " << pdir.angleXZ() << " " << pdir.angleYZ());
+     ATH_MSG_VERBOSE("  d.x : d.z : tantheta " << d.x() << " " << d.z() << " " << tantheta);
+-    ATH_MSG_VERBOSE(resetiosflags(std::ios_base::floatfield));
++    ATH_MSG_VERBOSE(std::resetiosflags(std::ios_base::floatfield));
+ 
+     MuonSegment* pseg = pseg_ref->clone();
+     ATH_MSG_DEBUG("  build_segment::  right after copying *  " << pseg->time());
+--- a/MuonSpectrometer/MuonValidation/MuonVertexValidation/CMakeLists.txt
++++ b/MuonSpectrometer/MuonValidation/MuonVertexValidation/CMakeLists.txt
+@@ -19,7 +19,8 @@
+                                      xAODEventInfo xAODTruth xAODTracking xAODMuon xAODJet xAODMissingET)
+ 
+ # Declare the validation macros as a library, excluding the cxx files that will be compiled to executables 
+-atlas_add_library( MuonVertexValidationLibMacro util/[!make]*.cxx
++atlas_add_library( MuonVertexValidationLibMacro util/MSVtxPlotComparison.cxx util/MSVtxPlotMaker.cxx
++                   util/PlotAnnotations.cxx util/Utils.cxx
+                    NO_PUBLIC_HEADERS
+                    INCLUDE_DIRS ${ROOT_INCLUDE_DIRS}
+                    LINK_LIBRARIES ${ROOT_LIBRARIES} 

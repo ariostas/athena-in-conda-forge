@@ -1428,6 +1428,32 @@ took:
 - Rebuilt with the fix (CPU_COUNT=2): analysis passes again (77 unit tests, 6642 s), and
   reco-tracking passes with the full output: 419,547 lines, all 9 collections' sizes as in
   ATLAS's release (6057 s).
+- reco on macOS: 16 files did not compile or link (reco patch 0002, README lists them). Found
+  in one pass with `ninja -k 0` in the failed tree (`_work/osx-work/k0.sh`), fixed there until
+  the whole layer built. A scan of trigger, sim and rest for the patterns already fixed below
+  (`sincos`, `HOST_NAME_MAX`, `finite`, special functions, `ulong`, `<ext/...>`) gave their
+  patches (trigger 0001, sim 0001) before they are built. Notable:
+  - CMake's `file(GLOB)` ignores case on macOS: `util/[!make]*.cxx` (MuonVertexValidation)
+    left out `MSVtxPlotMaker.cxx`, and the executables did not link.
+  - CLHEP is built without `-fvisibility-inlines-hidden` so that GenericFunctions' inline
+    `clone()`s are exported, but on macOS ld64 hides them anyway: clang marks inline functions
+    `weak_def_can_be_hidden`, and the linker makes them private. A call through the base class
+    (virtual) needs no symbol; GeoXPEngine's direct calls on temporaries did.
+  - `DataVector::insert(pos, move_iterator, move_iterator)` wraps the iterators in
+    `CxxUtils::releasing_iterator`, which has `!=` but not `==`; libc++'s `vector::insert`
+    for input iterators uses `==`. Fixed at the four call sites (under `_LIBCPP_VERSION`) rather
+    than in CxxUtils, which is athena-core and would mean rebuilding every layer.
+- reco's Reco_tf test then aborted on macOS after 10 minutes: "no dictionary for class
+  LArMinBiasAverageP" while reading the LAr conditions. LArRawConditions' selection files
+  (edm layer) leave 27 classes commented out, "picked up through iterator pattern below":
+  `<class pattern="__gnu_cxx::__normal_iterator<const X*"/>`. With libstdc++ the iterator's
+  second template argument, `std::vector<X>`, makes genreflex add `X`; libc++'s
+  `std::__wrap_iter<const X*>` has only the pointer (checked with genreflex on a toy header:
+  a `__wrap_iter` pattern selects the iterator and not `X`). edm patch 0002 selects the 27
+  classes by name. Only a dictionary library changes, which no other layer's build uses, so
+  locally edm is rebuilt and edm-det, analysis and reco-tracking are not.
+- Builds with all 10 cores overnight: memory is logged every 30 s (`_work/osx-work/memlog.sh`,
+  `logs/mem.log`); the recipe builds use 8 jobs (reco's compiles take up to 3 GB each).
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's

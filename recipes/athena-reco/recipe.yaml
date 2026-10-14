@@ -12,6 +12,15 @@ source:
     # CaloRecGPU's configuration flags without CUDA too: the trigger's calorimeter
     # configuration reads them whether or not the GPU clustering is used
     - 0001-CaloRecGPU-python-configuration-without-CUDA.patch
+    # libc++ and macOS: std::legendre (libc++ has no special mathematical functions),
+    # finite(), missing includes, libstdc++'s <ext/functional>, shared_ptr::unique() (removed in
+    # C++20), uint64_t (unsigned long long on macOS), an ambiguous pow(), DataVector::insert from
+    # moved unique_ptrs (libc++ compares the input iterators with ==, which CxxUtils'
+    # releasing_iterator does not have), MuonVertexValidation's source glob (CMake globs without
+    # case on macOS: [!make] also left out MSVtx*), and GeoXPEngine's clone() calls through the
+    # base class (macOS's linker does not export the clone() that CLHEP's GenericFunctions define
+    # inline in its .cc files)
+    - 0002-libc++-and-macOS.patch
 
 build:
   number: 0
