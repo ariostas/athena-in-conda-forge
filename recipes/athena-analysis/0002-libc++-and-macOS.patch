@@ -287,3 +287,60 @@
  
  int TSU::toTopoInteger(float value, unsigned int resolution) {
      float tmp = value*resolution;
+--- a/InnerDetector/InDetRecEvent/SiSPSeededTrackFinderData/SiSPSeededTrackFinderData/SiSpacePointsSeedMakerEventData.h
++++ b/InnerDetector/InDetRecEvent/SiSPSeededTrackFinderData/SiSPSeededTrackFinderData/SiSpacePointsSeedMakerEventData.h
+@@ -192,34 +192,47 @@
+      * dtor and the ctor will have a block reserved.
+      *
+      * See clearPoolList
++     *
++     * Not with libc++, whose std::list allocates each node through a temporary
++     * copy of its allocator: copies of ArenaPoolSTLAllocator do not share its
++     * pool, so the node's memory went away with the copy, and the next node
++     * reused it (every seed space point was one of a few objects).
+      */
++#ifdef _LIBCPP_VERSION
++    template <typename T>
++    using PoolAllocator = std::allocator<T>;
++#else
++    template <typename T>
++    using PoolAllocator = SG::ArenaPoolSTLAllocator<T>;
++#endif
++
+     using SiSpacePointForSeedPoolList =
+         std::list<InDet::SiSpacePointForSeed,
+-                  SG::ArenaPoolSTLAllocator<InDet::SiSpacePointForSeed>>;
++                  PoolAllocator<InDet::SiSpacePointForSeed>>;
+ 
+     using ITkSiSpacePointForSeedPoolList =
+         std::list<ITk::SiSpacePointForSeed,
+-                  SG::ArenaPoolSTLAllocator<ITk::SiSpacePointForSeed>>;
++                  PoolAllocator<ITk::SiSpacePointForSeed>>;
+ 
+     using SiSpacePointsSeedPoolList =
+         std::list<InDet::SiSpacePointsSeed,
+-                  SG::ArenaPoolSTLAllocator<InDet::SiSpacePointsSeed>>;
++                  PoolAllocator<InDet::SiSpacePointsSeed>>;
+ 
+     using SiSpacePointsProSeedPoolList =
+         std::list<InDet::SiSpacePointsProSeed,
+-                  SG::ArenaPoolSTLAllocator<InDet::SiSpacePointsProSeed>>;
++                  PoolAllocator<InDet::SiSpacePointsProSeed>>;
+ 
+     using ITkSiSpacePointsProSeedPoolList =
+         std::list<ITk::SiSpacePointsProSeed,
+-                  SG::ArenaPoolSTLAllocator<ITk::SiSpacePointsProSeed>>;
++                  PoolAllocator<ITk::SiSpacePointsProSeed>>;
+ 
+     // special treatment for cleaning
+     // given PoolStl allocator
+     template <typename T>
+-    static void clearPoolList(std::list<T, SG::ArenaPoolSTLAllocator<T>>& poolList){
++    static void clearPoolList(std::list<T, PoolAllocator<T>>& poolList){
+       // Can't just use clear() because we want to erase the
+       // pool as well.
+-      poolList = std::list<T, SG::ArenaPoolSTLAllocator<T>>();
++      poolList = std::list<T, PoolAllocator<T>>();
+     }
+ 
+     /**

@@ -1401,6 +1401,30 @@ took:
   them (a quantity sensitive to the code path, not a problem of this build). The linux-64
   sha256 file lists this build's sums too, and `run_derivation.sh` accepts any sum listed for
   a dump, as reco's test does.
+- athena-reco-tracking's recipe test passed on macOS, but its dump was 2% shorter than Linux's:
+  the tracking had found 9 tracks where Linux finds 75, and no primary vertex. The test compares
+  dumps only where ATLAS has a release, so nothing was checked there. Cause: the silicon seed
+  maker (`SiSpacePointsSeedMaker_ATLxk`) got all 2627 space points, as on Linux, and made 0
+  seeds (231 on Linux), because its radius-sorted lists held only 4 distinct space points, each
+  about 390 times. The pool of `SiSpacePointForSeed`s is a `std::list` with ATLAS's
+  `SG::ArenaPoolSTLAllocator`, and libc++'s `std::list` allocates each node through a temporary
+  copy of the allocator (`__allocation_guard`), whose own pool (copies do not share it, by
+  design) is freed with the copy: every node reused the same memory. Analysis patch 0002 makes
+  these lists use `std::allocator` under libc++ (`SiSpacePointsSeedMakerEventData.h`; Linux's
+  code is unchanged). It is the only `std::list` with that allocator in Athena. With it, a kept
+  tree's three libraries that use the header, swapped into a test environment, reconstruct
+  what Linux does: 894 seeds and 166 tracks, the dump's size and collections identical, 22
+  lines of 419,547 differing in one track's TRT hits. The macOS stack is rebuilt from analysis
+  (reco-tracking and trigger use the header). Found by bisecting with counters in the seed
+  maker, rebuilt in the kept tree (`ninja` on one library), with the installed library's rpaths
+  (`install_name_tool`), and swapped in by replacing the file (overwriting a signed library in
+  place gets the process killed).
+- So that such failures do not pass silently: the dump tests (edm-det, reco-tracking, reco,
+  rest) also compare each collection's size (its lines in the dump, over all events) with
+  ATLAS's release, within 5% (`dump_counts.py`, `<name>_dump_sizes.txt` from ATLAS's x86_64
+  release; its aarch64 release has the same sizes), on every platform. The broken macOS
+  tracking dump fails it (track particles 924 lines instead of 9828, no forward or large-d0
+  tracks, half the vertex lines).
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's

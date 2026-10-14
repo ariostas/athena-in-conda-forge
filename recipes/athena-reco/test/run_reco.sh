@@ -55,6 +55,12 @@ for type in ESD AOD; do
   fi
   echo "${type}: $(wc -l < "dump_${type}.txt") lines dumped"
 done
+# Every collection must have about the size it has in ATLAS's release (reco_dump_sizes.txt), on
+# every platform: this catches a job that runs but reconstructs much less where the dumps
+# cannot be compared exactly (macOS).
+if ! python "${here}/dump_counts.py" "${here}/reco_dump_sizes.txt" dump_ESD.txt dump_AOD.txt; then
+  exit 1
+fi
 # The references are per platform: ATLAS's release itself writes different floating point
 # numbers on x86_64 and aarch64. ATLAS has no release for macOS to compare with.
 case "$(uname -s)-$(uname -m)" in
@@ -63,7 +69,7 @@ case "$(uname -s)-$(uname -m)" in
   *)             platform=$(uname -s)-$(uname -m) ;;
 esac
 if [ ! -f "${here}/reco_dumps.${platform}.sha256" ]; then
-  echo "no references for ${platform}: the dumps are not compared"
+  echo "no references for ${platform}: the dumps are compared only in size"
   exit 0
 fi
 # Each dump must have one of the sums listed for it: ATLAS's, and on linux-64 also this

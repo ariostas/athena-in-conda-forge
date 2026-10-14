@@ -549,11 +549,21 @@ so that a work area can relink it with its own changes.
 - **SelectionHelpers' expression lexer reads a destroyed object** after it is moved (its tokenizer
   keeps iterators into the moved-from string). It works by chance with libstdc++ and not with
   libc++, whose strings keep more characters inline: analysis patch 0003 (**upstreamable**).
+- **The silicon seed finders found no seeds on macOS.** Their space points and seeds are in
+  `std::list`s with ATLAS's `ArenaPoolSTLAllocator`, whose copies do not share its pool (by
+  design), while libc++'s `std::list` allocates each node through a temporary copy of its
+  allocator: the node was freed with the copy, and the next one reused its memory. The job ran
+  without errors and found almost no tracks. Analysis patch 0002 uses `std::allocator` for these
+  lists under libc++ (**upstreamable**; the allocator does not meet the standard's requirement
+  that copies can free each other's memory). It is the only `std::list` with that allocator in
+  Athena; its maps, sets and hash tables are not affected (libc++ allocates their nodes through
+  the container's own allocator).
 - **The tests' references are per platform**: ATLAS's own release writes different floating point
   numbers on x86_64 and aarch64 (dumps of ESD, AOD, derivations, tracking, CP n-tuples; the
   DAOD reading and trigger counts agree). The linux-64 references come from ATLAS's x86_64
   release, run under Rosetta here. There is no ATLAS release for macOS: there the dumps are
-  written but not compared. On linux-64 the reco and rest dumps of these builds differ from
+  compared only in size, every collection within 5% of its size in ATLAS's release
+  (`dump_counts.py`, on every platform). On linux-64 the reco and rest dumps of these builds differ from
   ATLAS's x86_64 release in a few numbers (by one unit in the last printed digit, and the
   derivations in 7 electrons' `UEcorr_Pt`, where they have the values of ATLAS's aarch64
   release): their sums are listed with ATLAS's.

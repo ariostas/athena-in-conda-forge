@@ -15,8 +15,10 @@ source:
       # libc++ and macOS: missing includes, glibc's ulong and HOST_NAME_MAX, sincos(),
       # quick_exit(), libstdc++fs, Boost's flat_set where the C++ library has no
       # <flat_set> (libc++ 20), and the CP algorithms' eventNumber branch as uint64 (the type
-      # of EventInfo's, which is unsigned long only on Linux), and TrackQualityCuts' maps with
-      # const keys, which libc++ cannot assign element by element
+      # of EventInfo's, which is unsigned long only on Linux), TrackQualityCuts' maps with
+      # const keys, which libc++ cannot assign element by element, and the seed finders' lists
+      # with std::allocator under libc++, which allocates list nodes through a copy of the
+      # allocator (copies of ATLAS's pool allocator do not share the pool: no seeds were found)
       - 0002-libc++-and-macOS.patch
       # SelectionHelpers' expression lexer is moved with iterators into its string, which
       # then point into the moved-from object: the string is kept on the heap (seen with

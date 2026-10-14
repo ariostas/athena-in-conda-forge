@@ -50,6 +50,12 @@ cd tracking
 run log_reco "${here}/track_reco.py" "${RDO}" tracking.pool.root 10
 run log_dump "${here}/pool_rw.py" tracking.pool.root dump.txt
 echo "tracking: $(wc -l < dump.txt) lines dumped"
+# Every collection must have about the size it has in ATLAS's release (tracking_dump_sizes.txt), on
+# every platform: this catches a job that runs but reconstructs much less where the dumps
+# cannot be compared exactly (macOS).
+if ! python "${here}/dump_counts.py" "${here}/tracking_dump_sizes.txt" dump.txt; then
+  exit 1
+fi
 # The references are per platform: ATLAS's release itself writes different floating point
 # numbers on x86_64 and aarch64. ATLAS has no release for macOS to compare with.
 case "$(uname -s)-$(uname -m)" in
@@ -58,7 +64,7 @@ case "$(uname -s)-$(uname -m)" in
   *)             platform=$(uname -s)-$(uname -m) ;;
 esac
 if [ ! -f "${here}/tracking_dumps.${platform}.sha256" ]; then
-  echo "no references for ${platform}: the dumps are not compared"
+  echo "no references for ${platform}: the dumps are compared only in size"
   exit 0
 fi
 sha256sum -c "${here}/tracking_dumps.${platform}.sha256"

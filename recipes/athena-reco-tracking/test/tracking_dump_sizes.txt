@@ -1,0 +1,9 @@
+dump.txt [DataVector<xAOD::TrackParticle_v1>/InDetDisappearingTrackParticles] 0
+dump.txt [DataVector<xAOD::TrackParticle_v1>/InDetForwardTrackParticles] 84
+dump.txt [DataVector<xAOD::TrackParticle_v1>/InDetLargeD0TrackParticles] 420
+dump.txt [DataVector<xAOD::TrackParticle_v1>/InDetTrackParticles] 9828
+dump.txt [DataVector<xAOD::TruthEvent_v1>/TruthEvents] 180
+dump.txt [DataVector<xAOD::TruthParticle_v1>/TruthParticles] 282022
+dump.txt [DataVector<xAOD::TruthVertex_v1>/TruthVertices] 93834
+dump.txt [DataVector<xAOD::Vertex_v1>/PrimaryVertices] 256
+dump.txt [EventInfo_v1/EventInfo] 460

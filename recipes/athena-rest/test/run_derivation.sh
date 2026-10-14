@@ -46,6 +46,12 @@ for format in PHYS PHYSLITE; do
   fi
   echo "DAOD_${format}: $(wc -l < "dump_${format}.txt") lines dumped"
 done
+# Every collection must have about the size it has in ATLAS's release (derivation_dump_sizes.txt), on
+# every platform: this catches a job that runs but reconstructs much less where the dumps
+# cannot be compared exactly (macOS).
+if ! python "${here}/dump_counts.py" "${here}/derivation_dump_sizes.txt" dump_PHYS.txt dump_PHYSLITE.txt; then
+  exit 1
+fi
 # The references are per platform: ATLAS's release itself writes different floating point
 # numbers on x86_64 and aarch64. ATLAS has no release for macOS to compare with.
 case "$(uname -s)-$(uname -m)" in
@@ -54,7 +60,7 @@ case "$(uname -s)-$(uname -m)" in
   *)             platform=$(uname -s)-$(uname -m) ;;
 esac
 if [ ! -f "${here}/derivation_dumps.${platform}.sha256" ]; then
-  echo "no references for ${platform}: the dumps are not compared"
+  echo "no references for ${platform}: the dumps are compared only in size"
   exit 0
 fi
 # Each dump must have one of the sums listed for it: ATLAS's, and on linux-64 also this
