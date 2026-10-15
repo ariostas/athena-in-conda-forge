@@ -19,8 +19,8 @@ CMSSW.
 > **Status: proof of concept.** All of Athena but 30 packages builds in ten layers that pass their
 > tests on linux-aarch64, from the framework to simulation and derivations, with an `athena`
 > metapackage and a developer workflow. On linux-64 (M8) every external and all ten layers pass
-> too; on osx-arm64 (M8, in progress) every external and the layers up to reco-tracking do:
-> `athena.py` runs on a Mac. Nothing has been submitted to conda-forge yet.
+> too; on osx-arm64 (M8, in progress) every external and the layers up to reco do: `athena.py`
+> and `Reco_tf.py` run on a Mac. Nothing has been submitted to conda-forge yet.
 
 The reference release is Athena [`release/25.0.73`](https://gitlab.cern.ch/atlas/athena/-/tree/release/25.0.73).
 
@@ -95,7 +95,7 @@ The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
 | `athena-edm-det` (detector event data: HITS/RDO/ESD I/O) | [recipes/athena-edm-det](recipes/athena-edm-det) | ✅ | ✅ | ✅ |
 | `athena-analysis` (CP tools and algorithms, trigger decision tool) | [recipes/athena-analysis](recipes/athena-analysis) | ✅ | ✅ | ✅ |
 | `athena-reco-tracking` (inner detector and ITk tracking, vertexing) | [recipes/athena-reco-tracking](recipes/athena-reco-tracking) | ✅ | ✅ | ✅ |
-| `athena-reco` (full reconstruction, `Reco_tf.py`, digitization) | [recipes/athena-reco](recipes/athena-reco) | ✅ | ✅ | · |
+| `athena-reco` (full reconstruction, `Reco_tf.py`, digitization) | [recipes/athena-reco](recipes/athena-reco) | ✅ | ✅ | ✅ |
 | `athena-trigger` (L1 simulation, High-Level Trigger) | [recipes/athena-trigger](recipes/athena-trigger) | ✅ | ✅ | · |
 | `athena-sim` (Geant4 simulation, ISF, generator interfaces, `Sim_tf.py`) | [recipes/athena-sim](recipes/athena-sim) | ✅ | ✅ | · |
 | `athena-rest` (the project `Athena`: derivations, data quality, event display, the rest) | [recipes/athena-rest](recipes/athena-rest) | ✅ | ✅ | · |

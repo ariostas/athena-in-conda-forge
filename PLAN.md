@@ -1461,6 +1461,8 @@ took:
   returns null where glibc's does not. reco-tracking patch 0001 rounds the size up; the
   other `aligned_alloc` calls in Athena already do. After the crash, the job hung in
   CoreDumpSvc for the hour of TimeoutAlg's event timeout before it exited.
+- reco passes on macOS (4421 s with reco-tracking's fix): Reco_tf's ESD and AOD dumps (1.7M
+  and 406k lines) have the sizes of ATLAS's release in all 175 and 97 collections.
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's
