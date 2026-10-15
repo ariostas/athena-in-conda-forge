@@ -1487,6 +1487,8 @@ took:
   AtlasCMake copy of the layer below, so the whole stack is rebuilt (detdescr included: a
   rebuild that skipped it carried its old copy into every layer above). With it the program
   links `libL1TopoAlgorithms` and the module has 706 lines.
+- trigger then passed on macOS: the HLT with the Dev menu counts 111 chains, as ATLAS's release
+  does (build and tests 69 min with 5 threads; reco 94 min).
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's
