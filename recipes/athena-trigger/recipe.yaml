@@ -9,7 +9,10 @@ source:
   url: https://gitlab.cern.ch/atlas/athena/-/archive/release/${{ version }}/athena-release-${{ version }}.tar.gz
   sha256: e2df75b2fd966f97973e9ed89984222e4070be0d60ace0a4f3975e80e9ec1eba
   patches:
-    # libc++ and macOS: glibc's sincos() and HOST_NAME_MAX
+    # libc++ and macOS: glibc's sincos(), HOST_NAME_MAX, <ieee754.h>, uint and
+    # std::experimental::filesystem; includes that libstdc++ brings in implicitly; calls that
+    # rely on uint64_t being unsigned long or on ADL for setiosflags; assigning a map whose
+    # mapped type has a const member; no libstdc++fs or librt for TrigGpuTest
     - 0001-libc++-and-macOS.patch
 
 build:

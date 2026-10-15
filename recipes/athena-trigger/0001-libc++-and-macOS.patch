@@ -1,3 +1,66 @@
+--- a/Trigger/EFTracking/FPGATrackSim/FPGATrackSimBanks/src/FPGATrackSimFitConstantBank.cxx
++++ b/Trigger/EFTracking/FPGATrackSim/FPGATrackSimBanks/src/FPGATrackSimFitConstantBank.cxx
+@@ -15,7 +15,6 @@
+ #include <cstdio>
+ #include <cmath>
+ #include <bitset>
+-#include <ieee754.h>
+ 
+ #include <sstream>
+ 
+--- a/Trigger/TrigAccel/TrigGpuTest/CMakeLists.txt
++++ b/Trigger/TrigAccel/TrigGpuTest/CMakeLists.txt
+@@ -4,7 +4,10 @@
+ 
+ # Copyright (C) 2002-2026 CERN for the benefit of the ATLAS collaboration
+ 
+-link_libraries(stdc++fs)
++# libstdc++'s filesystem library and librt are Linux-only (macOS: libc++, no librt)
++if( NOT APPLE )
++   link_libraries(stdc++fs)
++endif()
+ 
+ # Set the name of the package.
+ atlas_subdir( TrigGpuTest )
+@@ -19,7 +22,7 @@
+ atlas_add_executable( trigGpuTest
+    src/*.cxx
+    INCLUDE_DIRS ${TBB_INCLUDE_DIRS}
+-   LINK_LIBRARIES TrigAccelEvent ${TBB_LIBRARIES} rt dl)
++   LINK_LIBRARIES TrigAccelEvent ${TBB_LIBRARIES} $<$<NOT:$<PLATFORM_ID:Darwin>>:rt> dl)
+ 
+ # Unit tests:
+ atlas_add_test( TrigValSteeringUT
+--- a/Trigger/TrigAccel/TrigGpuTest/src/trigGpuTest.cxx
++++ b/Trigger/TrigAccel/TrigGpuTest/src/trigGpuTest.cxx
+@@ -5,7 +5,7 @@
+ 
+ #include <dlfcn.h>
+ 
+-#include <experimental/filesystem>
++#include <filesystem>
+ #include "tbb/tick_count.h"
+ 
+ #include "TrigAccelEvent/WorkFactory.h"
+@@ -84,7 +84,7 @@
+   std::string data_path(argv[2]);
+   std::vector<std::string> event_files;
+ 
+-  for(const auto& entry : std::experimental::filesystem::directory_iterator(data_path)) {
++  for(const auto& entry : std::filesystem::directory_iterator(data_path)) {
+     event_files.push_back(entry.path());
+   }
+ 
+--- a/Trigger/TrigConfiguration/TrigConfStorage/src/JobOptionTableLoader.cxx
++++ b/Trigger/TrigConfiguration/TrigConfStorage/src/JobOptionTableLoader.cxx
+@@ -18,6 +18,7 @@
+ #include "RelationalAccess/ICursor.h"
+ #include "RelationalAccess/IQuery.h"
+ 
++#include <map>
+ #include <regex>
+ 
+ #include <set>
 --- a/Trigger/TrigConfiguration/TrigConfStorage/src/ReplicaSorter.cxx
 +++ b/Trigger/TrigConfiguration/TrigConfStorage/src/ReplicaSorter.cxx
 @@ -11,6 +11,10 @@
@@ -11,6 +74,122 @@
  #include <unistd.h>
  #include "RelationalAccess/IDatabaseServiceDescription.h"
  #include "ReplicaSorter.h"
+--- a/Trigger/TrigConfiguration/TrigConfStorage/src/TrigConfCoolHLTPayloadConverters.cxx
++++ b/Trigger/TrigConfiguration/TrigConfStorage/src/TrigConfCoolHLTPayloadConverters.cxx
+@@ -80,7 +80,7 @@
+ }
+ 
+ Record
+-TrigConfCoolHLTPayloadConverters::createMonConfigKeyPayload(cool::IFolderPtr fld, uint mck, string& info ) {
++TrigConfCoolHLTPayloadConverters::createMonConfigKeyPayload(cool::IFolderPtr fld, unsigned int mck, string& info ) {
+     Record payload(fld->payloadSpecification());
+  	payload["MonConfigKey"].setValue<cool::UInt32>(mck);
+     payload["Info"].setValue<cool::String4k>(info);
+--- a/Trigger/TrigConfiguration/TrigConfStorage/TrigConfStorage/TrigConfCoolHLTPayloadConverters.h
++++ b/Trigger/TrigConfiguration/TrigConfStorage/TrigConfStorage/TrigConfCoolHLTPayloadConverters.h
+@@ -63,7 +63,7 @@
+         *
+         * @returns a COOL db record
+         */
+-       cool::Record createMonConfigKeyPayload(cool::IFolderPtr fld, uint MCK, std::string& info );     
++       cool::Record createMonConfigKeyPayload(cool::IFolderPtr fld, unsigned int MCK, std::string& info );     
+       
+       /**@brief build a COOL db record from a HLT prescale value
+        *
+--- a/Trigger/TrigEvent/TrigNavTools/src/Run2ToRun3TrigNavConverterV2.cxx
++++ b/Trigger/TrigEvent/TrigNavTools/src/Run2ToRun3TrigNavConverterV2.cxx
+@@ -1611,7 +1611,7 @@
+   CLID expectedCLID = getExpectedParticleCLID(teName);
+ 
+   ATH_MSG_VERBOSE("Calculating FEA hash for TE " << teName << " expecting CLID " << expectedCLID);
+-  uint64_t hash = 0;
++  std::size_t hash = 0;  // boost::hash_combine's seed (uint64_t is unsigned long long on macOS)
+   for (auto fea : filterFEAs(feaVector, navigationDecoder))
+   {
+     const auto & [sgKey, sgCLID, sgName] = getSgKey(navigationDecoder, fea);
+--- a/Trigger/TrigT1/L1Topo/L1TopoSimulation/src/L1TopoSimulation.cxx
++++ b/Trigger/TrigT1/L1Topo/L1TopoSimulation/src/L1TopoSimulation.cxx
+@@ -317,8 +317,8 @@
+        std::bitset<64> outputOpt_1(outputOpt.to_string());
+        std::bitset<64> outputOpt_2((outputOpt<<64).to_string());
+        topoOutput2CTP->setOptCableWord( connOpt, outputOpt );
+-       WriteEDM(outputHandle,connOpt,1,outputOpt_1.to_ulong());
+-       WriteEDM(outputHandle,connOpt,0,outputOpt_2.to_ulong());
++       WriteEDM(outputHandle,connOpt,1,static_cast<uint64_t>(outputOpt_1.to_ullong()));
++       WriteEDM(outputHandle,connOpt,0,static_cast<uint64_t>(outputOpt_2.to_ullong()));
+      }
+     
+      CHECK(SG::makeHandle(m_topoCTPLocation, ctx)        .record(std::move(topoOutput2CTP)));
+--- a/Trigger/TrigT1/Muon/L1MuonInterface/src/ICandData.cxx
++++ b/Trigger/TrigT1/Muon/L1MuonInterface/src/ICandData.cxx
+@@ -4,6 +4,8 @@
+ 
+ #include "L1MuonInterface/ICandData.h"
+ 
++#include <algorithm>
++
+ namespace L0Muon
+ {
+ 
+--- a/Trigger/TrigT1/Muon/L1MuonInterface/src/TGCCandData.cxx
++++ b/Trigger/TrigT1/Muon/L1MuonInterface/src/TGCCandData.cxx
+@@ -3,6 +3,8 @@
+ */
+ #include "L1MuonInterface/TGCCandData.h"
+ 
++#include <algorithm>
++
+ namespace L0Muon {
+ 
+ uint8_t TGCCandData::coinType() const {
+--- a/Trigger/TrigT1/TrigT1RPCsteering/src/TrigT1RPC.cxx
++++ b/Trigger/TrigT1/TrigT1RPCsteering/src/TrigT1RPC.cxx
+@@ -20,6 +20,7 @@
+ 
+ #include <algorithm>
+ #include <cmath>
++#include <iomanip>
+ #include <stdexcept>
+ 
+ /////////////////////////////////////////////////////////////////////////////
+@@ -335,11 +336,11 @@
+         ATH_MSG_DEBUG("RPC Digit from GM:" << "\n"
+                                            << "         " << std::hex << channelId << std::dec << "\n"
+                                            << "         GlobalPosition (cm) = "
+-                                           << setiosflags(std::ios::fixed) << std::setprecision(3)
++                                           << std::setiosflags(std::ios::fixed) << std::setprecision(3)
+                                            << std::setw(11) << pos.x()
+-                                           << setiosflags(std::ios::fixed) << std::setprecision(3)
++                                           << std::setiosflags(std::ios::fixed) << std::setprecision(3)
+                                            << std::setw(11) << pos.y()
+-                                           << setiosflags(std::ios::fixed) << std::setprecision(3)
++                                           << std::setiosflags(std::ios::fixed) << std::setprecision(3)
+                                            << std::setw(11) << pos.z());
+         }
+ 
+--- a/Trigger/TrigT1/TrigT1TGC/src/TGCDatabaseManager.cxx
++++ b/Trigger/TrigT1/TrigT1TGC/src/TGCDatabaseManager.cxx
+@@ -231,7 +231,9 @@
+       m_mapEIFI[side] = new LVL1TGC::TGCEIFICoincidenceMap(*(right.m_mapEIFI[side]));
+     }
+ 
+-    m_patchPanelToConnectionInPP = right.m_patchPanelToConnectionInPP;
++    // a copy, moved in: libc++'s copy assignment assigns to the existing nodes, and the mapped
++    // pair<const TGCConnectionInPP, ...> cannot be assigned
++    m_patchPanelToConnectionInPP = decltype(m_patchPanelToConnectionInPP)(right.m_patchPanelToConnectionInPP);
+   }
+   return *this;
+ }
+--- a/Trigger/TrigTools/TrigByteStreamTools/TrigByteStreamTools/TrigByteStreamToolsDict.h
++++ b/Trigger/TrigTools/TrigByteStreamTools/TrigByteStreamTools/TrigByteStreamToolsDict.h
+@@ -5,6 +5,7 @@
+ #include "CTPfragment/CTPExtraWordsFormat.h"
+ #include "CTPfragment/CTPdataformat.h"
+ #include <algorithm>
++#include <iterator>
+ 
+ // Declare some additional types
+ //template class std::map<const CTPfragment::FolderIndex, CTPfragment::FolderEntry>;
 --- a/Trigger/TrigTools/TrigInDetTrackFitter/src/TrigInDetTrackFollowingTool.cxx
 +++ b/Trigger/TrigTools/TrigInDetTrackFitter/src/TrigInDetTrackFollowingTool.cxx
 @@ -5,6 +5,13 @@

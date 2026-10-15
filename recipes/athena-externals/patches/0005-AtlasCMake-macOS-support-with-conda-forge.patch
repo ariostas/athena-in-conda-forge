@@ -19,6 +19,9 @@ AtlasCMake and AtlasLCG on macOS with a (non-Apple) Clang, e.g. conda-forge's:
    compile part of a project as C++23 and the rest as C++20.
 8. the .components file of a library from the library's own file name: a shared library (the
    T/P converter factories) has another suffix than a module on macOS (.dylib, not .so).
+9. atlas_disable_as_needed() also removes -dead_strip_dylibs, Apple's linker's counterpart of
+   --as-needed (in conda-forge's LDFLAGS): packages that link a library only for what its static
+   initialisers register (L1Topo's algorithms) lost it.
 
 diff --git a/Build/AtlasCMake/modules/AtlasCompilerSettings.cmake b/Build/AtlasCMake/modules/AtlasCompilerSettings.cmake
 index 33cb2f3..97dcd37 100644
@@ -52,7 +55,7 @@ index 33cb2f3..97dcd37 100644
     # By default use the --as-needed option for everything. Remember that this
     # behaviour can be turned off in individual packages using
 diff --git a/Build/AtlasCMake/modules/AtlasFunctions.cmake b/Build/AtlasCMake/modules/AtlasFunctions.cmake
-index 42948f3..8f05db5 100644
+index 42948f3..496d40d 100644
 --- a/Build/AtlasCMake/modules/AtlasFunctions.cmake
 +++ b/Build/AtlasCMake/modules/AtlasFunctions.cmake
 @@ -79,13 +79,31 @@ function( atlas_project )
@@ -112,6 +115,23 @@ index 42948f3..8f05db5 100644
        # Copy bash into the build directory.
        file( COPY "${_bash_executable}"
           DESTINATION "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}" )
+@@ -824,6 +851,16 @@ macro( atlas_disable_as_needed )
+       "${CMAKE_SHARED_LINKER_FLAGS}" )
+    string( REPLACE "-Wl,--as-needed" "" CMAKE_MODULE_LINKER_FLAGS
+       "${CMAKE_MODULE_LINKER_FLAGS}" )
++   # Apple's linker has -dead_strip_dylibs for the same (conda-forge's LDFLAGS
++   # have it):
++   if( APPLE )
++      string( REPLACE "-Wl,-dead_strip_dylibs" "" CMAKE_EXE_LINKER_FLAGS
++         "${CMAKE_EXE_LINKER_FLAGS}" )
++      string( REPLACE "-Wl,-dead_strip_dylibs" "" CMAKE_SHARED_LINKER_FLAGS
++         "${CMAKE_SHARED_LINKER_FLAGS}" )
++      string( REPLACE "-Wl,-dead_strip_dylibs" "" CMAKE_MODULE_LINKER_FLAGS
++         "${CMAKE_MODULE_LINKER_FLAGS}" )
++   endif()
+ 
+ endmacro( atlas_disable_as_needed )
+ 
 diff --git a/Build/AtlasCMake/modules/AtlasLibraryFunctions.cmake b/Build/AtlasCMake/modules/AtlasLibraryFunctions.cmake
 index 4e762a6..a7b6e88 100644
 --- a/Build/AtlasCMake/modules/AtlasLibraryFunctions.cmake

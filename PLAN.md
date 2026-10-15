@@ -1463,6 +1463,30 @@ took:
   CoreDumpSvc for the hour of TimeoutAlg's event timeout before it exited.
 - reco passes on macOS (4421 s with reco-tracking's fix): Reco_tf's ESD and AOD dumps (1.7M
   and 406k lines) have the sizes of ATLAS's release in all 175 and 97 collections.
+- trigger on macOS: 14 files did not compile or link, beyond what the scan had found (trigger
+  patch 0001). Besides missing includes (`<algorithm>`, `<iomanip>`, `<iterator>`, `<map>`,
+  which libstdc++'s headers bring in), `<ieee754.h>` and `std::experimental::filesystem`:
+  - `uint64_t` is `unsigned long long` on macOS, so `boost::hash_combine(uint64_t&, ...)` does
+    not match its `size_t&` seed, and `bitset::to_ulong()` is ambiguous between overloads for
+    `uint32_t` and `uint64_t`.
+  - libc++'s `ios_base::fmtflags` is an integer, not an enum: an unqualified
+    `setiosflags(std::ios::fixed)` is not found by argument-dependent lookup.
+  - libc++'s map copy assignment reuses the nodes and assigns the values; a mapped
+    `pair<const X, ...>` cannot be assigned (TGCDatabaseManager): copy, then move.
+- trigger then built, but runHLT stopped generating the L1 menu: `L1TopoAlgConfig` has no
+  `eEmNoSort`. The module is written at build time (analysis layer) by
+  `TrigConfL1TopoGenPyAlg`, which lists the algorithms that `libL1TopoAlgorithms` registers in
+  its static initialisers; on macOS the program did not link that library, and the module came
+  out empty. conda-forge's macOS LDFLAGS have `-dead_strip_dylibs` (GNU ld's `--as-needed`), and
+  ATLAS's `atlas_disable_as_needed()`, which 20 packages call for such links (L1Topo, the
+  generators, AtlasGeant4, ByteStreamStoragePlugins), removes only `--as-needed`. AtlasCMake's
+  macro now removes both on macOS (athena-externals patch 0005). Redefining the macro in
+  `conda-postconfig.cmake` does not work: each project's `Config.cmake` finds its base project
+  (whose PostConfig defines it) before it includes `AtlasFunctions`, which defines ATLAS's macro
+  again, and `atlas_project()` does the same before it reads the packages. A layer uses the
+  AtlasCMake copy of the layer below, so the whole stack is rebuilt (detdescr included: a
+  rebuild that skipped it carried its old copy into every layer above). With it the program
+  links `libL1TopoAlgorithms` and the module has 706 lines.
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's

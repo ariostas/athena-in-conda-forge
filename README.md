@@ -536,6 +536,11 @@ so that a work area can relink it with its own changes.
   - With libc++, AtlasSTLAddReflexDict's rootmap also lists the `pair<>`s of some maps that
     xAODCoreSTLDict lists, and ROOT warns about each in every job: the layers keep the first
     entry of each class, the one ROOT uses.
+  - conda-forge's macOS LDFLAGS have `-dead_strip_dylibs`, the counterpart of GNU ld's
+    `--as-needed`, which ATLAS's `atlas_disable_as_needed()` does not remove: the packages that
+    link a library only for its static registrations (L1Topo's algorithms, the generators'
+    plugins) lost it, and the L1 menu could not be generated. athena-externals' AtlasCMake
+    patch 0005 makes the macro remove both (**upstreamable**).
   - ATLAS's test scripts take GNU's sed, diff and grep for granted (`post.sh`, which compares
     test logs with references): athena-core requires them from conda-forge there.
   - The CP algorithms declare the `eventNumber` n-tuple branch as `unsigned long`, but
@@ -545,9 +550,10 @@ so that a work area can relink it with its own changes.
     exception): the layers skip them on macOS (`unit_tests_excluded_osx.txt`).
   - The upper layers need more of the same (reco patch 0002, trigger and sim patches 0001):
     `std::legendre` (libc++ has none of C++17's special mathematical functions), `finite()`,
-    `sincos()`, `HOST_NAME_MAX`, `<ext/functional>`, `shared_ptr::unique()`. Three that are
-    worth reporting to ATLAS: `DataVector::insert` from moved `unique_ptr`s does not compile
-    with libc++, which compares the input iterators with `==`, and CxxUtils'
+    `sincos()`, `HOST_NAME_MAX`, `<ext/functional>`, `shared_ptr::unique()`, `<ieee754.h>`,
+    includes that libstdc++ brings in implicitly, `uint64_t` taken for `unsigned long`. Three
+    that are worth reporting to ATLAS: `DataVector::insert` from moved `unique_ptr`s does not
+    compile with libc++, which compares the input iterators with `==`, and CxxUtils'
     `releasing_iterator` has only `!=` (**upstreamable**); MuonVertexValidation's source glob
     `util/[!make]*.cxx` also leaves out `MSVtx*.cxx` where CMake globs without case (macOS,
     Windows) (**upstreamable**); and CLHEP's GenericFunctions define `clone()` inline in their
