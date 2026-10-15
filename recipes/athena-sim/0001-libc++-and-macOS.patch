@@ -31,6 +31,44 @@
  const LArStraightElectrodes* LArStraightElectrodes::GetInstance(const std::string& strDetector)
  {
    static const LArStraightElectrodes instance(strDetector);
+--- a/Simulation/AtlasGeant4/CMakeLists.txt
++++ b/Simulation/AtlasGeant4/CMakeLists.txt
+@@ -170,9 +170,14 @@
+ set_target_properties( AtlasGeant4Lib PROPERTIES INTERPROCEDURAL_OPTIMIZATION ${ATLAS_GEANT4_USE_LTO} )
+ 
+ # Primary "big" component composed of all library/component OBJECT libs
++# (Apple's linker has no --exclude-libs)
++set( _excludeLibs "-Wl,--exclude-libs,ALL" )
++if( APPLE )
++  set( _excludeLibs )
++endif()
+ atlas_add_component( AtlasGeant4
+                      ${AtlasGeant4_DUMMY_SOURCES}
+-                     LINK_LIBRARIES "-Wl,--exclude-libs,ALL" ${AtlasGeant4Component_TARGET_OBJECTS} ${AtlasGeant4_TARGET_OBJECTS} )
++                     LINK_LIBRARIES ${_excludeLibs} ${AtlasGeant4Component_TARGET_OBJECTS} ${AtlasGeant4_TARGET_OBJECTS} )
+ set_target_properties( AtlasGeant4 PROPERTIES INTERPROCEDURAL_OPTIMIZATION ${ATLAS_GEANT4_USE_LTO} )
+ 
+ if( ATLAS_GEANT4_USE_LTO AND CMAKE_COMPILER_IS_GNUCXX )
+--- a/Simulation/ISF/ISF_FastCaloSim/ISF_FastCaloSimEvent/src/TFCSParametrizationBinnedChain.cxx
++++ b/Simulation/ISF/ISF_FastCaloSim/ISF_FastCaloSimEvent/src/TFCSParametrizationBinnedChain.cxx
+@@ -20,7 +20,7 @@
+   if (m_bin_start[0] == size()) {
+     chain().push_back(param);
+   } else {
+-    Chain_t::iterator it(&chain()[m_bin_start[0]]);
++    Chain_t::iterator it = chain().begin() + m_bin_start[0];
+     chain().insert(it, param);
+   }
+   for (auto &ele : m_bin_start)
+@@ -37,7 +37,7 @@
+   if (m_bin_start[bin + 1] == size()) {
+     chain().push_back(param);
+   } else {
+-    Chain_t::iterator it(&chain()[m_bin_start[bin + 1]]);
++    Chain_t::iterator it = chain().begin() + m_bin_start[bin + 1];
+     chain().insert(it, param);
+   }
+   for (unsigned int ibin = bin + 1; ibin < m_bin_start.size(); ++ibin)
 --- a/Simulation/Tools/CaloSamplingFractionAnalysis/src/LArFCalSamplingFraction.cxx
 +++ b/Simulation/Tools/CaloSamplingFractionAnalysis/src/LArFCalSamplingFraction.cxx
 @@ -753,7 +753,7 @@

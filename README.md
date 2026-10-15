@@ -19,8 +19,9 @@ CMSSW.
 > **Status: proof of concept.** All of Athena but 30 packages builds in ten layers that pass their
 > tests on linux-aarch64, from the framework to simulation and derivations, with an `athena`
 > metapackage and a developer workflow. On linux-64 (M8) every external and all ten layers pass
-> too; on osx-arm64 (M8, in progress) every external and the layers up to trigger do:
-> `athena.py`, `Reco_tf.py` and ATLAS's HLT run on a Mac. Nothing has been submitted to conda-forge yet.
+> too; on osx-arm64 (M8, in progress) every external and the layers up to sim do: `athena.py`,
+> `Reco_tf.py`, ATLAS's HLT and `Sim_tf.py` (Geant4) run on a Mac. Nothing has been submitted to
+> conda-forge yet.
 
 The reference release is Athena [`release/25.0.73`](https://gitlab.cern.ch/atlas/athena/-/tree/release/25.0.73).
 
@@ -97,7 +98,7 @@ The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
 | `athena-reco-tracking` (inner detector and ITk tracking, vertexing) | [recipes/athena-reco-tracking](recipes/athena-reco-tracking) | ✅ | ✅ | ✅ |
 | `athena-reco` (full reconstruction, `Reco_tf.py`, digitization) | [recipes/athena-reco](recipes/athena-reco) | ✅ | ✅ | ✅ |
 | `athena-trigger` (L1 simulation, High-Level Trigger) | [recipes/athena-trigger](recipes/athena-trigger) | ✅ | ✅ | ✅ |
-| `athena-sim` (Geant4 simulation, ISF, generator interfaces, `Sim_tf.py`) | [recipes/athena-sim](recipes/athena-sim) | ✅ | ✅ | · |
+| `athena-sim` (Geant4 simulation, ISF, generator interfaces, `Sim_tf.py`) | [recipes/athena-sim](recipes/athena-sim) | ✅ | ✅ | ✅ |
 | `athena-rest` (the project `Athena`: derivations, data quality, event display, the rest) | [recipes/athena-rest](recipes/athena-rest) | ✅ | ✅ | · |
 | `athena` (all the layers) | [recipes/athena](recipes/athena) | ✅ | · | · |
 | `athena-devel` (compilers and externals for building Athena packages against the release) | [recipes/athena-devel](recipes/athena-devel) | ✅ | · | · |
@@ -551,15 +552,15 @@ so that a work area can relink it with its own changes.
   - The upper layers need more of the same (reco patch 0002, trigger and sim patches 0001):
     `std::legendre` (libc++ has none of C++17's special mathematical functions), `finite()`,
     `sincos()`, `HOST_NAME_MAX`, `<ext/functional>`, `shared_ptr::unique()`, `<ieee754.h>`,
-    includes that libstdc++ brings in implicitly, `uint64_t` taken for `unsigned long`. Three
-    that are worth reporting to ATLAS: `DataVector::insert` from moved `unique_ptr`s does not
-    compile with libc++, which compares the input iterators with `==`, and CxxUtils'
-    `releasing_iterator` has only `!=` (**upstreamable**); MuonVertexValidation's source glob
-    `util/[!make]*.cxx` also leaves out `MSVtx*.cxx` where CMake globs without case (macOS,
+    includes that libstdc++ brings in implicitly, `uint64_t` taken for `unsigned long`, a vector
+    iterator constructed from a pointer (FastCaloSim), GNU ld's `--exclude-libs` (AtlasGeant4, left
+    out on macOS). Three that are worth reporting to ATLAS: `DataVector::insert` from moved
+    `unique_ptr`s does not compile with libc++, which compares the input iterators with `==`, and
+    CxxUtils' `releasing_iterator` has only `!=` (**upstreamable**); MuonVertexValidation's source
+    glob `util/[!make]*.cxx` also leaves out `MSVtx*.cxx` where CMake globs without case (macOS,
     Windows) (**upstreamable**); and CLHEP's GenericFunctions define `clone()` inline in their
-    `.cc` files, which macOS's linker does not export, so code that calls `clone()` on a
-    concrete function class (GeoXPEngine) does not link: reco's patch calls it through the base
-    class.
+    `.cc` files, which macOS's linker does not export, so code that calls `clone()` on a concrete
+    function class (GeoXPEngine) does not link: reco's patch calls it through the base class.
   - LArRawConditions' dictionaries select 27 persistent classes of the LAr conditions only
     through a pattern on libstdc++'s vector iterator (`__gnu_cxx::__normal_iterator<const X*,
     std::vector<X> >`, whose `std::vector<X>` argument brings `X` in). libc++'s iterator has no

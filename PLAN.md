@@ -1489,6 +1489,12 @@ took:
   links `libL1TopoAlgorithms` and the module has 706 lines.
 - trigger then passed on macOS: the HLT with the Dev menu counts 111 chains, as ATLAS's release
   does (build and tests 69 min with 5 threads; reco 94 min).
+- sim on macOS: FastCaloSim constructs a vector iterator from a pointer (libc++'s is a class
+  with a private constructor from it), and AtlasGeant4 links with `-Wl,--exclude-libs,ALL`,
+  which Apple's linker does not know (sim patch 0001). sim then passed: `Sim_tf.py` with
+  FullG4MT_QS, the hit collections within the tolerances as on Linux (36 min with 5 threads).
+  rest asked for `libgl-devel` and `libglu`, which conda-forge has only for Linux: OpenGL is a
+  system framework on macOS.
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's

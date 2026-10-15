@@ -40,8 +40,11 @@ requirements:
     - qt-main 5.*
     - coin3d
     - soqt
-    - libgl-devel
-    - libglu
+    # OpenGL and GLU (on macOS, the system's OpenGL framework)
+    - if: linux
+      then:
+        - libgl-devel
+        - libglu
     # the layers below, whose headers (and CMake configuration) this layer includes
     - athena-trigger ==${{ version }}
     - atlas-geant4 ==10.6.3.15
