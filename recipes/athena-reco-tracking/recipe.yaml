@@ -11,8 +11,9 @@ source:
   patches:
     # libc++ and macOS: Boost's flat_set where the C++ library has no <flat_set> (libc++ 20),
     # std::shuffle for the removed std::random_shuffle, glibc's sincos() and <sys/sysinfo.h>,
-    # GNU's <ext/functional>, null iterators, JiveXML with libtirpc, and no static gfortran
-    # libraries for TrkAlgebraUtils
+    # GNU's <ext/functional>, null iterators, JiveXML with libtirpc, no static gfortran
+    # libraries for TrkAlgebraUtils, and GSF's aligned_alloc sizes rounded up to the alignment
+    # (macOS returns null otherwise)
     - 0001-libc++-and-macOS.patch
 
 build:

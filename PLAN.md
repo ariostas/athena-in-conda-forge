@@ -1454,6 +1454,13 @@ took:
   locally edm is rebuilt and edm-det, analysis and reco-tracking are not.
 - Builds with all 10 cores overnight: memory is logged every 30 s (`_work/osx-work/memlog.sh`,
   `logs/mem.log`); the recipe builds use 8 jobs (reco's compiles take up to 3 GB each).
+- reco then built (9134 s with its test), but Reco_tf crashed on the first event in
+  `GSFUtils::findMerges` (egamma's GSF refit). The stack trace showed the return address after
+  a call to `aligned_alloc` (a leaf function: frame-pointer walks skip it): `AlignedDynArray`
+  asks for `n * sizeof(T)` bytes at 32-byte alignment, and macOS's `aligned_alloc(32, 12)`
+  returns null where glibc's does not. reco-tracking patch 0001 rounds the size up; the
+  other `aligned_alloc` calls in Athena already do. After the crash, the job hung in
+  CoreDumpSvc for the hour of TimeoutAlg's event timeout before it exited.
 
 **To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
 these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's

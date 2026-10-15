@@ -559,6 +559,10 @@ so that a work area can relink it with its own changes.
     std::vector<X> >`, whose `std::vector<X>` argument brings `X` in). libc++'s iterator has no
     such argument, so reconstruction aborted reading the LAr conditions ("no dictionary for
     class LArMinBiasAverageP"). edm patch 0002 selects them by name (**upstreamable**).
+  - GSF's `AlignedDynArray` (TrkGaussianSumFilterUtils) asks `std::aligned_alloc` for
+    `n * sizeof(T)` bytes, not a multiple of the 32-byte alignment. C requires that multiple:
+    glibc does not check it, but macOS returns null, and the electron refit (`findMerges`)
+    crashed on the first event. reco-tracking patch 0001 rounds the size up (**upstreamable**).
 - **ATLAS's scripts start with `#!/usr/bin/bash` or `#!/bin/env`** (233 in the sources), which
   neither macOS nor distributions without the merged `/usr` have: the layers rewrite them to
   `#!/usr/bin/env` before building.

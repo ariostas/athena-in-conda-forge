@@ -344,3 +344,25 @@
 -                   PRIVATE_LINK_LIBRARIES ${ROOT_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${EIGEN_LIBRARIES} GaudiKernel ${CMAKE_Fortran_IMPLICIT_LINK_LIBRARIES} EventPrimitives)
 +                   PRIVATE_LINK_LIBRARIES ${ROOT_LIBRARIES} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${EIGEN_LIBRARIES} GaudiKernel ${_fortranLibs} EventPrimitives)
  
+--- a/Tracking/TrkFitter/TrkGaussianSumFilterUtils/TrkGaussianSumFilterUtils/AlignedDynArray.icc
++++ b/Tracking/TrkFitter/TrkGaussianSumFilterUtils/TrkGaussianSumFilterUtils/AlignedDynArray.icc
+@@ -19,7 +19,8 @@ inline AlignedDynArray<T, ALIGNMENT>::AlignedDynArray(const size_type n)
+   , m_size(n)
+ {
+ 
+-  const size_t bufferSize = n * sizeof(T);
++  // aligned_alloc wants a multiple of the alignment: macOS returns null otherwise
++  const size_t bufferSize = (n * sizeof(T) + ALIGNMENT - 1) / ALIGNMENT * ALIGNMENT;
+   m_buffer = static_cast<T*>(std::aligned_alloc(ALIGNMENT, bufferSize));
+   std::uninitialized_default_construct(m_buffer, m_buffer + m_size);
+ }
+@@ -30,7 +31,8 @@ inline AlignedDynArray<T, ALIGNMENT>::AlignedDynArray(const size_type n,
+   : m_buffer(nullptr)
+   , m_size(n)
+ {
+-  const size_t bufferSize = n * sizeof(T);
++  // aligned_alloc wants a multiple of the alignment: macOS returns null otherwise
++  const size_t bufferSize = (n * sizeof(T) + ALIGNMENT - 1) / ALIGNMENT * ALIGNMENT;
+   m_buffer = static_cast<T*>(std::aligned_alloc(ALIGNMENT, bufferSize));
+   std::uninitialized_fill(m_buffer, m_buffer + m_size, value);
+ }
