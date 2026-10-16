@@ -11,6 +11,10 @@ source:
   patches:
     # DQUtils' C++ code without Oracle's client, which it does not use (not on conda-forge)
     - 0001-DQUtils-without-Oracle.patch
+    # libc++ and macOS: includes that libstdc++ brings in implicitly (<span>, <charconv>,
+    # mkstemps' <unistd.h>), std::views::chunk (not in libc++ 20), a vector of C arrays, and a
+    # vector assigned from the cluster cell link's incomplete iterator
+    - 0002-libc++-and-macOS.patch
 
 build:
   number: 0

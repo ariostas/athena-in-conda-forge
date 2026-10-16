@@ -1,0 +1,24 @@
+diff --git a/HighGranularityTimingDetector/HGTD_Calibration/CMakeLists.txt b/HighGranularityTimingDetector/HGTD_Calibration/CMakeLists.txt
+index c051bf92..26e3ef29 100644
+--- a/HighGranularityTimingDetector/HGTD_Calibration/CMakeLists.txt
++++ b/HighGranularityTimingDetector/HGTD_Calibration/CMakeLists.txt
+@@ -15,7 +15,6 @@ atlas_add_library( HGTD_CalibrationLib HGTD_Calibration/*.h src/*.cxx
+                   AthenaBaseComps SiDigitization GaudiKernel InDetSimEvent)
+ 
+ atlas_add_component( HGTD_Calibration
+-                  src/*.cxx
+                   src/components/*.cxx
+                   LINK_LIBRARIES HGTD_CalibrationLib)
+ 
+diff --git a/Tracking/Acts/ActsVertexReconstruction/CMakeLists.txt b/Tracking/Acts/ActsVertexReconstruction/CMakeLists.txt
+index da4daaa1..d3573e30 100644
+--- a/Tracking/Acts/ActsVertexReconstruction/CMakeLists.txt
++++ b/Tracking/Acts/ActsVertexReconstruction/CMakeLists.txt
+@@ -15,7 +15,6 @@ atlas_add_library( ActsVertexReconstructionLib
+ 								  ActsEventLib InDetTrackSelectionToolLib TrkLinks xAODInDetMeasurement xAODTracking)
+ 
+ atlas_add_component( ActsVertexReconstruction
+-                     src/*.h src/*.cxx
+                      src/components/*.cxx
+                      LINK_LIBRARIES 
+ 		       Acts::Core

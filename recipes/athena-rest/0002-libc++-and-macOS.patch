@@ -1,0 +1,102 @@
+--- a/Control/AthenaExamples/AthExOnnxRuntime/src/EvaluateUtils.h
++++ b/Control/AthenaExamples/AthExOnnxRuntime/src/EvaluateUtils.h
+@@ -4,6 +4,7 @@
+ #define EvaluateUtils_H
+ 
+ #include <format>
++#include <span>
+ #include <vector>
+ #include <string>
+ 
+--- a/Control/AthenaExamples/AthExTriton/src/EvaluateUtils.h
++++ b/Control/AthenaExamples/AthExTriton/src/EvaluateUtils.h
+@@ -4,6 +4,7 @@
+ #define ATHEXTRITON_EVALUATEUTILS_H
+ 
+ #include <format>
++#include <span>
+ #include <string>
+ #include <vector>
+ 
+--- a/Control/PileUpMT/src/SkipEventIdxSvc.cxx
++++ b/Control/PileUpMT/src/SkipEventIdxSvc.cxx
+@@ -8,7 +8,9 @@
+ #include <GaudiKernel/IIncidentSvc.h>
+ 
+ #include <boost/core/typeinfo.hpp>
++#include <algorithm>
+ #include <ranges>
++#include <span>
+ #include <string>
+ 
+ #include "AthenaKernel/IEvtIdModifierSvc.h"
+@@ -93,7 +95,10 @@
+       std::string config_str{};
+       auto config_str_iter = std::back_inserter(config_str);
+       modifier_evts.clear();
+-      for (const auto rec : lst | std::views::chunk(6)) {
++      // chunks of 6 (libc++ has no std::views::chunk yet)
++      for (std::size_t ichunk = 0; ichunk < lst.size(); ichunk += 6) {
++            const auto rec = std::span<const std::uint64_t>(lst).subspan(
++                ichunk, std::min<std::size_t>(6, lst.size() - ichunk));
+             const int mod_bitset = rec[5];
+             const bool mod_run_num = mod_bitset & 1;
+             const bool mod_evt_num = mod_bitset & (1 << 1);
+--- a/DataQuality/dqm_algorithms/src/AFP_ToFSiTCorrCheck.cxx
++++ b/DataQuality/dqm_algorithms/src/AFP_ToFSiTCorrCheck.cxx
+@@ -3,6 +3,7 @@
+ */
+ 
+ #include "dqm_algorithms/AFP_ToFSiTCorrCheck.h"
++#include <charconv>
+ 
+ #include <dqm_algorithms/tools/AlgorithmHelper.h>
+ #include <dqm_core/AlgorithmManager.h>
+--- a/graphics/VP1/VP1Base/src/VP1QtInventorUtils.cxx
++++ b/graphics/VP1/VP1Base/src/VP1QtInventorUtils.cxx
+@@ -48,6 +48,8 @@
+ 
+ #include <iostream>
+ #include <bit>
++#include <cstdlib>
++#include <unistd.h> // mkstemps (macOS)
+ namespace{
+   unsigned char *
+   ucharAddress(auto * pv){
+--- a/LArCalorimeter/LArSamplesMon/src/OccupancyMonitor.cxx
++++ b/LArCalorimeter/LArSamplesMon/src/OccupancyMonitor.cxx
+@@ -11,6 +11,7 @@
+ 
+ #include "TH1I.h"
+ #include "TH2D.h"
++#include <array>
+ #include <map>
+ #include <vector>
+ 
+@@ -260,7 +261,8 @@
+   const unsigned int nPhiRings = 5516; // == Geo::nPhiRings()
+   using block_t = unsigned int[4][3];
+   block_t nCells, nRings;
+-  std::vector<block_t> ringOccupancy (nPhiRings);
++  // (a vector of C arrays does not compile with libc++)
++  std::vector<std::array<std::array<unsigned int, 3>, 4> > ringOccupancy (nPhiRings);
+   
+   for (unsigned int i = 0; i < 4; i++)
+     for (unsigned int j = 0; j < 3; j++) {
+--- a/PhysicsAnalysis/D3PDMaker/CaloD3PDMaker/src/CaloClusterCellAssociationTool.cxx
++++ b/PhysicsAnalysis/D3PDMaker/CaloD3PDMaker/src/CaloClusterCellAssociationTool.cxx
+@@ -68,8 +68,12 @@
+   m_cells.clear();
+ 
+   // Protect against missing cells.
+-  if (p.getCellLinks())
+-    m_cells.assign (p.cell_begin(), p.cell_end());
++  // (one by one: libc++'s assign() needs a complete iterator, which the cell
++  // link's is not)
++  if (p.getCellLinks()) {
++    for (auto it = p.cell_begin(); it != p.cell_end(); ++it)
++      m_cells.push_back (*it);
++  }
+ 
+   return StatusCode::SUCCESS;
+ }

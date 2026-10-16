@@ -63,8 +63,10 @@ requirements:
     - zlib
     - fastjet-cxx ==3.5.1 *_5
     - fastjet-contrib
-    # rivet-build compiles analyses with the C++ compiler recorded at build time
-    - cxx-compiler
+    # rivet-build compiles analyses with the C++ compiler recorded at build time, in the major
+    # version it was built with: cxx-compiler has none for clang 20 (ROOT's on macOS), and an
+    # environment with Athena could then hold no other compiler than clang 18 there
+    - ${{ cxx_compiler }}_${{ target_platform }} ${{ cxx_compiler_version }}.*
   run_constraints:
     # the same files as conda-forge's rivet
     - rivet <0a0

@@ -24,6 +24,9 @@ source:
       # then point into the moved-from object: the string is kept on the heap (seen with
       # libc++, which keeps longer strings inline than libstdc++)
       - 0003-SelectionHelpers-Lexer-keeps-its-string-in-place-when-moved.patch
+      # ExpressionEvaluation's accessors for (unsigned) long and long long: it knows the
+      # fixed-width integer types only, and on macOS size_t (TauJet::nTracks()) is none of them
+      - 0004-ExpressionEvaluation-accessors-for-long-types.patch
   # For the tests: a DAOD_PHYSLITE file of ATLAS Open Data (CC0-1.0), 2015 data, run 276183,
   # 132 events, from https://doi.org/10.7483/OPENDATA.ATLAS.AOQL.8TT3
   - url: https://opendata.cern.ch/eos/opendata/atlas/rucio/data15_13TeV/DAOD_PHYSLITE.37001701._000001.pool.root.1

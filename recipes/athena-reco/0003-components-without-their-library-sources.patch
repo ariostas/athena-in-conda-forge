@@ -1,0 +1,16 @@
+diff --git a/Reconstruction/DiTauRec/CMakeLists.txt b/Reconstruction/DiTauRec/CMakeLists.txt
+index 111dc44e..14f4ef3a 100644
+--- a/Reconstruction/DiTauRec/CMakeLists.txt
++++ b/Reconstruction/DiTauRec/CMakeLists.txt
+@@ -8,10 +8,8 @@ find_package( FastJet )
+ 
+ # Component(s) in the package:
+ atlas_add_component( DiTauRec
+-                     src/*.cxx
+                      src/components/*.cxx
+-                     INCLUDE_DIRS ${FASTJET_INCLUDE_DIRS}
+-                     LINK_LIBRARIES ${FASTJET_LIBRARIES} AthenaBaseComps xAODJet xAODTau GaudiKernel JetEDM TrkToolInterfaces CaloEvent xAODTracking StoreGateLib tauRecToolsLib PathResolver)
++                     LINK_LIBRARIES DiTauRecLib )
+ 
+ atlas_add_library( DiTauRecLib
+ 	DiTauRec/*.h src/*.cxx

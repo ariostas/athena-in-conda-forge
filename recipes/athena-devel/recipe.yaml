@@ -27,19 +27,23 @@ requirements:
     - libboost-devel
   run:
     - athena ==${{ version }}
-    # The compilers, in the major version the layers were built with (the global pinning's):
+    # The compilers, in the major version the layers were built with (variants.yaml): with gcc,
     # code built with another major mixes libstdc++ ABIs with theirs (std::format's internals,
-    # as with conda-forge's gcc 14 Gaudi). c-compiler and friends would bring the newest gcc.
-    - gcc_${{ target_platform }} ${{ c_compiler_version }}.*
-    - gxx_${{ target_platform }} ${{ cxx_compiler_version }}.*
-    - gfortran_${{ target_platform }} ${{ fortran_compiler_version }}.*
+    # as with conda-forge's gcc 14 Gaudi); on macOS, clang 20 is ROOT's, whose libc++ headers
+    # cling parses. c-compiler and friends would bring the newest gcc or clang.
+    - ${{ c_compiler }}_${{ target_platform }} ${{ c_compiler_version }}.*
+    - ${{ cxx_compiler }}_${{ target_platform }} ${{ cxx_compiler_version }}.*
+    - ${{ fortran_compiler }}_${{ target_platform }} ${{ fortran_compiler_version }}.*
     - cmake
     - make
     - ninja
     - pkg-config
-    # No glibc 2.34 sysroot, which the layers were built with: root_base requires the 2.17 one
-    # (for cling), and an environment has only one. Work areas compile against glibc 2.17's
-    # headers (see the README).
+    # On Linux no glibc 2.34 sysroot, which the layers were built with: root_base requires the
+    # 2.17 one (for cling), and an environment has only one. Work areas compile against glibc
+    # 2.17's headers (see the README). On macOS the deployment target the layers were built
+    # for, which its activation sets (MACOSX_DEPLOYMENT_TARGET).
+    - if: osx
+      then: ${{ c_stdlib }}_${{ target_platform }} ${{ c_stdlib_version }}.*
     # Everything the layers were built against: the headers and the link-time symlinks of the
     # externals, which conda-forge often splits into -devel packages, and the CMake
     # configurations that Athena's packages look for.
@@ -114,8 +118,11 @@ requirements:
     - qt-main 5.*
     - coin3d
     - soqt
-    - libgl-devel
-    - libglu
+    # OpenGL and GLU (on macOS, the system's OpenGL framework)
+    - if: linux
+      then:
+        - libgl-devel
+        - libglu
   ignore_run_exports:
     by_name:
       - root_base

@@ -15,6 +15,11 @@ source:
     # libraries for TrkAlgebraUtils, and GSF's aligned_alloc sizes rounded up to the alignment
     # (macOS returns null otherwise)
     - 0001-libc++-and-macOS.patch
+    # Components built from their components/ sources only, linking the package's library,
+    # which has the tools: otherwise the tool classes are in both, and on macOS a ToolHandle of
+    # the concrete class in another package fails its dynamic_cast (each library keeps its own
+    # type_info). (HGTD_Calibration, ActsVertexReconstruction)
+    - 0002-components-without-their-library-sources.patch
 
 build:
   number: 0

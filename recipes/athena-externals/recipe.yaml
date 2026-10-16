@@ -16,6 +16,7 @@ source:
     - patches/0003-AtlasLCG-lcg_generate_env-with-Gaudi-from-its-CMake-config.patch
     - patches/0004-AtlasCMake-root-dictionaries-without-include-paths.patch
     - patches/0005-AtlasCMake-macOS-support-with-conda-forge.patch
+    - patches/0006-AtlasLCG-no-externals-in-DYLD_LIBRARY_PATH-on-macOS.patch
 
 build:
   number: 0

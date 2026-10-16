@@ -18,10 +18,11 @@ CMSSW.
 
 > **Status: proof of concept.** All of Athena but 30 packages builds in ten layers that pass their
 > tests on linux-aarch64, from the framework to simulation and derivations, with an `athena`
-> metapackage and a developer workflow. On linux-64 (M8) every external and all ten layers pass
-> too; on osx-arm64 (M8, in progress) every external and the layers up to sim do: `athena.py`,
-> `Reco_tf.py`, ATLAS's HLT and `Sim_tf.py` (Geant4) run on a Mac. Nothing has been submitted to
-> conda-forge yet.
+> metapackage and a developer workflow. On osx-arm64 (M8) all of it passes too: `athena.py`,
+> `Reco_tf.py`, ATLAS's HLT, `Sim_tf.py` (Geant4) and the PHYS and PHYSLITE derivations run on a
+> Mac, and a work area builds against the release. On linux-64 (M8) every external and all ten
+> layers pass; the metapackage and the developer workflow are next. Nothing has been submitted
+> to conda-forge yet.
 
 The reference release is Athena [`release/25.0.73`](https://gitlab.cern.ch/atlas/athena/-/tree/release/25.0.73).
 
@@ -99,9 +100,9 @@ The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
 | `athena-reco` (full reconstruction, `Reco_tf.py`, digitization) | [recipes/athena-reco](recipes/athena-reco) | ✅ | ✅ | ✅ |
 | `athena-trigger` (L1 simulation, High-Level Trigger) | [recipes/athena-trigger](recipes/athena-trigger) | ✅ | ✅ | ✅ |
 | `athena-sim` (Geant4 simulation, ISF, generator interfaces, `Sim_tf.py`) | [recipes/athena-sim](recipes/athena-sim) | ✅ | ✅ | ✅ |
-| `athena-rest` (the project `Athena`: derivations, data quality, event display, the rest) | [recipes/athena-rest](recipes/athena-rest) | ✅ | ✅ | · |
-| `athena` (all the layers) | [recipes/athena](recipes/athena) | ✅ | · | · |
-| `athena-devel` (compilers and externals for building Athena packages against the release) | [recipes/athena-devel](recipes/athena-devel) | ✅ | · | · |
+| `athena-rest` (the project `Athena`: derivations, data quality, event display, the rest) | [recipes/athena-rest](recipes/athena-rest) | ✅ | ✅ | ✅ |
+| `athena` (all the layers) | [recipes/athena](recipes/athena) | ✅ | · | ✅ |
+| `athena-devel` (compilers and externals for building Athena packages against the release) | [recipes/athena-devel](recipes/athena-devel) | ✅ | · | ✅ |
 | `clhep` (existing feedstock: built without `-fvisibility-inlines-hidden`, ATLAS's RandGaussZiggurat fix) | [athena-notes/feedstock-changes/clhep](athena-notes/feedstock-changes/clhep) | ✅ | ✅ | ✅ |
 
 ✅ = builds locally with rattler-build and passes the recipe tests: linux-aarch64 natively in
@@ -239,9 +240,10 @@ AthenaExternals 25.0.73 uses. Only python 3.13 is built locally.
   test file and conditions payloads).
 - **All of Athena in one package, and a developer workflow on top of it.** `athena` installs
   every layer; its environment runs `athena.py` with all ten projects set up, the top one named
-  `Athena` as in ATLAS's release. `athena-devel` adds the compilers (the gcc major the layers
-  were built with), CMake and the development packages of the externals, so that ATLAS's usual
-  work area builds against the installed release, as with `asetup` on CVMFS:
+  `Athena` as in ATLAS's release. `athena-devel` adds the compilers (the gcc or, on macOS,
+  clang major the layers were built with), CMake and the development packages of the externals,
+  so that ATLAS's usual work area builds against the installed release, as with `asetup` on
+  CVMFS:
 
   ```sh
   conda install athena-devel
@@ -549,7 +551,8 @@ so that a work area can relink it with its own changes.
     declares it `uint64` (**upstreamable**).
   - Three unit tests' references depend on libstdc++ (`std::shuffle`'s order, the text of an
     exception): the layers skip them on macOS (`unit_tests_excluded_osx.txt`).
-  - The upper layers need more of the same (reco patch 0002, trigger and sim patches 0001):
+  - The upper layers need more of the same (reco patch 0002, trigger and sim patches 0001, rest
+    patch 0002):
     `std::legendre` (libc++ has none of C++17's special mathematical functions), `finite()`,
     `sincos()`, `HOST_NAME_MAX`, `<ext/functional>`, `shared_ptr::unique()`, `<ieee754.h>`,
     includes that libstdc++ brings in implicitly, `uint64_t` taken for `unsigned long`, a vector
@@ -570,6 +573,36 @@ so that a work area can relink it with its own changes.
     `n * sizeof(T)` bytes, not a multiple of the 32-byte alignment. C requires that multiple:
     glibc does not check it, but macOS returns null, and the electron refit (`findMerges`)
     crashed on the first event. reco-tracking patch 0001 rounds the size up (**upstreamable**).
+  - Fifteen packages compile some of their library's sources into their component library as
+    well. On Linux the two copies of each class are merged when the libraries are loaded; on
+    macOS each library keeps its own type information, and a cast to one of those classes fails
+    for an object made by the other library. Three of them are used across packages:
+    DiTauRec's tools (the DAOD_PHYS derivation stopped at initialisation, "unable to dcast
+    AlgTool DiTauOnnxDiscriminantTool"), HGTD_Calibration's and ActsVertexReconstruction's
+    (Run 4 only). reco-tracking patch 0002 and reco patch 0003 build their components from
+    `src/components/` alone, linking the library, as other ATLAS packages do (**upstreamable**).
+  - ExpressionEvaluation, which the derivations' skimming and thinning expressions use, has
+    accessors for the fixed-width integer types only. `size_t` is one of them on Linux but not on
+    macOS, where `uint64_t` is `unsigned long long`, so `TauJets.nTracks` (a method that returns
+    `size_t`) could not be evaluated. Analysis patch 0004 adds `(unsigned) long` and
+    `(unsigned) long long` (**upstreamable**).
+  - OpenGL is the system's framework, and conda-forge has no OpenGL for macOS: VP1's packages
+    link `GL` by name, which athena-externals defines as `-framework OpenGL` there. It also keeps
+    CMake's FindOpenGL from taking XQuartz's libGL, which a user's machine may have.
+  - Work areas (athena-devel): athena-externals' CMake configuration gives a project without
+    rpaths of its own (a work area) its lib/ and the layers' as rpaths, and keeps CMake from
+    taking Homebrew's packages or Python framework, which a plain `cmake` call (without
+    conda-forge's `CMAKE_ARGS`) would. The environment's `lib/` must not be in
+    `DYLD_LIBRARY_PATH`: dyld then takes its libraries for system ones of the same name in every
+    process that keeps the variable (conda-forge's bash crashed on any glob), so AtlasLCG writes
+    no externals there on macOS (athena-externals patch 0006). Clang 20 has no `cxx-compiler`
+    version (1.10 is clang 18, 1.11 is 19, 2.0 is 21), and `atlas-rivet` required
+    `cxx-compiler`, so an environment with Athena could have no other clang than 18: it now
+    requires the compiler it was built with. A work area builds with the system's SDK: the
+    `math.h` of newer ones (macOS 27's) takes `INFINITY` and `NAN` from the compiler's
+    `float.h` in C++20 with `__need_infinity_nan`, which clang knows only from version 21, so
+    with clang 20 not even `<complex>` compiles; athena-externals' CMake configuration defines
+    the two macros then. Users need the 11.0 SDK in `SDKROOT` for ROOT, see above.
 - **ATLAS's scripts start with `#!/usr/bin/bash` or `#!/bin/env`** (233 in the sources), which
   neither macOS nor distributions without the merged `/usr` have: the layers rewrite them to
   `#!/usr/bin/env` before building.

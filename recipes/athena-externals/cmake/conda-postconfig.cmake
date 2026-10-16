@@ -76,6 +76,73 @@ if( APPLE AND NOT TARGET VDT::VDT )
    endif()
 endif()
 
+# On macOS, look for frameworks and app bundles after everything else, as conda-forge's builds
+# do (CMAKE_ARGS), and not in Homebrew's prefixes: in a user's work area (configured without
+# conda-forge's CMAKE_ARGS) CMake's FindPython took Homebrew's Python framework, a different
+# Python than the environment's, which the layers were built against.
+if( APPLE )
+   if( NOT DEFINED CMAKE_FIND_FRAMEWORK )
+      set( CMAKE_FIND_FRAMEWORK LAST )
+   endif()
+   if( NOT DEFINED CMAKE_FIND_APPBUNDLE )
+      set( CMAKE_FIND_APPBUNDLE LAST )
+   endif()
+   if( NOT DEFINED Python_FIND_FRAMEWORK )
+      set( Python_FIND_FRAMEWORK LAST )
+   endif()
+   list( APPEND CMAKE_SYSTEM_IGNORE_PREFIX_PATH /opt/homebrew /usr/local )
+endif()
+
+# On macOS the libraries find each other through rpaths (AtlasCMake patch 0005), which the
+# layers' builds give in CMAKE_INSTALL_RPATH. A project built on top of them without one (a
+# user's work area) gets its own lib/ first, so that what it rebuilds takes precedence, then
+# the lib/ of every installed layer and the environment's lib/.
+if( APPLE AND NOT DEFINED CMAKE_INSTALL_RPATH )
+   get_filename_component( _conda_platform "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE )
+   get_filename_component( _conda_platform "${_conda_platform}" NAME )
+   get_filename_component( _conda_athena "${CMAKE_CURRENT_LIST_DIR}/../../../../.." ABSOLUTE )
+   file( GLOB _conda_rpath "${_conda_athena}/*/*/InstallArea/${_conda_platform}/lib" )
+   set( CMAKE_INSTALL_RPATH "${CMAKE_BINARY_DIR}/${_conda_platform}/lib" ${_conda_rpath}
+      "${_conda_athena}/../../lib" )
+   unset( _conda_platform )
+   unset( _conda_athena )
+   unset( _conda_rpath )
+endif()
+
+# On macOS a user's work area builds with the system's SDK (the layers with conda-forge's). In
+# C++20 and later, the math.h of newer SDKs (macOS 27's) takes INFINITY and NAN from the
+# compiler's float.h, asking for them with __need_infinity_nan, which clang knows from version
+# 21 on: clang 20's float.h defines them only outside strict ANSI mode (not with -std=c++23), and
+# <complex> does not compile.
+if( APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND
+   CMAKE_CXX_COMPILER_VERSION VERSION_LESS 21 )
+   set( _conda_math_h "${CMAKE_OSX_SYSROOT}/usr/include/math.h" )
+   if( NOT EXISTS "${_conda_math_h}" )
+      set( _conda_math_h "${_CMAKE_OSX_SYSROOT_PATH}/usr/include/math.h" )
+   endif()
+   if( EXISTS "${_conda_math_h}" )
+      file( STRINGS "${_conda_math_h}" _conda_need_infinity_nan REGEX "__need_infinity_nan" )
+      if( _conda_need_infinity_nan )
+         add_compile_definitions( "$<$<COMPILE_LANGUAGE:CXX>:INFINITY=__builtin_inff()>"
+            "$<$<COMPILE_LANGUAGE:CXX>:NAN=__builtin_nanf(\"\")>" )
+      endif()
+   endif()
+   unset( _conda_math_h )
+   unset( _conda_need_infinity_nan )
+endif()
+
+# On macOS OpenGL is the system's framework. VP1's packages link "GL" by name, which names no
+# library there. And FindOpenGL takes an XQuartz libGL (/usr/X11R6) before the framework
+# (conda-forge's CMAKE_FIND_FRAMEWORK=LAST), which a user's machine may have and conda-forge's
+# environments do not.
+if( APPLE )
+   list( APPEND CMAKE_SYSTEM_IGNORE_PREFIX_PATH /usr/X11R6 /opt/X11 )
+   if( NOT TARGET GL )
+      add_library( GL INTERFACE IMPORTED GLOBAL )
+      set_target_properties( GL PROPERTIES INTERFACE_LINK_LIBRARIES "-framework OpenGL" )
+   endif()
+endif()
+
 # On macOS the libraries that use Python (Gaudi's, and Athena's through AtlasLCG's FindPython)
 # look its symbols up in the process instead of linking libpython: conda-forge's python has the
 # interpreter built in, and a library linking libpython would run against a second,

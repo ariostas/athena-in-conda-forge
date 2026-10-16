@@ -1495,7 +1495,81 @@ took:
   FullG4MT_QS, the hit collections within the tolerances as on Linux (36 min with 5 threads).
   rest asked for `libgl-devel` and `libglu`, which conda-forge has only for Linux: OpenGL is a
   system framework on macOS.
+- rest on macOS (rest patch 0002): `<span>`, `<charconv>` and `mkstemps`' `<unistd.h>` that
+  libstdc++ and glibc bring in implicitly, `std::views::chunk` (not in libc++ 20: PileUpMT
+  iterates over spans), a `std::vector` of C arrays (LArSamplesMon), and `vector::assign` from
+  `CaloClusterCellLink`'s iterator, which libc++'s `assign` does not take (CaloD3PDMaker).
+  VP1's 14 system libraries link "GL" by name, which names nothing on macOS, and FindOpenGL
+  (CMake 4) takes XQuartz's `/usr/X11R6/lib/libGL.dylib` before the framework where XQuartz is
+  installed (this Mac, not conda-forge's CI), with conda-forge's `CMAKE_FIND_FRAMEWORK=LAST`.
+  athena-externals' `conda-postconfig.cmake` defines a `GL` target for the OpenGL framework and
+  ignores the XQuartz prefixes on macOS.
+- rest then built, but its derivation stopped in initialize: "unable to dcast AlgTool
+  DiTauOnnxDiscriminantTool to interface DiTauOnnxDiscriminantTool". DiTauRec compiles its
+  sources into both its component and DiTauRecLib, so the tool class (with its type_info) is in
+  both. ELF's symbol interposition makes the two one on Linux; on macOS each library keeps its
+  own, the component makes the tool, and DerivationFrameworkTau's `ToolHandle` of the concrete
+  class casts with DiTauRecLib's. 15 packages compile sources into both; in three, another
+  package holds a `ToolHandle`, `ServiceHandle` or `dynamic_cast` of such a class (a scan of
+  the CMakeLists and of the sources): DiTauRec, HGTD_Calibration and
+  ActsVertexReconstruction (the last two Run 4 only). Their components are now built from
+  `src/components/` only and link the library (reco-tracking patch 0002, reco patch 0003;
+  **upstreamable**). Only those component libraries change, so trigger and sim are not rebuilt.
+- rest's derivation then ran events, and stopped in the PHYS skimming: "MultipleProxyLoader:
+  unable to find valid proxy loader for TauJets.nTracks". ExpressionEvaluation's
+  `MethodAccessorFactory` keys its accessors on ROOT's name for a method's return type and
+  registers the `<cstdint>` types only. `TauJet::nTracks()` returns `size_t`, which ROOT names
+  `unsigned long`; on Linux that is `uint64_t`, on macOS `uint64_t` is `unsigned long long`
+  (`ULong64_t`). Analysis patch 0004 also registers `(unsigned) long` and `(unsigned) long long`
+  (the map keeps the first of duplicate keys, so nothing changes on Linux), and the same for
+  the aux-variable accessors (`unsigned long long`, `long long`). Only the ExpressionEvaluation
+  library changes.
+- athena-devel on macOS, tried in rest's test environment (with the dev packages and clang 20
+  added) with the recipe's devloop test, before the stack's rebuild:
+  - conda-forge has no `cxx-compiler` for clang 20 (1.10 is 18, 1.11 is 19, 2.0 is 21), and
+    `atlas-rivet` ran-required `cxx-compiler`: every environment with Athena got clang 18, and
+    clang 20 removed athena-sim and athena-rest. atlas-rivet now requires the compiler it was
+    built with (`${cxx_compiler}_${target_platform} ${cxx_compiler_version}.*`); athena-devel
+    takes `${c_compiler}`/`${cxx_compiler}` the same way, and `macosx_deployment_target` 13.3
+    (its activation sets `MACOSX_DEPLOYMENT_TARGET`).
+  - The work area's CMake took Homebrew's Python 3.14 framework (`/opt/homebrew` is in CMake's
+    system prefixes, and frameworks come first without conda-forge's `CMAKE_ARGS`), and its
+    python byte-compilation failed. `conda-postconfig.cmake` sets `CMAKE_FIND_FRAMEWORK`,
+    `CMAKE_FIND_APPBUNDLE` and `Python_FIND_FRAMEWORK` to LAST unless given, and ignores
+    `/opt/homebrew` and `/usr/local`.
+  - The work area's libraries had no rpaths to the layers: AtlasCMake (patch 0005) sets them only
+    from `CMAKE_INSTALL_RPATH`, which the layers' builds pass. `conda-postconfig.cmake` defaults
+    it, for a project that does not give it, to its own `<platform>/lib` (first, so that what a
+    work area rebuilds takes precedence), every installed layer's lib/ and the prefix's lib/.
+  - Then conda-forge's bash crashed (SIGSEGV) on `source build/*/setup.sh`, on any glob in fact,
+    with the layers set up: their `env_setup.sh` (AtlasLCG's `lcg_generate_env`) put the
+    externals' library directories, i.e. the prefix's lib/ (and, from one external, the build
+    machine's SDK `System/Library/Frameworks`), in `DYLD_LIBRARY_PATH`. dyld then loads the
+    prefix's libiconv, libsqlite3, libcompression, ... for the system's in every process that
+    keeps the variable (not SIP-protected binaries such as conda's bash and python). The rpaths
+    cover the externals, so athena-externals patch 0006 writes no `DYLD_LIBRARY_PATH` there. It
+    is in AtlasLCG, which every layer copies, so the macOS stack is rebuilt (overnight, 8 jobs).
+  - With these (the `env_setup.sh` files edited by hand), the devloop passed: the work area
+    built and `athena.py` printed the changed HelloWorld message.
+- The macOS stack rebuilt overnight with all of this (8 jobs, 18:09 to 00:57: externals,
+  atlas-rivet and the eleven layers): every layer passed its tests, rest's derivation
+  included (DAOD_PHYS and DAOD_PHYSLITE with the collections of ATLAS's release; no macOS
+  references, so compared in size only), and the `athena` metapackage's HelloWorld.
+- athena-devel's test then failed in the work area's first compilation: `<complex>` saw no
+  `INFINITY` or `NAN`. Outside rattler-build's `CMAKE_ARGS`, CMake takes Xcode's SDK (here
+  macOS 27's), not the 11.0 SDK the layers build with. That `math.h`, in C++20 and later
+  (`__has_feature(modules)` is true there), leaves both macros to the compiler's `float.h`,
+  asking with `__need_infinity_nan`, which clang's `float.h` handles from version 21 on; clang
+  20's defines them only outside strict ANSI mode (C23 or GNU modes), and ATLAS compiles with
+  `-std=c++23`. `conda-postconfig.cmake` defines `INFINITY` and `NAN` for C++ when the compiler
+  is clang < 21 and the SDK's `math.h` mentions `__need_infinity_nan` (never for the layers'
+  builds). With it the devloop passed in the failed test environment (macOS 27 SDK). This
+  hits every C++20 build with conda-forge's clang 20 and a current SDK: to report to
+  conda-forge.
+- athena-externals and athena-devel rebuilt with it: athena-devel's test passes. **osx-arm64 is
+  done**: every recipe builds and passes its tests.
 
-**To do**: the remaining layers on both platforms; the linux-aarch64 stack was built before
-these changes (they change Linux code too: tdaq-common's portable fixes, athena-core's
-patches), so it is to be rebuilt; report the libc++ and ROOT SDK issues to conda-forge.
+**To do**: rebuild the linux-64 and linux-aarch64 stacks with the patches of the macOS work
+(they change Linux code too), then build and test `athena` and `athena-devel` on linux-64;
+report the libc++, ROOT SDK, `cxx-compiler` and `float.h` issues to conda-forge, and the
+upstreamable fixes to ATLAS.

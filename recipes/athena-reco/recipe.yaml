@@ -21,6 +21,11 @@ source:
     # base class (macOS's linker does not export the clone() that CLHEP's GenericFunctions define
     # inline in its .cc files)
     - 0002-libc++-and-macOS.patch
+    # Components built from their components/ sources only, linking the package's library,
+    # which has the tools: otherwise the tool classes are in both, and on macOS a ToolHandle of
+    # the concrete class in another package fails its dynamic_cast (each library keeps its own
+    # type_info). (DiTauRec)
+    - 0003-components-without-their-library-sources.patch
 
 build:
   number: 0

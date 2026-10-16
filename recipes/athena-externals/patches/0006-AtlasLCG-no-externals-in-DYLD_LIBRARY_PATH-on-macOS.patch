@@ -1,0 +1,30 @@
+AtlasLCG: no externals in DYLD_LIBRARY_PATH on macOS. The binaries find them through their
+rpaths, and with conda-forge's lib/ in DYLD_LIBRARY_PATH dyld takes its libraries for system
+ones of the same name in every process that keeps the variable (conda-forge's bash crashed on
+any glob in an environment with Athena set up).
+
+diff --git a/Build/AtlasLCG/modules/LCGFunctions.cmake b/Build/AtlasLCG/modules/LCGFunctions.cmake
+index 76f1bd5..a83aa9e 100644
+--- a/Build/AtlasLCG/modules/LCGFunctions.cmake
++++ b/Build/AtlasLCG/modules/LCGFunctions.cmake
+@@ -929,15 +929,11 @@ function( lcg_generate_env )
+             "\${LD_LIBRARY_PATH}\n"
+             "fi\n" )
+       endif()
+-      if( APPLE AND NOT "${_library_paths_written}" STREQUAL "" )
+-         file( APPEND ${ARG_SH_FILE}.in
+-            "if [ -z \"\${DYLD_LIBRARY_PATH}\" ]; then\n"
+-            "   export DYLD_LIBRARY_PATH=${_library_paths_written}\n"
+-            "else\n"
+-            "   export DYLD_LIBRARY_PATH=${_library_paths_written}:"
+-            "\${DYLD_LIBRARY_PATH}\n"
+-            "fi\n" )
+-      endif()
++      # No DYLD_LIBRARY_PATH on macOS: the binaries find the externals through
++      # their rpaths, and with conda-forge's lib/ in DYLD_LIBRARY_PATH dyld takes
++      # its libraries for system ones of the same name (libiconv, libsqlite3, ...)
++      # in every process that keeps the variable (conda-forge's bash crashed on
++      # any glob).
+       if( NOT "${_include_paths_written}" STREQUAL "" )
+          file( APPEND ${ARG_SH_FILE}.in
+             "if [ -z \"\${ROOT_INCLUDE_PATH}\" ]; then\n"

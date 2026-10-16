@@ -1,0 +1,31 @@
+diff --git a/PhysicsAnalysis/CommonTools/ExpressionEvaluation/src/MethodAccessor.h b/PhysicsAnalysis/CommonTools/ExpressionEvaluation/src/MethodAccessor.h
+index 96a6c9e8..1c2770a5 100644
+--- a/PhysicsAnalysis/CommonTools/ExpressionEvaluation/src/MethodAccessor.h
++++ b/PhysicsAnalysis/CommonTools/ExpressionEvaluation/src/MethodAccessor.h
+@@ -238,6 +238,12 @@ namespace ExpressionParsing {
+          m_kits.insert(keyAndIntMethodKit<std::uint16_t>());
+          m_kits.insert(keyAndIntMethodKit<std::uint32_t>());
+          m_kits.insert(keyAndIntMethodKit<std::uint64_t>());
++         // size_t and friends: on macOS (std::u)int64_t is (unsigned) long long, and ROOT
++         // names (unsigned) long differently. Kits already there are not replaced.
++         m_kits.insert(keyAndIntMethodKit<long>());
++         m_kits.insert(keyAndIntMethodKit<unsigned long>());
++         m_kits.insert(keyAndIntMethodKit<long long>());
++         m_kits.insert(keyAndIntMethodKit<unsigned long long>());
+          m_kits.insert(keyAndDoubleMethodKit<double>());
+          m_kits.insert(keyAndDoubleMethodKit<float>());
+       }
+diff --git a/PhysicsAnalysis/CommonTools/ExpressionEvaluation/src/xAODAccessor.h b/PhysicsAnalysis/CommonTools/ExpressionEvaluation/src/xAODAccessor.h
+index 34525201..6915dc31 100644
+--- a/PhysicsAnalysis/CommonTools/ExpressionEvaluation/src/xAODAccessor.h
++++ b/PhysicsAnalysis/CommonTools/ExpressionEvaluation/src/xAODAccessor.h
+@@ -191,6 +191,9 @@ namespace ExpressionParsing {
+          m_kits.insert( std::make_pair(typeid(short).hash_code(),          std::make_unique<AccessorKit<short,IProxyLoader::VT_VECINT> >()));
+          m_kits.insert( std::make_pair(typeid(int).hash_code(),            std::make_unique<AccessorKit<int,IProxyLoader::VT_VECINT> >()));
+          m_kits.insert( std::make_pair(typeid(long).hash_code(),           std::make_unique<AccessorKit<long,IProxyLoader::VT_VECINT> >()));          // @TODO might get cropped if int interface is used
++         // on macOS (std::u)int64_t is (unsigned) long long
++         m_kits.insert( std::make_pair(typeid(unsigned long long).hash_code(), std::make_unique<AccessorKit<unsigned long long,IProxyLoader::VT_VECINT> >()));
++         m_kits.insert( std::make_pair(typeid(long long).hash_code(),      std::make_unique<AccessorKit<long long,IProxyLoader::VT_VECINT> >()));
+       }
+ 
+       /** create an accessor for the specified content of an AuxElement.*/
