@@ -1568,8 +1568,13 @@ took:
   conda-forge.
 - athena-externals and athena-devel rebuilt with it: athena-devel's test passes. **osx-arm64 is
   done**: every recipe builds and passes its tests.
+- linux-64 rebuilt with all of it (`/work/chain6.sh` in athena-dev-amd64: every external and
+  layer with its recipe tests, then the metapackage and athena-devel; 05:12 to 01:10 UTC under
+  Rosetta, 5 to 10 jobs): everything passes. The layers' dumps match their linux-64 references
+  (reco's ESD and AOD, rest's DAOD_PHYS and DAOD_PHYSLITE), so the macOS patches change nothing
+  there; `athena` runs HelloWorld and athena-devel's work area builds and runs. **linux-64 is
+  done.**
 
-**To do**: rebuild the linux-64 and linux-aarch64 stacks with the patches of the macOS work
-(they change Linux code too), then build and test `athena` and `athena-devel` on linux-64;
-report the libc++, ROOT SDK, `cxx-compiler` and `float.h` issues to conda-forge, and the
-upstreamable fixes to ATLAS.
+**To do**: rebuild the linux-aarch64 stack with the patches of the macOS work (they change
+Linux code too); report the libc++, ROOT SDK, `cxx-compiler` and `float.h` issues to
+conda-forge, and the upstreamable fixes to ATLAS.

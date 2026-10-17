@@ -18,11 +18,10 @@ CMSSW.
 
 > **Status: proof of concept.** All of Athena but 30 packages builds in ten layers that pass their
 > tests on linux-aarch64, from the framework to simulation and derivations, with an `athena`
-> metapackage and a developer workflow. On osx-arm64 (M8) all of it passes too: `athena.py`,
-> `Reco_tf.py`, ATLAS's HLT, `Sim_tf.py` (Geant4) and the PHYS and PHYSLITE derivations run on a
-> Mac, and a work area builds against the release. On linux-64 (M8) every external and all ten
-> layers pass; the metapackage and the developer workflow are next. Nothing has been submitted
-> to conda-forge yet.
+> metapackage and a developer workflow. On linux-64 and osx-arm64 (M8) all of it passes too:
+> `athena.py`, `Reco_tf.py`, ATLAS's HLT, `Sim_tf.py` (Geant4) and the PHYS and PHYSLITE
+> derivations run on a Mac, and a work area builds against the release. Nothing has been
+> submitted to conda-forge yet.
 
 The reference release is Athena [`release/25.0.73`](https://gitlab.cern.ch/atlas/athena/-/tree/release/25.0.73).
 
@@ -101,8 +100,8 @@ The full analysis, the decisions and a progress log are in [PLAN.md](PLAN.md).
 | `athena-trigger` (L1 simulation, High-Level Trigger) | [recipes/athena-trigger](recipes/athena-trigger) | ✅ | ✅ | ✅ |
 | `athena-sim` (Geant4 simulation, ISF, generator interfaces, `Sim_tf.py`) | [recipes/athena-sim](recipes/athena-sim) | ✅ | ✅ | ✅ |
 | `athena-rest` (the project `Athena`: derivations, data quality, event display, the rest) | [recipes/athena-rest](recipes/athena-rest) | ✅ | ✅ | ✅ |
-| `athena` (all the layers) | [recipes/athena](recipes/athena) | ✅ | · | ✅ |
-| `athena-devel` (compilers and externals for building Athena packages against the release) | [recipes/athena-devel](recipes/athena-devel) | ✅ | · | ✅ |
+| `athena` (all the layers) | [recipes/athena](recipes/athena) | ✅ | ✅ | ✅ |
+| `athena-devel` (compilers and externals for building Athena packages against the release) | [recipes/athena-devel](recipes/athena-devel) | ✅ | ✅ | ✅ |
 | `clhep` (existing feedstock: built without `-fvisibility-inlines-hidden`, ATLAS's RandGaussZiggurat fix) | [athena-notes/feedstock-changes/clhep](athena-notes/feedstock-changes/clhep) | ✅ | ✅ | ✅ |
 
 ✅ = builds locally with rattler-build and passes the recipe tests: linux-aarch64 natively in
