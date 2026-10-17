@@ -1575,6 +1575,11 @@ took:
   there; `athena` runs HelloWorld and athena-devel's work area builds and runs. **linux-64 is
   done.**
 
-**To do**: rebuild the linux-aarch64 stack with the patches of the macOS work (they change
-Linux code too); report the libc++, ROOT SDK, `cxx-compiler` and `float.h` issues to
+- linux-aarch64 rebuilt the same way (`/work/chain6.sh` in athena-dev; 01:15 to 11:45 UTC, 10
+  jobs, then 7): everything passes, the dumps match the linux-aarch64 references. At 10 jobs
+  reco-tracking reached 88% of the Docker VM's 23.4 GB (ACTS-heavy sources take 2.6 GB each
+  to compile), with no OOM kill; 7 jobs is the safe maximum for the heavy layers. **M8 is
+  done**: every recipe builds and passes its tests on linux-64, linux-aarch64 and osx-arm64.
+
+**To do**: report the libc++, ROOT SDK, `cxx-compiler` and `float.h` issues to
 conda-forge, and the upstreamable fixes to ATLAS.
